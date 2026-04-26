@@ -20,8 +20,8 @@
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
         .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 15px; }
-        .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 15px; }
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; position: relative; }
         .plan-type { display: inline-block; background: #e9f0ff; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: bold; color: #1e3c72; margin-bottom: 12px; }
         .amount { font-size: 1.8rem; font-weight: bold; margin: 10px 0; }
         .progress-bar { background: #e9ecef; border-radius: 20px; height: 8px; margin: 15px 0; overflow: hidden; }
@@ -40,8 +40,14 @@
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
-        #modal > div { background: white; max-width: 500px; width: 90%; border-radius: 24px; padding: 20px; pointer-events: auto; }
+        #modal > div { background: white; max-width: 650px; width: 90%; border-radius: 24px; padding: 20px; pointer-events: auto; max-height: 80vh; overflow-y: auto; }
         .pending-badge { background: #fff3cd; color: #856404; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-top: 8px; }
+        .request-badge { background: #ffe0b3; color: #b45f06; border-radius: 20px; padding: 4px 10px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-left: 8px; }
+        .history-list { list-style: none; padding-left: 0; }
+        .history-list li { border-bottom: 1px solid #eee; padding: 8px 0; }
+        .status-pending { color: #e67e22; font-weight: bold; }
+        .status-approved { color: #27ae60; }
+        h4 { margin: 16px 0 8px 0; color: #2c3e50; }
     </style>
 </head>
 <body>
@@ -73,7 +79,7 @@
             <div id="authMessage" class="alert hidden"></div>
         </div>
 
-        <!-- USER DASHBOARD (full features) -->
+        <!-- USER DASHBOARD -->
         <div id="dashboardSection" class="hidden">
             <div class="info-banner" id="permWarning" style="display:none;">⚠️ Firestore permission error – update rules.</div>
             <div class="section">
@@ -101,8 +107,8 @@
         <h3 id="modalTitle"></h3>
         <div id="modalBody"></div>
         <div class="flex-btns" style="margin-top:20px;">
-            <button class="btn btn-outline" id="closeModalBtn">Cancel</button>
-            <button class="btn btn-primary" id="modalConfirmBtn">Confirm</button>
+            <button class="btn btn-outline" id="closeModalBtn">Close</button>
+            <button class="btn btn-primary" id="modalConfirmBtn" style="display:none;">Confirm</button>
         </div>
     </div>
 </div>
@@ -136,7 +142,6 @@
     const logoutBtn = document.getElementById('logoutBtn');
     const plansList = document.getElementById('plansList');
     const groupsList = document.getElementById('groupsList');
-    const permWarning = document.getElementById('permWarning');
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
@@ -149,18 +154,24 @@
 
     function getGreeting() { const h = new Date().getHours(); if (h<12) return "Good morning"; if (h<18) return "Good afternoon"; return "Good evening"; }
 
-    function showModal(title, bodyHtml, confirmText = "Confirm") {
-        if (!title || !bodyHtml) return Promise.resolve(false);
+    function showModal(title, bodyHtml, showConfirm = false, confirmText = "Confirm") {
         return new Promise((resolve) => {
             modalTitle.innerText = title;
             modalBody.innerHTML = bodyHtml;
-            confirmModalBtn.innerText = confirmText;
+            if (showConfirm) {
+                confirmModalBtn.style.display = 'inline-block';
+                confirmModalBtn.innerText = confirmText;
+            } else {
+                confirmModalBtn.style.display = 'none';
+            }
             modal.classList.remove('hidden');
             modalResolve = resolve;
-            setTimeout(() => { const inp = modalBody.querySelector('input'); if(inp) inp.focus(); }, 50);
         });
     }
-    function closeModal() { modal.classList.add('hidden'); if(modalResolve) { modalResolve(false); modalResolve = null; } }
+    function closeModal() { 
+        modal.classList.add('hidden'); 
+        if(modalResolve) { modalResolve(false); modalResolve = null; } 
+    }
     confirmModalBtn.onclick = () => { if(modalResolve) { modalResolve(true); modalResolve = null; } closeModal(); };
     closeModalBtn.onclick = closeModal;
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
@@ -169,7 +180,16 @@
     function showMessage(text, isError = true) { authMsg.innerText = text; authMsg.classList.remove('hidden'); setTimeout(() => authMsg.classList.add('hidden'), 5000); }
     function handleFirestoreError(err) { console.error(err); showMessage(err.message); }
 
-    // ========== 1. SAVINGS PLANS (Deposit & Withdrawal REQUESTS require admin approval) ==========
+    // Helper: fetch pending request counts for a plan
+    async function getPendingCounts(planId) {
+        try {
+            const depPending = await getDocs(query(collection(db, "deposit_requests"), where("planId", "==", planId), where("status", "==", "pending")));
+            const wdPending = await getDocs(query(collection(db, "withdrawal_requests"), where("planId", "==", planId), where("status", "==", "pending")));
+            return { deposits: depPending.size, withdrawals: wdPending.size };
+        } catch(e) { return { deposits: 0, withdrawals: 0 }; }
+    }
+
+    // Render savings plans with clear textual buttons
     async function renderUserPlans() {
         if (!currentUser) return;
         try {
@@ -179,18 +199,34 @@
             let html = '';
             for (const docSnap of snap.docs) {
                 const p = { id: docSnap.id, ...docSnap.data() };
+                const pendingCounts = await getPendingCounts(p.id);
+                let pendingText = '';
+                if (pendingCounts.withdrawals > 0) pendingText += `<span class="request-badge">⏳ ${pendingCounts.withdrawals} pending withdrawal request(s)</span>`;
+                if (pendingCounts.deposits > 0) pendingText += `<span class="request-badge">💰 ${pendingCounts.deposits} pending deposit request(s)</span>`;
+                
                 let progress = p.type === 'target' ? `<div class="progress-bar"><div class="progress-fill" style="width:${(p.balance/p.targetAmount)*100}%"></div></div><div>₦${p.balance.toFixed(2)} / ₦${p.targetAmount.toFixed(2)} (${((p.balance/p.targetAmount)*100).toFixed(1)}%)</div>` : `<div class="amount">₦${p.balance.toFixed(2)}</div>`;
                 let extra = (p.type === 'locked') ? `<div>🔓 Available after: ${new Date(p.lockUntil).toLocaleDateString()}</div>` : (p.type === 'target' ? `<div>🎯 Target date: ${new Date(p.targetDate).toLocaleDateString()}</div>` : '');
-                html += `<div class="card"><div class="plan-type">${p.type.toUpperCase()}</div>${progress}${extra}<div class="flex-btns"><button class="btn btn-sm btn-primary" data-plan="${p.id}" data-action="deposit">💰 Request Deposit</button><button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw">📤 Request Withdrawal</button><button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history">📜 History</button></div><div class="pending-badge">⏳ All deposits & withdrawals need admin approval</div></div>`;
+                html += `<div class="card">
+                            <div class="plan-type">${p.type.toUpperCase()} PLAN</div>
+                            ${progress}
+                            ${extra}
+                            <div class="flex-btns">
+                                <button class="btn btn-sm btn-primary" data-plan="${p.id}" data-action="deposit">Request Deposit</button>
+                                <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw" style="background:#f8f9fa; color:#333; border:1px solid #ccc;">Request Withdrawal</button>
+                                <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history" style="background:#eef2f7;">View History & Requests</button>
+                            </div>
+                            <div>${pendingText}</div>
+                            <div class="pending-badge">⏳ Note: All deposits and withdrawals require admin approval.</div>
+                        </div>`;
             }
             plansList.innerHTML = html;
             document.querySelectorAll('[data-action="deposit"]').forEach(btn => btn.onclick = () => createDepositRequest(btn.dataset.plan));
             document.querySelectorAll('[data-action="withdraw"]').forEach(btn => btn.onclick = () => createWithdrawalRequest(btn.dataset.plan));
-            document.querySelectorAll('[data-action="history"]').forEach(btn => btn.onclick = () => viewPlanHistory(btn.dataset.plan));
+            document.querySelectorAll('[data-action="history"]').forEach(btn => btn.onclick = () => viewFullHistory(btn.dataset.plan));
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // DEPOSIT REQUEST (admin approval needed)
+    // Deposit request (admin approval)
     async function createDepositRequest(planId) {
         const amount = parseFloat(prompt("Enter deposit amount (₦):"));
         if (isNaN(amount) || amount <= 0) return showMessage("Invalid amount");
@@ -206,28 +242,29 @@
                 requestDate: new Date().toISOString(),
                 planType: planSnap.data().type
             });
-            showMessage(`💰 Deposit request of ₦${amount.toFixed(2)} submitted. Awaiting admin approval.`, false);
+            showMessage(`Deposit request of ₦${amount.toFixed(2)} submitted. Awaiting admin approval.`, false);
+            renderUserPlans();
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // WITHDRAWAL REQUEST for ALL plan types (requires admin approval)
+    // Withdrawal request (admin approval required for ALL plans)
     async function createWithdrawalRequest(planId) {
         try {
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showMessage("Not your plan");
             const plan = planSnap.data();
-            const amount = parseFloat(prompt(`Enter withdrawal request amount (₦): Max ₦${plan.balance.toFixed(2)}`));
+            const amount = parseFloat(prompt(`Enter withdrawal request amount (₦): Maximum ₦${plan.balance.toFixed(2)}`));
             if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showMessage("Invalid amount or exceeds balance.");
             
-            // For locked plan, show additional warning but still allow request
+            // warnings for locked/target but still allow request
             if (plan.type === 'locked') {
                 const lockDate = new Date(plan.lockUntil);
                 if (new Date() < lockDate) {
-                    if (!confirm(`⚠️ This plan is locked until ${lockDate.toLocaleDateString()}. Withdrawal request will still be sent to admin for review. Continue?`)) return;
+                    if (!confirm(`This plan is locked until ${lockDate.toLocaleDateString()}. The withdrawal request will be sent to admin for review. Continue?`)) return;
                 }
             } else if (plan.type === 'target') {
-                if (!confirm(`Target plan withdrawal requires admin review. Continue with request?`)) return;
+                if (!confirm(`This is a target savings plan. Withdrawal requests require admin approval. Continue?`)) return;
             }
             
             await addDoc(collection(db, "withdrawal_requests"), {
@@ -239,40 +276,88 @@
                 requestedAt: new Date().toISOString(),
                 userName: currentUser.email
             });
-            showMessage(`📤 Withdrawal request of ₦${amount.toFixed(2)} submitted. Admin will approve and process.`, false);
+            showMessage(`Withdrawal request of ₦${amount.toFixed(2)} submitted. Admin will review and process.`, false);
+            renderUserPlans();
         } catch(err) { handleFirestoreError(err); }
     }
 
-    async function viewPlanHistory(planId) {
+    // Full history: confirmed transactions + pending deposit/withdrawal requests (fully spelled out)
+    async function viewFullHistory(planId) {
         try {
             // Confirmed transactions
             const txQuery = query(collection(db, "transactions"), where("planId", "==", planId));
             const txSnap = await getDocs(txQuery);
-            let list = "<strong>✅ Confirmed transactions:</strong><ul>";
-            txSnap.forEach(d => { const t = d.data(); list += `<li>${new Date(t.date).toLocaleString()} - ${t.type}: ₦${t.amount.toFixed(2)}</li>`; });
-            list += "</ul>";
+            
             // Pending deposit requests
             const depReqQuery = query(collection(db, "deposit_requests"), where("planId", "==", planId), where("status", "==", "pending"));
             const depReqSnap = await getDocs(depReqQuery);
-            if (!depReqSnap.empty) {
-                list += "<strong>⏳ Pending deposit requests:</strong><ul>";
-                depReqSnap.forEach(d => { const r = d.data(); list += `<li>₦${r.amount} requested on ${new Date(r.requestDate).toLocaleString()}</li>`; });
-                list += "</ul>";
-            }
+            
             // Pending withdrawal requests
             const wdReqQuery = query(collection(db, "withdrawal_requests"), where("planId", "==", planId), where("status", "==", "pending"));
             const wdReqSnap = await getDocs(wdReqQuery);
-            if (!wdReqSnap.empty) {
-                list += "<strong>⏳ Pending withdrawal requests:</strong><ul>";
-                wdReqSnap.forEach(d => { const r = d.data(); list += `<li>₦${r.amount} requested on ${new Date(r.requestedAt).toLocaleString()}</li>`; });
-                list += "</ul>";
-            }
-            if (txSnap.empty && depReqSnap.empty && wdReqSnap.empty) list = "<p>No transactions or pending requests.</p>";
-            showModal("Transaction & Request History", list, "Close");
+            
+            // Approved/processed withdrawal requests (already deducted)
+            const approvedWdQuery = query(collection(db, "withdrawal_requests"), where("planId", "==", planId), where("status", "==", "approved"));
+            const approvedWdSnap = await getDocs(approvedWdQuery);
+            
+            // Also show any rejected requests for transparency
+            const rejectedWdQuery = query(collection(db, "withdrawal_requests"), where("planId", "==", planId), where("status", "==", "rejected"));
+            const rejectedWdSnap = await getDocs(rejectedWdQuery);
+            
+            let html = `<div style="max-height: 60vh; overflow-y: auto;">`;
+            
+            // Confirmed transactions
+            html += `<h4>✅ Confirmed Transactions</h4><ul class="history-list">`;
+            if (txSnap.empty) html += `<li>No confirmed transactions yet.</li>`;
+            txSnap.forEach(d => { 
+                const t = d.data(); 
+                const typeLabel = t.type === 'deposit' ? 'Deposit' : (t.type === 'withdrawal' ? 'Withdrawal' : t.type);
+                html += `<li><strong>${new Date(t.date).toLocaleString()}</strong> — ${typeLabel}: ₦${t.amount.toFixed(2)}</li>`;
+            });
+            html += `</ul>`;
+            
+            // Pending deposit requests
+            html += `<h4>⏳ Pending Deposit Requests (awaiting admin approval)</h4><ul class="history-list">`;
+            if (depReqSnap.empty) html += `<li>No pending deposit requests.</li>`;
+            depReqSnap.forEach(d => { 
+                const r = d.data(); 
+                html += `<li><strong>${new Date(r.requestDate).toLocaleString()}</strong> — Requested deposit: ₦${r.amount} <span class="status-pending">(pending approval)</span></li>`;
+            });
+            html += `</ul>`;
+            
+            // Pending withdrawal requests
+            html += `<h4>⏳ Pending Withdrawal Requests (awaiting admin approval)</h4><ul class="history-list">`;
+            if (wdReqSnap.empty) html += `<li>No pending withdrawal requests.</li>`;
+            wdReqSnap.forEach(d => { 
+                const r = d.data(); 
+                html += `<li><strong>${new Date(r.requestedAt).toLocaleString()}</strong> — Requested withdrawal: ₦${r.amount} <span class="status-pending">(pending approval)</span></li>`;
+            });
+            html += `</ul>`;
+            
+            // Approved withdrawal requests (processed)
+            html += `<h4>✅ Processed Withdrawals (approved by admin)</h4><ul class="history-list">`;
+            if (approvedWdSnap.empty) html += `<li>No processed withdrawals.</li>`;
+            approvedWdSnap.forEach(d => { 
+                const r = d.data(); 
+                html += `<li><strong>${new Date(r.requestedAt).toLocaleString()}</strong> — Withdrawal of ₦${r.amount} was approved and completed.</li>`;
+            });
+            html += `</ul>`;
+            
+            // Rejected withdrawal requests
+            html += `<h4>❌ Rejected Withdrawal Requests</h4><ul class="history-list">`;
+            if (rejectedWdSnap.empty) html += `<li>No rejected requests.</li>`;
+            rejectedWdSnap.forEach(d => { 
+                const r = d.data(); 
+                html += `<li><strong>${new Date(r.requestedAt).toLocaleString()}</strong> — Withdrawal request for ₦${r.amount} was rejected by admin.</li>`;
+            });
+            html += `</ul>`;
+            
+            html += `</div>`;
+            showModal("Transaction and Request History", html, false);
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // ========== 2. CREATE PLANS (initial deposit as request) ==========
+    // Create plan with initial deposit as request
     async function createPlanWithInitialDeposit(planData, initialDepositAmt) {
         try {
             const planRef = await addDoc(collection(db, "savings_plans"), { ...planData, balance: 0, createdAt: new Date().toISOString() });
@@ -285,7 +370,7 @@
                     requestDate: new Date().toISOString(),
                     planType: planData.type
                 });
-                showMessage(`✅ Plan created! Initial deposit of ₦${initialDepositAmt} requires admin approval.`, false);
+                showMessage(`Plan created! Initial deposit of ₦${initialDepositAmt} requires admin approval.`, false);
             } else {
                 showMessage(`Plan created successfully.`, false);
             }
@@ -294,41 +379,44 @@
     }
 
     document.getElementById('createFlexBtn')?.addEventListener('click', () => {
-        showModal("Flexible Plan", `<div class="form-group"><label>Initial deposit (₦) - will be approved by admin</label><input type="number" id="flexDeposit" value="0" step="100"></div>`, "Create Plan")
+        showModal("Create Flexible Plan", `<div class="form-group"><label>Initial deposit (₦) - will be approved by admin</label><input type="number" id="flexDeposit" value="0" step="100"></div>`, true, "Create Plan")
         .then(async ok => {
             if(ok && currentUser) {
                 let amt = parseFloat(document.getElementById('flexDeposit')?.value) || 0;
                 if (amt < 0) amt = 0;
                 await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "flex" }, amt);
             }
+            closeModal();
         });
     });
     document.getElementById('createLockedBtn')?.addEventListener('click', () => {
-        showModal("Locked Plan", `<div class="form-group"><label>Initial deposit (₦) - pending approval</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, "Create")
+        showModal("Create Locked Plan", `<div class="form-group"><label>Initial deposit (₦) - pending approval</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, true, "Create")
         .then(async ok => {
             if(ok && currentUser) {
                 let amt = parseFloat(document.getElementById('lockAmount')?.value) || 0;
                 let until = document.getElementById('lockUntil')?.value;
-                if(!until) { showMessage("Lock until date required"); return; }
+                if(!until) { showMessage("Lock until date required"); closeModal(); return; }
                 await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "locked", lockUntil: until }, amt);
             }
+            closeModal();
         });
     });
     document.getElementById('createTargetBtn')?.addEventListener('click', () => {
-        showModal("Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦) - pending approval</label><input type="number" id="targetDeposit" value="0"></div>`, "Create")
+        showModal("Create Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦) - pending approval</label><input type="number" id="targetDeposit" value="0"></div>`, true, "Create")
         .then(async ok => {
             if(ok && currentUser) {
                 let target = parseFloat(document.getElementById('targetAmount')?.value);
                 let date = document.getElementById('targetDate')?.value;
                 let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0;
-                if(!target || !date) { showMessage("Target amount & date required"); return; }
-                if (target <=0) { showMessage("Target amount must be >0"); return; }
+                if(!target || !date) { showMessage("Target amount & date required"); closeModal(); return; }
+                if (target <=0) { showMessage("Target amount must be >0"); closeModal(); return; }
                 await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit);
             }
+            closeModal();
         });
     });
 
-    // ========== 3. THRIFT GROUPS: ONLY JOIN EXISTING GROUPS (admin created) ==========
+    // Thrift groups (unchanged, users only join existing groups)
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
@@ -348,9 +436,9 @@
                 } else {
                     btns = `<button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="join">Join Group</button>`;
                 }
-                html += `<div class="card"><div class="plan-type">📌 ${g.name}</div><div>💰 Contribution: ₦${g.contributionAmount} every ${g.frequencyDays} days</div><div>👥 Members: ${count}/${g.maxMembers}</div><div>🔄 Next payout index: ${g.currentPayoutIndex || 0}</div>${btns}</div>`;
+                html += `<div class="card"><div class="plan-type">Group: ${g.name}</div><div>💰 Contribution: ₦${g.contributionAmount} every ${g.frequencyDays} days</div><div>👥 Members: ${count}/${g.maxMembers}</div><div>🔄 Next payout index: ${g.currentPayoutIndex || 0}</div>${btns}</div>`;
             });
-            groupsList.innerHTML = anyGroup ? html : '<p>📢 No groups available yet. Admin will create thrift groups soon. Stay tuned!</p>';
+            groupsList.innerHTML = anyGroup ? html : '<p>No groups available yet. Admin will create thrift groups soon. Stay tuned!</p>';
             document.querySelectorAll('[data-gaction="join"]').forEach(btn => btn.onclick = () => joinGroup(btn.dataset.group));
             document.querySelectorAll('[data-gaction="contribute"]').forEach(btn => btn.onclick = () => contributeToGroup(btn.dataset.group));
             document.querySelectorAll('[data-gaction="claim"]').forEach(btn => btn.onclick = () => claimPayout(btn.dataset.group));
@@ -366,7 +454,7 @@
             if (group.members?.includes(currentUser.uid)) return showMessage("Already a member");
             if (group.members?.length >= group.maxMembers) return showMessage("Group is full");
             await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
-            showMessage(`🎉 Successfully joined "${group.name}"!`, false);
+            showMessage(`Successfully joined "${group.name}"!`, false);
         } catch(err) { handleFirestoreError(err); }
     }
 
@@ -377,7 +465,7 @@
             const group = groupSnap.data();
             if (!group.members?.includes(currentUser.uid)) return showMessage("You are not a member.");
             await addDoc(collection(db, "contributions"), { groupId, userId: currentUser.uid, amount: group.contributionAmount, date: new Date().toISOString() });
-            showMessage(`✅ Contributed ₦${group.contributionAmount} to ${group.name}.`, false);
+            showMessage(`Contributed ₦${group.contributionAmount} to ${group.name}.`, false);
         } catch(err) { handleFirestoreError(err); }
     }
 
@@ -404,12 +492,12 @@
             }
             await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
             await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString(), description: `Payout from group ${group.name}` });
-            showMessage(`🎉 Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
+            showMessage(`Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
             renderUserPlans();
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // ========== 4. ADMIN ACCOUNT FALLBACK ==========
+    // Admin creation fallback
     async function createAdminAccountManually() {
         try {
             const userCred = await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123");
@@ -424,7 +512,7 @@
     }
     document.getElementById('createAdminBtn').onclick = createAdminAccountManually;
 
-    // ========== 5. AUTH FLOW ==========
+    // Auth UI
     document.getElementById('showLoginBtn').onclick = () => { loginForm.classList.remove('hidden'); registerForm.classList.add('hidden'); };
     document.getElementById('showRegisterBtn').onclick = () => { registerForm.classList.remove('hidden'); loginForm.classList.add('hidden'); };
     document.getElementById('doLoginBtn').onclick = async () => {
