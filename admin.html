@@ -110,7 +110,7 @@
 </div>
 
 <script type="module">
-    // Firebase configuration (same as your project)
+    // Firebase configuration (same as your main app)
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -121,7 +121,7 @@
     };
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
@@ -202,9 +202,14 @@
         let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
-            usersHtml += `<tr><td>${u.fullName || 'N/A'}</td><td>${u.email}</td><td>${u.role || 'user'}</td><td>${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
+            usersHtml += `<tr>
+                <td>${u.fullName || 'N/A'}</td>
+                <td>${u.email}</td>
+                <td>${u.role || 'user'}</td>
+                <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+            </tr>`;
         }
-        usersHtml += '</tbody></tr>';
+        usersHtml += '</tbody></table>';
         document.getElementById('allUsersTable').innerHTML = usersHtml;
 
         // All savings plans
@@ -216,7 +221,12 @@
             let details = '';
             if (p.type === 'locked') details = `Lock until: ${new Date(p.lockUntil).toLocaleDateString()}`;
             else if (p.type === 'target') details = `Target: ₦${p.targetAmount} by ${new Date(p.targetDate).toLocaleDateString()}`;
-            plansHtml += `<tr><td>${userName}</td><td>${p.type}</td><td>₦${(p.balance||0).toFixed(2)}</td><td>${details}</td></tr>`;
+            plansHtml += `<tr>
+                <td>${userName}</td>
+                <td>${p.type}</td>
+                <td>₦${(p.balance||0).toFixed(2)}</td>
+                <td>${details}</td>
+            </tr>`;
         }
         plansHtml += '</tbody></table>';
         document.getElementById('allPlansTable').innerHTML = plansHtml;
@@ -264,7 +274,7 @@
     }
 
     async function disableStaff(uid) {
-        if (confirm("Disable this staff member? They will no longer have staff access.")) {
+        if (confirm("Disable this staff member? They will no longer have access.")) {
             await updateDoc(doc(db, "users", uid), { role: 'disabled' });
             loadAdminData();
             showMessage("Staff disabled", false);
@@ -286,9 +296,7 @@
                 const role = document.getElementById('staffRoleSelect').value;
                 if (!email || !pwd) return showMessage("Email and password required");
                 try {
-                    const { getAuth, createUserWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
-                    const authLocal = getAuth(app);
-                    const userCred = await createUserWithEmailAndPassword(authLocal, email, pwd);
+                    const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
                     await setDoc(doc(db, "users", userCred.user.uid), {
                         fullName: name,
                         email: email,
@@ -308,7 +316,6 @@
         const password = document.getElementById('adminPassword').value;
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // Auth state will trigger the dashboard
         } catch(e) {
             showMessage(e.message);
         }
@@ -327,8 +334,9 @@
             const role = userDoc.exists() ? userDoc.data().role : null;
             if (role === 'admin') {
                 currentAdmin = user;
-                const fullName = userDoc.data().fullName || "Administrator";
-                adminNameSpan.innerText = `👋 ${fullName}`;
+                // Display the full name from Firestore (fallback to email)
+                const fullName = userDoc.data().fullName || user.email;
+                adminNameSpan.innerHTML = `👋 ${fullName}`;   // <-- full name displayed here
                 loginSection.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
                 await loadAdminData();
