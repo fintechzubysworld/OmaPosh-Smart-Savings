@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1400px; margin: auto; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        .container { max-width: 1600px; margin: auto; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
         header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .logo h1 { font-size: 1.8rem; letter-spacing: 1px; }
         .logo p { font-size: 0.8rem; opacity: 0.8; }
@@ -24,16 +24,16 @@
         .btn-sm { padding: 5px 12px; font-size: 0.8rem; margin: 0 3px; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
-        .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; }
+        .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; }
         .stats-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
         .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 20px; flex: 1; min-width: 150px; text-align: center; }
         .stat-number { font-size: 2rem; font-weight: bold; }
         .stat-label { font-size: 0.9rem; opacity: 0.9; margin-top: 8px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: 600; margin-bottom: 5px; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 12px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 12px; }
         .flex-btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; overflow-x: auto; display: block; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #f5f5f5; }
         .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
@@ -43,9 +43,11 @@
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
-        #modal > div { background: white; max-width: 500px; width: 90%; border-radius: 24px; padding: 20px; }
+        #modal > div { background: white; max-width: 600px; width: 90%; border-radius: 24px; padding: 20px; max-height: 80vh; overflow-y: auto; }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
         .loader { text-align: center; padding: 50px; font-size: 1.2rem; }
+        .action-group { display: flex; gap: 5px; flex-wrap: wrap; }
+        @media (max-width: 768px) { table, thead, tbody, th, td, tr { display: block; } }
     </style>
 </head>
 <body>
@@ -53,7 +55,7 @@
     <header>
         <div class="logo">
             <h1>👑 OmaPosh Admin Portal</h1>
-            <p>co-operative management • staff & thrift oversight</p>
+            <p>co-operative management • full admin control</p>
         </div>
         <div class="user-info">
             <span id="adminName"></span>
@@ -71,19 +73,68 @@
             <div id="loginError" class="alert hidden" style="margin-top:15px;"></div>
         </div>
 
-        <!-- Loading placeholder -->
         <div id="loadingSpinner" class="loader hidden">Loading dashboard...</div>
 
         <!-- Admin Dashboard Content -->
         <div id="dashboardContent" class="hidden">
             <div class="stats-row" id="statsCards"></div>
 
-            <!-- Withdrawal Requests Section -->
+            <!-- Withdrawal Requests (existing) -->
             <div class="section">
                 <div class="section-title">💰 Pending Withdrawal Requests</div>
                 <div id="withdrawalRequestsTable"></div>
             </div>
 
+            <!-- User Management -->
+            <div class="section">
+                <div class="section-title">👥 User Management</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="createUserBtn">➕ Create User</button>
+                    <button class="btn btn-danger" id="closeUserBtn">🔒 Close Account</button>
+                    <button class="btn btn-success" id="reactivateUserBtn">🔄 Reactivate Account</button>
+                    <button class="btn btn-outline" id="resetPasswordBtn">🔑 Reset Password</button>
+                    <button class="btn btn-danger" id="wipeUserDataBtn">⚠️ Wipe User Data</button>
+                </div>
+                <div id="userManagementTable">用户</div>
+            </div>
+
+            <!-- Deposit Creation -->
+            <div class="section">
+                <div class="section-title">💰 Deposit Creation (Manual)</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="manualDepositBtn">💵 Manual Deposit</button>
+                    <button class="btn btn-primary" id="bulkDepositBtn">📂 Bulk Deposit (CSV)</button>
+                </div>
+            </div>
+
+            <!-- Loan Management -->
+            <div class="section">
+                <div class="section-title">🏦 Loan Management</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="disburseLoanBtn">💰 Disburse Loan</button>
+                    <button class="btn btn-primary" id="recoverLoanBtn">📥 Recover Loan</button>
+                </div>
+                <div id="loanList"></div>
+            </div>
+
+            <!-- Withdrawals (Direct from Flexible Plans) -->
+            <div class="section">
+                <div class="section-title">💸 Direct Withdrawal (Flexible Plans)</div>
+                <button class="btn btn-primary" id="directWithdrawBtn">Withdraw from User's Flexible Plan</button>
+            </div>
+
+            <!-- Statements / Audit Trail -->
+            <div class="section">
+                <div class="section-title">📜 Statements & Audit Trail</div>
+                <div class="flex-btns">
+                    <button class="btn btn-outline" id="viewStatementBtn">View User Statement</button>
+                    <button class="btn btn-outline" id="viewAuditTrailBtn">View Audit Trail</button>
+                </div>
+                <div id="statementView"></div>
+                <div id="auditTrailView"></div>
+            </div>
+
+            <!-- Staff Management (existing) -->
             <div class="section">
                 <div class="section-title">👥 Staff Management</div>
                 <button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button>
@@ -95,23 +146,22 @@
                 </div>
             </div>
 
+            <!-- All Users, Plans, Groups (existing) -->
             <div class="section">
                 <div class="section-title">👥 All Users</div>
                 <div id="allUsersTable"></div>
             </div>
-
             <div class="section">
                 <div class="section-title">💰 All Savings Plans</div>
                 <div id="allPlansTable"></div>
             </div>
-
             <div class="section">
                 <div class="section-title">👥 All Thrift Groups</div>
                 <div id="allGroupsTable"></div>
             </div>
         </div>
     </div>
-    <footer>© 2026 OmaPosh Smart Savings — Admin only</footer>
+    <footer>© 2026 OmaPosh Smart Savings — Full Admin Control</footer>
 </div>
 
 <!-- Modal -->
@@ -134,8 +184,8 @@
     };
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -177,99 +227,20 @@
         setTimeout(() => loginError.classList.add('hidden'), 4000);
     }
 
-    // Load withdrawal requests
-    async function loadWithdrawalRequests() {
-        const requestsQuery = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
-        const snapshot = await getDocs(requestsQuery);
-        if (snapshot.empty) {
-            document.getElementById('withdrawalRequestsTable').innerHTML = '<p>No pending withdrawal requests.</p>';
-            return;
-        }
-        let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
-        for (const docSnap of snapshot.docs) {
-            const req = docSnap.data();
-            const userDoc = await getDoc(doc(db, "users", req.userId));
-            const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
-            html += `<tr>
-                <td>${userName}</td>
-                <td>${req.planType}</td>
-                <td>₦${req.amount.toFixed(2)}</td>
-                <td>${new Date(req.createdAt).toLocaleString()}</td>
-                <td>${req.planId}</td>
-                <td>
-                    <button class="btn btn-sm btn-success" data-request="${docSnap.id}" data-action="approve">Approve</button>
-                    <button class="btn btn-sm btn-danger" data-request="${docSnap.id}" data-action="reject">Reject</button>
-                </td>
-            </tr>`;
-        }
-        html += '</tbody></table>';
-        document.getElementById('withdrawalRequestsTable').innerHTML = html;
-        document.querySelectorAll('[data-action="approve"]').forEach(btn => btn.onclick = () => approveWithdrawal(btn.dataset.request));
-        document.querySelectorAll('[data-action="reject"]').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.request));
+    // Utility: log admin action to audit trail
+    async function logAudit(action, targetUserId = null, details = {}) {
+        if (!currentAdmin) return;
+        await addDoc(collection(db, "audit_logs"), {
+            adminId: currentAdmin.uid,
+            adminEmail: currentAdmin.email,
+            action: action,
+            targetUserId: targetUserId,
+            details: details,
+            timestamp: new Date().toISOString()
+        });
     }
 
-    async function approveWithdrawal(requestId) {
-        if (!confirm("Approve this withdrawal request? The amount will be moved to the user's flexible plan.")) return;
-        const requestRef = doc(db, "withdrawal_requests", requestId);
-        const requestSnap = await getDoc(requestRef);
-        if (!requestSnap.exists()) return showMessage("Request not found");
-        const request = requestSnap.data();
-        const { userId, planId, amount } = request;
-        
-        try {
-            await runTransaction(db, async (transaction) => {
-                const planRef = doc(db, "savings_plans", planId);
-                const planSnap = await transaction.get(planRef);
-                if (!planSnap.exists()) throw new Error("Plan not found");
-                const plan = planSnap.data();
-                if (plan.userId !== userId) throw new Error("User mismatch");
-                if (plan.balance < amount) throw new Error("Insufficient balance in plan");
-                
-                const plansQuery = query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex"));
-                const flexSnap = await transaction.get(plansQuery);
-                let flexPlanRef;
-                if (flexSnap.empty) {
-                    const newFlexRef = doc(collection(db, "savings_plans"));
-                    transaction.set(newFlexRef, {
-                        userId: userId,
-                        type: "flex",
-                        balance: amount,
-                        createdAt: new Date().toISOString()
-                    });
-                    flexPlanRef = newFlexRef;
-                } else {
-                    flexPlanRef = flexSnap.docs[0].ref;
-                    transaction.update(flexPlanRef, { balance: increment(amount) });
-                }
-                transaction.update(planRef, { balance: increment(-amount) });
-                transaction.update(requestRef, { status: "approved", processedAt: new Date().toISOString() });
-                const txRef = doc(collection(db, "transactions"));
-                transaction.set(txRef, {
-                    userId: userId,
-                    planId: planId,
-                    amount: amount,
-                    type: "withdrawal_approved",
-                    description: `Withdrawal approved from ${plan.type} plan`,
-                    date: new Date().toISOString()
-                });
-            });
-            showMessage("Withdrawal approved successfully", false);
-            loadWithdrawalRequests();
-            loadAdminData();
-        } catch (err) {
-            showMessage("Error approving withdrawal: " + err.message);
-        }
-    }
-
-    async function rejectWithdrawal(requestId) {
-        if (!confirm("Reject this withdrawal request?")) return;
-        const requestRef = doc(db, "withdrawal_requests", requestId);
-        await updateDoc(requestRef, { status: "rejected", processedAt: new Date().toISOString() });
-        showMessage("Request rejected", false);
-        loadWithdrawalRequests();
-    }
-
-    // Load all admin data (stats, staff, users, plans, groups)
+    // Load all existing data (stats, users, plans, groups, withdrawal requests)
     async function loadAdminData() {
         if (!currentAdmin) return;
         const usersSnap = await getDocs(collection(db, "users"));
@@ -285,42 +256,47 @@
             <div class="stat-card"><div class="stat-number">${pendingRequestsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
         `;
 
-        // Staff table
+        // User management table (separate from all users)
+        let userMgmtHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        for (const docSnap of usersSnap.docs) {
+            const u = docSnap.data();
+            const status = u.disabled ? "Disabled" : "Active";
+            userMgmtHtml += `<tr>
+                <td>${u.fullName || 'N/A'}</td>
+                <td>${u.email}</td>
+                <td>${status}</td>
+                <td class="action-group">
+                    <button class="btn btn-sm btn-outline" data-uid="${docSnap.id}" data-action="selectUserStatement">Statement</button>
+                </td>
+            </tr>`;
+        }
+        userMgmtHtml += '</tbody></table>';
+        document.getElementById('userManagementTable').innerHTML = userMgmtHtml;
+        document.querySelectorAll('[data-action="selectUserStatement"]').forEach(btn => btn.onclick = () => showStatement(btn.dataset.uid));
+
+        // All users table (existing)
+        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
+        for (const docSnap of usersSnap.docs) {
+            const u = docSnap.data();
+            usersHtml += `<tr><td>${u.fullName || 'N/A'}</td><td>${u.email}</td><td>${u.role || 'user'}</td><td>${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
+        }
+        usersHtml += '</tbody></table>';
+        document.getElementById('allUsersTable').innerHTML = usersHtml;
+
+        // Staff table (existing)
         let staffHtml = '';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             if (u.role === 'collector' || u.role === 'supervisor') {
-                staffHtml += `<tr>
-                    <td>${u.fullName || 'No name'}</td>
-                    <td>${u.email}</td>
-                    <td>${u.role}</td>
-                    <td>
-                        <button class="btn btn-sm btn-primary" data-uid="${docSnap.id}" data-action="editRole">Edit Role</button>
-                        <button class="btn btn-sm btn-danger" data-uid="${docSnap.id}" data-action="deleteStaff">Disable</button>
-                    </td>
-                </tr>`;
+                staffHtml += `<tr><td>${u.fullName || 'No name'}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-primary" data-uid="${docSnap.id}" data-action="editRole">Edit Role</button> <button class="btn btn-sm btn-danger" data-uid="${docSnap.id}" data-action="deleteStaff">Disable</button></td></tr>`;
             }
         }
         document.querySelector('#staffTable tbody').innerHTML = staffHtml;
         document.querySelectorAll('[data-action="editRole"]').forEach(btn => btn.onclick = () => editStaffRole(btn.dataset.uid));
         document.querySelectorAll('[data-action="deleteStaff"]').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
 
-        // All users
-        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
-        for (const docSnap of usersSnap.docs) {
-            const u = docSnap.data();
-            usersHtml += `<td>
-                <td>${u.fullName || 'N/A'}</td>
-                <td>${u.email}</td>
-                <td>${u.role || 'user'}</td>
-                <td>${new Date(u.createdAt).toLocaleDateString()}</td>
-            </tr>`;
-        }
-        usersHtml += '</tbody></table>';
-        document.getElementById('allUsersTable').innerHTML = usersHtml;
-
         // All plans
-        let plansHtml = '</tr><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
+        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
         for (const docSnap of plansSnap.docs) {
             const p = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", p.userId));
@@ -328,12 +304,7 @@
             let details = '';
             if (p.type === 'locked') details = `Lock until: ${new Date(p.lockUntil).toLocaleDateString()}`;
             else if (p.type === 'target') details = `Target: ₦${p.targetAmount} by ${new Date(p.targetDate).toLocaleDateString()}`;
-            plansHtml += `<tr>
-                <td>${userName}</td>
-                <td>${p.type}</td>
-                <td>₦${(p.balance||0).toFixed(2)}</td>
-                <td>${details}</td>
-            </tr>`;
+            plansHtml += `<tr><td>${userName}</td><td>${p.type}</td><td>₦${(p.balance||0).toFixed(2)}</td><td>${details}</td></tr>`;
         }
         plansHtml += '</tbody></table>';
         document.getElementById('allPlansTable').innerHTML = plansHtml;
@@ -344,59 +315,386 @@
             const g = docSnap.data();
             const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
             const creatorName = creatorDoc.exists() ? creatorDoc.data().fullName : g.creatorId;
-            groupsHtml += `<tr>
-                <td>${g.name}</td>
-                <td>₦${g.contributionAmount}</td>
-                <td>${g.members?.length||0}/${g.maxMembers}</td>
-                <td>${creatorName}</td>
-                <td><button class="btn btn-sm btn-danger" data-group="${docSnap.id}" data-action="deleteGroup">Delete</button></td>
-            </tr>`;
+            groupsHtml += `<tr><td>${g.name}</td><td>₦${g.contributionAmount}</td><td>${g.members?.length||0}/${g.maxMembers}</td><td>${creatorName}</td><td><button class="btn btn-sm btn-danger" data-group="${docSnap.id}" data-action="deleteGroup">Delete</button></td></tr>`;
         }
         groupsHtml += '</tbody></table>';
         document.getElementById('allGroupsTable').innerHTML = groupsHtml;
         document.querySelectorAll('[data-action="deleteGroup"]').forEach(btn => btn.onclick = async () => {
             if (confirm("Permanently delete this group?")) {
                 await deleteDoc(doc(db, "groups", btn.dataset.group));
+                await logAudit("delete_group", null, { groupId: btn.dataset.group });
                 loadAdminData();
             }
         });
     }
 
+    // Withdrawal requests (existing)
+    async function loadWithdrawalRequests() {
+        const requestsQuery = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
+        const snapshot = await getDocs(requestsQuery);
+        if (snapshot.empty) {
+            document.getElementById('withdrawalRequestsTable').innerHTML = '<p>No pending withdrawal requests.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
+        for (const docSnap of snapshot.docs) {
+            const req = docSnap.data();
+            const userDoc = await getDoc(doc(db, "users", req.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
+            html += `<tr><td>${userName}</td><td>${req.planType}</td><td>₦${req.amount.toFixed(2)}</td><td>${new Date(req.createdAt).toLocaleString()}</td><td>${req.planId}</td><td><button class="btn btn-sm btn-success" data-request="${docSnap.id}" data-action="approve">Approve</button> <button class="btn btn-sm btn-danger" data-request="${docSnap.id}" data-action="reject">Reject</button></td></tr>`;
+        }
+        html += '</tbody></table>';
+        document.getElementById('withdrawalRequestsTable').innerHTML = html;
+        document.querySelectorAll('[data-action="approve"]').forEach(btn => btn.onclick = () => approveWithdrawal(btn.dataset.request));
+        document.querySelectorAll('[data-action="reject"]').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.request));
+    }
+
+    async function approveWithdrawal(requestId) {
+        if (!confirm("Approve this withdrawal request?")) return;
+        const requestRef = doc(db, "withdrawal_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const request = requestSnap.data();
+        const { userId, planId, amount } = request;
+        try {
+            await runTransaction(db, async (transaction) => {
+                const planRef = doc(db, "savings_plans", planId);
+                const planSnap = await transaction.get(planRef);
+                if (!planSnap.exists()) throw new Error("Plan not found");
+                const plan = planSnap.data();
+                if (plan.userId !== userId) throw new Error("User mismatch");
+                if (plan.balance < amount) throw new Error("Insufficient balance");
+                const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex"));
+                const flexSnap = await transaction.get(flexQuery);
+                if (flexSnap.empty) {
+                    const newFlexRef = doc(collection(db, "savings_plans"));
+                    transaction.set(newFlexRef, { userId, type: "flex", balance: amount, createdAt: new Date().toISOString() });
+                } else {
+                    transaction.update(flexSnap.docs[0].ref, { balance: increment(amount) });
+                }
+                transaction.update(planRef, { balance: increment(-amount) });
+                transaction.update(requestRef, { status: "approved", processedAt: new Date().toISOString() });
+                await addDoc(collection(db, "transactions"), { userId, planId, amount, type: "withdrawal_approved", description: `Withdrawal approved from ${plan.type} plan`, date: new Date().toISOString() });
+            });
+            await logAudit("approve_withdrawal", userId, { requestId, amount });
+            showMessage("Withdrawal approved", false);
+            loadWithdrawalRequests();
+            loadAdminData();
+        } catch (err) { showMessage(err.message); }
+    }
+
+    async function rejectWithdrawal(requestId) {
+        if (!confirm("Reject this withdrawal request?")) return;
+        const requestRef = doc(db, "withdrawal_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const { userId } = requestSnap.data();
+        await updateDoc(requestRef, { status: "rejected", processedAt: new Date().toISOString() });
+        await logAudit("reject_withdrawal", userId, { requestId });
+        showMessage("Request rejected", false);
+        loadWithdrawalRequests();
+    }
+
+    // --- User Management Functions ---
+    async function createUserAccount() {
+        const email = prompt("Enter user email:");
+        if (!email) return;
+        const password = prompt("Enter temporary password (min 6 chars):");
+        if (!password || password.length < 6) return showMessage("Password min 6 chars");
+        const fullName = prompt("Full name:");
+        if (!fullName) return;
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, email, password);
+            await setDoc(doc(db, "users", userCred.user.uid), {
+                fullName: fullName,
+                email: email,
+                role: "user",
+                createdAt: new Date().toISOString(),
+                disabled: false
+            });
+            await logAudit("create_user", userCred.user.uid, { email, fullName });
+            showMessage(`User ${fullName} created`, false);
+            loadAdminData();
+        } catch(e) { showMessage(e.message); }
+    }
+
+    async function closeUserAccount() {
+        const email = prompt("Enter user email to close:");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userDoc = usersSnap.docs[0];
+        if (confirm(`Close account for ${userDoc.data().fullName}? This will disable login.`)) {
+            await updateDoc(doc(db, "users", userDoc.id), { disabled: true });
+            await logAudit("close_account", userDoc.id, { email });
+            showMessage("Account closed", false);
+            loadAdminData();
+        }
+    }
+
+    async function reactivateUserAccount() {
+        const email = prompt("Enter user email to reactivate:");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userDoc = usersSnap.docs[0];
+        if (confirm(`Reactivate account for ${userDoc.data().fullName}?`)) {
+            await updateDoc(doc(db, "users", userDoc.id), { disabled: false });
+            await logAudit("reactivate_account", userDoc.id, { email });
+            showMessage("Account reactivated", false);
+            loadAdminData();
+        }
+    }
+
+    async function resetUserPassword() {
+        const email = prompt("Enter user email to send password reset link:");
+        if (!email) return;
+        try {
+            await sendPasswordResetEmail(auth, email);
+            await logAudit("password_reset", null, { email });
+            showMessage(`Password reset email sent to ${email}`, false);
+        } catch(e) { showMessage(e.message); }
+    }
+
+    async function wipeUserData() {
+        const email = prompt("⚠️ DANGER: Enter user email to wipe ALL data (savings plans, transactions, groups). This cannot be undone.");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userId = usersSnap.docs[0].id;
+        if (!confirm(`Wipe ALL data for ${email}? This will delete all savings plans, transactions, group memberships.`)) return;
+        // Delete savings plans
+        const plansSnap = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId)));
+        const batch = writeBatch(db);
+        plansSnap.forEach(doc => batch.delete(doc.ref));
+        // Delete transactions
+        const txSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
+        txSnap.forEach(doc => batch.delete(doc.ref));
+        // Remove from groups
+        const groupsSnap = await getDocs(collection(db, "groups"));
+        for (const groupDoc of groupsSnap.docs) {
+            const group = groupDoc.data();
+            if (group.members && group.members.includes(userId)) {
+                batch.update(groupDoc.ref, { members: arrayRemove(userId) });
+            }
+        }
+        await batch.commit();
+        // Optionally delete user document? We'll just mark as wiped.
+        await updateDoc(doc(db, "users", userId), { wiped: true, disabled: true });
+        await logAudit("wipe_user_data", userId, { email });
+        showMessage("User data wiped", false);
+        loadAdminData();
+    }
+
+    // --- Deposit Creation ---
+    async function manualDeposit() {
+        const email = prompt("User email:");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userId = usersSnap.docs[0].id;
+        const amount = parseFloat(prompt("Amount (₦):"));
+        if (isNaN(amount) || amount <= 0) return;
+        const planType = prompt("Plan type (flex/locked/target):");
+        if (!planType) return;
+        // Find or create plan
+        let planId = null;
+        const existingPlans = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", planType)));
+        if (existingPlans.empty) {
+            const newPlanRef = doc(collection(db, "savings_plans"));
+            await setDoc(newPlanRef, {
+                userId, type: planType, balance: amount, createdAt: new Date().toISOString()
+            });
+            planId = newPlanRef.id;
+        } else {
+            planId = existingPlans.docs[0].id;
+            await updateDoc(doc(db, "savings_plans", planId), { balance: increment(amount) });
+        }
+        await addDoc(collection(db, "transactions"), { userId, planId, amount, type: "admin_deposit", description: "Manual deposit by admin", date: new Date().toISOString() });
+        await logAudit("manual_deposit", userId, { amount, planType });
+        showMessage(`Deposited ₦${amount} to ${planType} plan`, false);
+        loadAdminData();
+    }
+
+    async function bulkDeposit() {
+        showModal("Bulk Deposit (CSV)", `
+            <div class="form-group"><label>CSV Data (email,amount,planType)</label><textarea id="bulkCsv" rows="5" placeholder="user@example.com,1000,flex&#10;another@example.com,2000,locked"></textarea></div>
+            <div class="form-group"><label>Separator</label><select id="csvSep"><option value=",">Comma</option><option value=";">Semicolon</option></select></div>
+        `, "Process").then(async (confirmed) => {
+            if (!confirmed) return;
+            const csvText = document.getElementById('bulkCsv').value;
+            const sep = document.getElementById('csvSep').value;
+            const lines = csvText.trim().split('\n');
+            let success = 0, fail = 0;
+            for (const line of lines) {
+                const parts = line.split(sep);
+                if (parts.length < 3) continue;
+                const email = parts[0].trim();
+                const amount = parseFloat(parts[1]);
+                const planType = parts[2].trim();
+                if (isNaN(amount) || amount <= 0) { fail++; continue; }
+                const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+                if (usersSnap.empty) { fail++; continue; }
+                const userId = usersSnap.docs[0].id;
+                const existingPlans = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", planType)));
+                if (existingPlans.empty) {
+                    await addDoc(collection(db, "savings_plans"), { userId, type: planType, balance: amount, createdAt: new Date().toISOString() });
+                } else {
+                    await updateDoc(existingPlans.docs[0].ref, { balance: increment(amount) });
+                }
+                await addDoc(collection(db, "transactions"), { userId, amount, type: "admin_deposit", description: "Bulk deposit", date: new Date().toISOString() });
+                success++;
+            }
+            await logAudit("bulk_deposit", null, { success, fail });
+            showMessage(`Bulk deposit complete: ${success} succeeded, ${fail} failed`, false);
+            loadAdminData();
+        });
+    }
+
+    // --- Loan Management ---
+    async function disburseLoan() {
+        const email = prompt("User email for loan disbursement:");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userId = usersSnap.docs[0].id;
+        const amount = parseFloat(prompt("Loan amount (₦):"));
+        if (isNaN(amount) || amount <= 0) return;
+        const interestRate = parseFloat(prompt("Interest rate (% per month):", "5")) || 0;
+        const repayMonths = parseInt(prompt("Repayment months:", "6")) || 6;
+        const loanRef = doc(collection(db, "loans"));
+        await setDoc(loanRef, {
+            userId, amount, interestRate, repayMonths, status: "active", disbursedAt: new Date().toISOString(),
+            remainingBalance: amount * (1 + interestRate/100)
+        });
+        // Add to user's flexible plan
+        const flexPlans = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex")));
+        if (flexPlans.empty) {
+            await addDoc(collection(db, "savings_plans"), { userId, type: "flex", balance: amount, createdAt: new Date().toISOString() });
+        } else {
+            await updateDoc(flexPlans.docs[0].ref, { balance: increment(amount) });
+        }
+        await addDoc(collection(db, "transactions"), { userId, amount, type: "loan_disbursement", description: "Loan disbursed", date: new Date().toISOString() });
+        await logAudit("disburse_loan", userId, { amount, interestRate, repayMonths });
+        showMessage(`Loan of ₦${amount} disbursed`, false);
+        loadAdminData();
+        loadLoans();
+    }
+
+    async function recoverLoan() {
+        const email = prompt("User email for loan recovery:");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userId = usersSnap.docs[0].id;
+        const loansSnap = await getDocs(query(collection(db, "loans"), where("userId", "==", userId), where("status", "==", "active")));
+        if (loansSnap.empty) return showMessage("No active loan for this user");
+        const loanDoc = loansSnap.docs[0];
+        const loan = loanDoc.data();
+        const amount = parseFloat(prompt(`Outstanding balance: ₦${loan.remainingBalance}. Enter amount to recover:`));
+        if (isNaN(amount) || amount <= 0 || amount > loan.remainingBalance) return;
+        // Deduct from user's flexible plan
+        const flexPlans = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex")));
+        if (flexPlans.empty) return showMessage("User has no flexible plan to deduct from");
+        const flexPlanRef = flexPlans.docs[0].ref;
+        const flexData = flexPlans.docs[0].data();
+        if (flexData.balance < amount) return showMessage("Insufficient balance in flexible plan");
+        await updateDoc(flexPlanRef, { balance: increment(-amount) });
+        const newBalance = loan.remainingBalance - amount;
+        if (newBalance <= 0) {
+            await updateDoc(loanDoc.ref, { status: "paid", recoveredAt: new Date().toISOString(), remainingBalance: 0 });
+        } else {
+            await updateDoc(loanDoc.ref, { remainingBalance: newBalance });
+        }
+        await addDoc(collection(db, "transactions"), { userId, amount, type: "loan_recovery", description: "Loan repayment", date: new Date().toISOString() });
+        await logAudit("recover_loan", userId, { amount });
+        showMessage(`Recovered ₦${amount} from loan`, false);
+        loadAdminData();
+        loadLoans();
+    }
+
+    async function loadLoans() {
+        const loansSnap = await getDocs(collection(db, "loans"));
+        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Repayment Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+        for (const docSnap of loansSnap.docs) {
+            const l = docSnap.data();
+            const userDoc = await getDoc(doc(db, "users", l.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : l.userId;
+            html += `<tr><td>${userName}</td><td>₦${l.amount}</td><td>${l.interestRate}%</td><td>${l.repayMonths}</td><td>₦${l.remainingBalance.toFixed(2)}</td><td>${l.status}</td></tr>`;
+        }
+        html += '</tbody></table>';
+        document.getElementById('loanList').innerHTML = html;
+    }
+
+    // --- Direct Withdrawal (from flexible plan) ---
+    async function directWithdraw() {
+        const email = prompt("User email:");
+        if (!email) return;
+        const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+        if (usersSnap.empty) return showMessage("User not found");
+        const userId = usersSnap.docs[0].id;
+        const amount = parseFloat(prompt("Withdrawal amount (₦):"));
+        if (isNaN(amount) || amount <= 0) return;
+        const flexPlans = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex")));
+        if (flexPlans.empty) return showMessage("User has no flexible plan");
+        const planRef = flexPlans.docs[0].ref;
+        const planData = flexPlans.docs[0].data();
+        if (planData.balance < amount) return showMessage("Insufficient balance");
+        await updateDoc(planRef, { balance: increment(-amount) });
+        await addDoc(collection(db, "transactions"), { userId, planId: planRef.id, amount, type: "admin_withdrawal", description: "Direct withdrawal by admin", date: new Date().toISOString() });
+        await logAudit("direct_withdrawal", userId, { amount });
+        showMessage(`Withdrew ₦${amount} from user's flexible plan`, false);
+        loadAdminData();
+    }
+
+    // --- Statement for a user ---
+    async function showStatement(userId) {
+        const userDoc = await getDoc(doc(db, "users", userId));
+        const userName = userDoc.exists() ? userDoc.data().fullName : userId;
+        const transactions = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
+        let html = `<h4>Statement for ${userName}</h4><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody>`;
+        transactions.forEach(doc => {
+            const t = doc.data();
+            html += `<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type}</td><td>₦${t.amount.toFixed(2)}</td><td>${t.description || ''}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        showModal("User Statement", html, "Close");
+    }
+
+    // --- Audit Trail ---
+    async function viewAuditTrail() {
+        const auditSnap = await getDocs(query(collection(db, "audit_logs"), orderBy("timestamp", "desc"), limit(100)));
+        let html = '<table><thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody>';
+        auditSnap.forEach(doc => {
+            const a = doc.data();
+            html += `<tr><td>${new Date(a.timestamp).toLocaleString()}</td><td>${a.adminEmail}</td><td>${a.action}</td><td>${a.targetUserId || '-'}</td><td>${JSON.stringify(a.details)}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        showModal("Audit Trail (last 100 entries)", html, "Close");
+    }
+
+    // --- Staff management (existing) ---
     async function editStaffRole(uid) {
         const userDoc = await getDoc(doc(db, "users", uid));
         const currentRole = userDoc.data().role;
-        const result = await showModal("Edit Role", `
-            <select id="newRole">
-                <option value="collector" ${currentRole==='collector' ? 'selected' : ''}>Collector</option>
-                <option value="supervisor" ${currentRole==='supervisor' ? 'selected' : ''}>Supervisor</option>
-                <option value="user">Regular User</option>
-            </select>
-        `, "Update");
+        const result = await showModal("Edit Role", `<select id="newRole"><option value="collector" ${currentRole==='collector'?'selected':''}>Collector</option><option value="supervisor" ${currentRole==='supervisor'?'selected':''}>Supervisor</option><option value="user">Regular User</option></select>`, "Update");
         if (result) {
             const newRole = document.getElementById('newRole').value;
             await updateDoc(doc(db, "users", uid), { role: newRole });
+            await logAudit("edit_staff_role", uid, { newRole });
             loadAdminData();
-            showMessage(`Role updated to ${newRole}`, false);
         }
     }
-
     async function disableStaff(uid) {
-        if (confirm("Disable this staff member? They will lose access.")) {
+        if (confirm("Disable this staff member?")) {
             await updateDoc(doc(db, "users", uid), { role: 'disabled' });
+            await logAudit("disable_staff", uid, {});
             loadAdminData();
-            showMessage("Staff disabled", false);
         }
     }
-
-    // Create staff
     document.getElementById('createStaffBtn').onclick = () => {
-        showModal("Create Staff Account", `
-            <div class="form-group"><label>Full Name</label><input id="staffFullName" placeholder="John Doe"></div>
-            <div class="form-group"><label>Email</label><input id="staffEmail" placeholder="staff@example.com"></div>
-            <div class="form-group"><label>Password</label><input type="password" id="staffPassword" placeholder="min 6 chars"></div>
-            <div class="form-group"><label>Role</label><select id="staffRoleSelect"><option value="collector">Collector</option><option value="supervisor">Supervisor</option></select></div>
-        `, "Create").then(async (confirmed) => {
-            if (confirmed) {
+        showModal("Create Staff", `<div class="form-group"><label>Full Name</label><input id="staffFullName"></div><div class="form-group"><label>Email</label><input id="staffEmail"></div><div class="form-group"><label>Password</label><input type="password" id="staffPassword"></div><div class="form-group"><label>Role</label><select id="staffRoleSelect"><option value="collector">Collector</option><option value="supervisor">Supervisor</option></select></div>`, "Create").then(async (ok) => {
+            if (ok) {
                 const name = document.getElementById('staffFullName').value;
                 const email = document.getElementById('staffEmail').value;
                 const pwd = document.getElementById('staffPassword').value;
@@ -404,70 +702,44 @@
                 if (!email || !pwd) return showMessage("Email and password required");
                 try {
                     const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
-                    await setDoc(doc(db, "users", userCred.user.uid), {
-                        fullName: name,
-                        email: email,
-                        role: role,
-                        createdAt: new Date().toISOString()
-                    });
-                    showMessage(`Staff ${name} created as ${role}`, false);
+                    await setDoc(doc(db, "users", userCred.user.uid), { fullName: name, email, role, createdAt: new Date().toISOString() });
+                    await logAudit("create_staff", userCred.user.uid, { role });
+                    showMessage(`Staff ${name} created`, false);
                     loadAdminData();
                 } catch(e) { showMessage(e.message); }
             }
         });
     };
 
-    // Create admin account manually
+    // --- Admin account creation (fallback) ---
     document.getElementById('createAdminBtn').onclick = async () => {
         try {
             const userCred = await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123");
-            await setDoc(doc(db, "users", userCred.user.uid), {
-                fullName: "Super Administrator",
-                email: "admin@omaposhsmartsavings.com",
-                role: "admin",
-                createdAt: new Date().toISOString()
-            });
-            showMessage("Admin account created! You can now login.", false);
-        } catch(e) {
-            showMessage("Error: " + e.message);
-        }
+            await setDoc(doc(db, "users", userCred.user.uid), { fullName: "Super Administrator", email: "admin@omaposhsmartsavings.com", role: "admin", createdAt: new Date().toISOString() });
+            showMessage("Admin account created! Please login.", false);
+        } catch(e) { showMessage(e.message); }
     };
 
-    // Admin login
+    // --- Login handler ---
     document.getElementById('adminLoginBtn').onclick = async () => {
         const email = document.getElementById('adminEmail').value;
         const password = document.getElementById('adminPassword').value;
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // Auth state listener will handle routing
-        } catch(e) {
-            showMessage(e.message);
-        }
+        } catch(e) { showMessage(e.message); }
     };
+    logoutBtn.onclick = async () => { await signOut(auth); };
 
-    logoutBtn.onclick = async () => {
-        await signOut(auth);
-    };
-
-    // Auth state observer
+    // --- Auth state observer ---
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            // Ensure user document exists and set role to admin if email matches
             const userRef = doc(db, "users", user.uid);
             const userSnap = await getDoc(userRef);
             let role = userSnap.exists() ? userSnap.data().role : null;
-            
-            // Force admin role for the special email
             if (user.email === "admin@omaposhsmartsavings.com" && role !== 'admin') {
-                await setDoc(userRef, {
-                    fullName: userSnap.exists() ? userSnap.data().fullName : "Administrator",
-                    email: user.email,
-                    role: "admin",
-                    createdAt: userSnap.exists() ? userSnap.data().createdAt : new Date().toISOString()
-                }, { merge: true });
+                await setDoc(userRef, { fullName: "Administrator", email: user.email, role: "admin", createdAt: new Date().toISOString() }, { merge: true });
                 role = 'admin';
             }
-            
             if (role === 'admin') {
                 currentAdmin = user;
                 const fullName = userSnap.exists() ? userSnap.data().fullName : user.email;
@@ -475,21 +747,19 @@
                 loginSection.classList.add('hidden');
                 loadingSpinner.classList.remove('hidden');
                 dashboardContent.classList.add('hidden');
-                
-                // Load data and then show dashboard
                 await loadAdminData();
                 await loadWithdrawalRequests();
+                await loadLoans();
                 loadingSpinner.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
-                
-                // Real-time listeners
+                // Realtime listeners
                 const unsubUsers = onSnapshot(collection(db, "users"), () => loadAdminData());
                 const unsubPlans = onSnapshot(collection(db, "savings_plans"), () => loadAdminData());
                 const unsubGroups = onSnapshot(collection(db, "groups"), () => loadAdminData());
                 const unsubRequests = onSnapshot(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")), () => loadWithdrawalRequests());
-                window.adminListeners = [unsubUsers, unsubPlans, unsubGroups, unsubRequests];
+                const unsubLoans = onSnapshot(collection(db, "loans"), () => loadLoans());
+                window.adminListeners = [unsubUsers, unsubPlans, unsubGroups, unsubRequests, unsubLoans];
             } else {
-                // Not admin – force sign out
                 await signOut(auth);
                 loginSection.classList.remove('hidden');
                 dashboardContent.classList.add('hidden');
@@ -497,7 +767,6 @@
                 showMessage("Access denied: Admin only.");
             }
         } else {
-            // User not logged in
             currentAdmin = null;
             loginSection.classList.remove('hidden');
             dashboardContent.classList.add('hidden');
@@ -505,6 +774,28 @@
             if (window.adminListeners) window.adminListeners.forEach(fn => fn());
         }
     });
+
+    // Attach event listeners for new buttons
+    document.getElementById('createUserBtn').onclick = createUserAccount;
+    document.getElementById('closeUserBtn').onclick = closeUserAccount;
+    document.getElementById('reactivateUserBtn').onclick = reactivateUserAccount;
+    document.getElementById('resetPasswordBtn').onclick = resetUserPassword;
+    document.getElementById('wipeUserDataBtn').onclick = wipeUserData;
+    document.getElementById('manualDepositBtn').onclick = manualDeposit;
+    document.getElementById('bulkDepositBtn').onclick = bulkDeposit;
+    document.getElementById('disburseLoanBtn').onclick = disburseLoan;
+    document.getElementById('recoverLoanBtn').onclick = recoverLoan;
+    document.getElementById('directWithdrawBtn').onclick = directWithdraw;
+    document.getElementById('viewStatementBtn').onclick = () => {
+        const email = prompt("Enter user email to view statement:");
+        if (email) {
+            getDocs(query(collection(db, "users"), where("email", "==", email))).then(snap => {
+                if (snap.empty) showMessage("User not found");
+                else showStatement(snap.docs[0].id);
+            });
+        }
+    };
+    document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
 </script>
 </body>
 </html>
