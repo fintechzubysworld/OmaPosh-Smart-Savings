@@ -41,6 +41,7 @@
             background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
         #modal > div { background: white; max-width: 500px; width: 90%; border-radius: 24px; padding: 20px; pointer-events: auto; }
+        .pending-badge { background: #fff3cd; color: #856404; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -85,12 +86,10 @@
                 <div id="plansList" class="card-grid">Loading plans...</div>
             </div>
             <div class="section">
-                <div class="section-title">👥 My Thrift Groups</div>
-                <div class="flex-btns" style="margin-bottom:20px;">
-                    <button class="btn btn-primary" id="showCreateGroupBtn">➕ Create Group</button>
-                    <button class="btn btn-outline" id="showJoinGroupBtn">🔍 Join Group</button>
-                </div>
+                <div class="section-title">👥 Thrift Groups (Admin Created)</div>
+                <!-- Removed "Create Group" and "Join by ID" buttons — now users only join groups created by admin -->
                 <div id="groupsList" class="card-grid">Loading groups...</div>
+                <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Groups are created by admin. Click "Join Group" on any group card to become a member.</p>
             </div>
         </div>
     </div>
@@ -168,10 +167,10 @@
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
     modal.classList.add('hidden');
 
-    function showMessage(text, isError = true) { authMsg.innerText = text; authMsg.classList.remove('hidden'); setTimeout(() => authMsg.classList.add('hidden'), 4000); }
+    function showMessage(text, isError = true) { authMsg.innerText = text; authMsg.classList.remove('hidden'); setTimeout(() => authMsg.classList.add('hidden'), 5000); }
     function handleFirestoreError(err) { console.error(err); showMessage(err.message); }
 
-    // ----- RENDER USER PLANS (display with deposit/withdraw buttons) -----
+    // ========== 1. SAVINGS PLANS (deposit/withdrawal requests only, no direct balance changes) ==========
     async function renderUserPlans() {
         if (!currentUser) return;
         try {
@@ -183,132 +182,209 @@
                 const p = { id: docSnap.id, ...docSnap.data() };
                 let progress = p.type === 'target' ? `<div class="progress-bar"><div class="progress-fill" style="width:${(p.balance/p.targetAmount)*100}%"></div></div><div>₦${p.balance.toFixed(2)} / ₦${p.targetAmount.toFixed(2)} (${((p.balance/p.targetAmount)*100).toFixed(1)}%)</div>` : `<div class="amount">₦${p.balance.toFixed(2)}</div>`;
                 let extra = (p.type === 'locked') ? `<div>🔓 Available after: ${new Date(p.lockUntil).toLocaleDateString()}</div>` : (p.type === 'target' ? `<div>🎯 Target date: ${new Date(p.targetDate).toLocaleDateString()}</div>` : '');
-                html += `<div class="card"><div class="plan-type">${p.type.toUpperCase()}</div>${progress}${extra}<div class="flex-btns"><button class="btn btn-sm btn-primary" data-plan="${p.id}" data-action="deposit">Deposit</button><button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw">Withdraw</button><button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history">History</button></div></div>`;
+                html += `<div class="card"><div class="plan-type">${p.type.toUpperCase()}</div>${progress}${extra}<div class="flex-btns"><button class="btn btn-sm btn-primary" data-plan="${p.id}" data-action="deposit">Request Deposit</button><button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw">Request Withdrawal</button><button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history">History</button></div><div class="pending-badge">✅ All deposits/withdrawals require admin approval</div></div>`;
             }
             plansList.innerHTML = html;
-            document.querySelectorAll('[data-action="deposit"]').forEach(btn => btn.onclick = () => depositToPlan(btn.dataset.plan));
-            document.querySelectorAll('[data-action="withdraw"]').forEach(btn => btn.onclick = () => withdrawFromPlan(btn.dataset.plan));
+            document.querySelectorAll('[data-action="deposit"]').forEach(btn => btn.onclick = () => createDepositRequest(btn.dataset.plan));
+            document.querySelectorAll('[data-action="withdraw"]').forEach(btn => btn.onclick = () => createWithdrawalRequest(btn.dataset.plan));
             document.querySelectorAll('[data-action="history"]').forEach(btn => btn.onclick = () => viewPlanHistory(btn.dataset.plan));
         } catch(err) { handleFirestoreError(err); }
     }
 
-    async function depositToPlan(planId) {
-        const amount = parseFloat(prompt("Deposit amount (₦):"));
-        if (isNaN(amount) || amount<=0) return;
+    // DEPOSIT REQUEST (admin approval needed)
+    async function createDepositRequest(planId) {
+        const amount = parseFloat(prompt("Enter deposit amount (₦):"));
+        if (isNaN(amount) || amount <= 0) return showMessage("Invalid amount");
         try {
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showMessage("Invalid plan");
-            await updateDoc(planRef, { balance: increment(amount) });
-            await addDoc(collection(db, "transactions"), { planId, userId: currentUser.uid, amount, type: "deposit", date: new Date().toISOString(), description: `Deposit to ${planSnap.data().type} plan` });
-            showMessage(`₦${amount.toFixed(2)} deposited`, false);
-            renderUserPlans();
+            // Create deposit request document
+            await addDoc(collection(db, "deposit_requests"), {
+                userId: currentUser.uid,
+                planId: planId,
+                amount: amount,
+                status: "pending",
+                requestDate: new Date().toISOString(),
+                planType: planSnap.data().type
+            });
+            showMessage(`💰 Deposit request of ₦${amount.toFixed(2)} submitted. Awaiting admin approval.`, false);
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // Withdraw function – flexible plans withdraw directly; locked/target create a withdrawal request
-    async function withdrawFromPlan(planId) {
+    // WITHDRAWAL REQUEST for ALL plan types (no immediate deduction)
+    async function createWithdrawalRequest(planId) {
         try {
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showMessage("Not your plan");
             const plan = planSnap.data();
-
-            // For flexible plans: immediate withdrawal
-            if (plan.type === 'flex') {
-                const amount = parseFloat(prompt("Withdraw amount (₦): Max ₦" + plan.balance.toFixed(2)));
-                if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showMessage("Invalid amount");
-                await updateDoc(planRef, { balance: increment(-amount) });
-                await addDoc(collection(db, "transactions"), {
-                    planId, userId: currentUser.uid, amount, type: "withdrawal",
-                    date: new Date().toISOString(), description: `Direct withdrawal from flexible plan`
-                });
-                showMessage(`₦${amount.toFixed(2)} withdrawn`, false);
-                renderUserPlans();
-                return;
-            }
-
-            // For locked or target plans: create withdrawal request
+            const amount = parseFloat(prompt(`Enter withdrawal request amount (₦): Max ₦${plan.balance.toFixed(2)}`));
+            if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showMessage("Invalid amount or exceeds balance.");
+            
+            // For locked plan, additional info warning but still creates request
             if (plan.type === 'locked') {
                 const lockDate = new Date(plan.lockUntil);
                 if (new Date() < lockDate) {
-                    if (!confirm(`This plan is locked until ${lockDate.toLocaleDateString()}. Any withdrawal request will require admin approval. Continue?`)) return;
+                    if (!confirm(`⚠️ This plan is locked until ${lockDate.toLocaleDateString()}. Withdrawal request will still be sent to admin for review. Continue?`)) return;
                 }
             } else if (plan.type === 'target') {
-                if (!confirm(`This is a target savings plan. Withdrawal requests require admin approval. Continue?`)) return;
+                if (!confirm(`Target plan withdrawal requires admin review. Continue with request?`)) return;
             }
-
-            const amount = parseFloat(prompt(`Enter withdrawal request amount (₦): Max ₦${plan.balance.toFixed(2)}`));
-            if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showMessage("Invalid amount");
-
+            
             await addDoc(collection(db, "withdrawal_requests"), {
                 userId: currentUser.uid,
                 planId: planId,
                 planType: plan.type,
                 amount: amount,
                 status: "pending",
-                createdAt: new Date().toISOString(),
+                requestedAt: new Date().toISOString(),
                 userName: currentUser.email
             });
-            showMessage(`Withdrawal request of ₦${amount.toFixed(2)} submitted. Awaiting admin approval.`, false);
+            showMessage(`📤 Withdrawal request of ₦${amount.toFixed(2)} submitted. Admin will approve and process.`, false);
         } catch(err) { handleFirestoreError(err); }
     }
 
     async function viewPlanHistory(planId) {
         try {
-            const q = query(collection(db, "transactions"), where("planId", "==", planId));
-            const snap = await getDocs(q);
-            let list = "<ul>";
-            snap.forEach(d => { const t = d.data(); list += `<li>${new Date(t.date).toLocaleString()} - ${t.type}: ₦${t.amount.toFixed(2)}</li>`; });
+            // Show both regular confirmed transactions & also show pending requests maybe
+            const txQuery = query(collection(db, "transactions"), where("planId", "==", planId));
+            const txSnap = await getDocs(txQuery);
+            let list = "<strong>✅ Confirmed transactions:</strong><ul>";
+            txSnap.forEach(d => { const t = d.data(); list += `<li>${new Date(t.date).toLocaleString()} - ${t.type}: ₦${t.amount.toFixed(2)}</li>`; });
             list += "</ul>";
-            showModal("Transaction History", list, "Close");
+            // Show pending deposit requests
+            const depReqQuery = query(collection(db, "deposit_requests"), where("planId", "==", planId), where("status", "==", "pending"));
+            const depReqSnap = await getDocs(depReqQuery);
+            if (!depReqSnap.empty) {
+                list += "<strong>⏳ Pending deposit requests:</strong><ul>";
+                depReqSnap.forEach(d => { const r = d.data(); list += `<li>₦${r.amount} requested on ${new Date(r.requestDate).toLocaleString()}</li>`; });
+                list += "</ul>";
+            }
+            const wdReqQuery = query(collection(db, "withdrawal_requests"), where("planId", "==", planId), where("status", "==", "pending"));
+            const wdReqSnap = await getDocs(wdReqQuery);
+            if (!wdReqSnap.empty) {
+                list += "<strong>⏳ Pending withdrawal requests:</strong><ul>";
+                wdReqSnap.forEach(d => { const r = d.data(); list += `<li>₦${r.amount} requested on ${new Date(r.requestedAt).toLocaleString()}</li>`; });
+                list += "</ul>";
+            }
+            if (txSnap.empty && depReqSnap.empty && wdReqSnap.empty) list = "<p>No transactions or pending requests.</p>";
+            showModal("Transaction & Request History", list, "Close");
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // ----- THRIFT GROUPS (unchanged) -----
+    // ========== 2. CREATE PLANS (balance starts at 0, initial deposit as request) ==========
+    async function createPlanWithInitialDeposit(planData, initialDepositAmt) {
+        try {
+            const planRef = await addDoc(collection(db, "savings_plans"), { ...planData, balance: 0, createdAt: new Date().toISOString() });
+            if (initialDepositAmt > 0) {
+                await addDoc(collection(db, "deposit_requests"), {
+                    userId: currentUser.uid,
+                    planId: planRef.id,
+                    amount: initialDepositAmt,
+                    status: "pending",
+                    requestDate: new Date().toISOString(),
+                    planType: planData.type
+                });
+                showMessage(`✅ Plan created! Initial deposit of ₦${initialDepositAmt} requires admin approval to reflect.`, false);
+            } else {
+                showMessage(`Plan created successfully.`, false);
+            }
+            renderUserPlans();
+        } catch(err) { handleFirestoreError(err); }
+    }
+
+    document.getElementById('createFlexBtn')?.addEventListener('click', () => {
+        showModal("Flexible Plan", `<div class="form-group"><label>Initial deposit (₦) - will be approved by admin</label><input type="number" id="flexDeposit" value="0" step="100"></div>`, "Create Plan")
+        .then(async ok => {
+            if(ok && currentUser) {
+                let amt = parseFloat(document.getElementById('flexDeposit')?.value) || 0;
+                if (amt < 0) amt = 0;
+                await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "flex" }, amt);
+            }
+        });
+    });
+    document.getElementById('createLockedBtn')?.addEventListener('click', () => {
+        showModal("Locked Plan", `<div class="form-group"><label>Initial deposit (₦) - pending approval</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, "Create")
+        .then(async ok => {
+            if(ok && currentUser) {
+                let amt = parseFloat(document.getElementById('lockAmount')?.value) || 0;
+                let until = document.getElementById('lockUntil')?.value;
+                if(!until) { showMessage("Lock until date required"); return; }
+                await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "locked", lockUntil: until }, amt);
+            }
+        });
+    });
+    document.getElementById('createTargetBtn')?.addEventListener('click', () => {
+        showModal("Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦) - pending approval</label><input type="number" id="targetDeposit" value="0"></div>`, "Create")
+        .then(async ok => {
+            if(ok && currentUser) {
+                let target = parseFloat(document.getElementById('targetAmount')?.value);
+                let date = document.getElementById('targetDate')?.value;
+                let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0;
+                if(!target || !date) { showMessage("Target amount & date required"); return; }
+                if (target <=0) { showMessage("Target amount must be >0"); return; }
+                await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit);
+            }
+        });
+    });
+
+    // ========== 3. THRIFT GROUPS: NO USER CREATION, ONLY JOIN EXISTING GROUPS (admin created) ==========
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
         unsubscribeGroups = onSnapshot(q, (snapshot) => {
             if (!currentUser) return;
             let html = '';
+            let anyGroup = false;
             snapshot.forEach(docSnap => {
+                anyGroup = true;
                 const g = { id: docSnap.id, ...docSnap.data() };
                 const isMember = g.members?.includes(currentUser.uid);
                 const count = g.members?.length || 0;
                 let btns = '';
-                if (isMember) btns = `<button class="btn btn-sm btn-primary" data-group="${g.id}" data-gaction="contribute">Contribute (₦${g.contributionAmount})</button><button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="claim">Claim Payout</button>`;
-                else btns = `<button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="join">Join Group</button>`;
-                html += `<div class="card"><div class="plan-type">Group: ${g.name}</div><div>💰 Contribution: ₦${g.contributionAmount} every ${g.frequencyDays} days</div><div>👥 Members: ${count}/${g.maxMembers}</div><div>🔄 Next payout index: ${g.currentPayoutIndex}</div>${btns}</div>`;
+                if (isMember) {
+                    btns = `<button class="btn btn-sm btn-primary" data-group="${g.id}" data-gaction="contribute">Contribute (₦${g.contributionAmount})</button>
+                            <button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="claim">Claim Payout</button>`;
+                } else {
+                    btns = `<button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="join">Join Group</button>`;
+                }
+                html += `<div class="card"><div class="plan-type">📌 ${g.name}</div><div>💰 Contribution: ₦${g.contributionAmount} every ${g.frequencyDays} days</div><div>👥 Members: ${count}/${g.maxMembers}</div><div>🔄 Next payout index: ${g.currentPayoutIndex || 0}</div>${btns}</div>`;
             });
-            groupsList.innerHTML = html || "<p>No groups. Create one!</p>";
+            groupsList.innerHTML = anyGroup ? html : '<p>📢 No groups available yet. Admin will create thrift groups soon. Stay tuned!</p>';
+            // Attach event listeners for dynamic buttons
             document.querySelectorAll('[data-gaction="join"]').forEach(btn => btn.onclick = () => joinGroup(btn.dataset.group));
             document.querySelectorAll('[data-gaction="contribute"]').forEach(btn => btn.onclick = () => contributeToGroup(btn.dataset.group));
             document.querySelectorAll('[data-gaction="claim"]').forEach(btn => btn.onclick = () => claimPayout(btn.dataset.group));
         }, err => handleFirestoreError(err));
     }
+
     async function joinGroup(groupId) {
         try {
             const groupRef = doc(db, "groups", groupId);
             const groupSnap = await getDoc(groupRef);
             if (!groupSnap.exists()) return showMessage("Group not found");
             const group = groupSnap.data();
-            if (group.members?.includes(currentUser.uid)) return showMessage("Already member");
-            if (group.members?.length >= group.maxMembers) return showMessage("Group full");
+            if (group.members?.includes(currentUser.uid)) return showMessage("Already a member");
+            if (group.members?.length >= group.maxMembers) return showMessage("Group is full");
             await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
-            showMessage(`Joined ${group.name}`, false);
+            showMessage(`🎉 Successfully joined "${group.name}"!`, false);
         } catch(err) { handleFirestoreError(err); }
     }
+
     async function contributeToGroup(groupId) {
         try {
             const groupRef = doc(db, "groups", groupId);
             const groupSnap = await getDoc(groupRef);
             const group = groupSnap.data();
-            if (!group.members?.includes(currentUser.uid)) return showMessage("Not a member");
+            if (!group.members?.includes(currentUser.uid)) return showMessage("You are not a member.");
+            // record contribution (does not require admin approval, part of thrift cycle)
             await addDoc(collection(db, "contributions"), { groupId, userId: currentUser.uid, amount: group.contributionAmount, date: new Date().toISOString() });
-            showMessage(`Contributed ₦${group.contributionAmount} to ${group.name}`, false);
+            showMessage(`✅ Contributed ₦${group.contributionAmount} to ${group.name}.`, false);
         } catch(err) { handleFirestoreError(err); }
     }
+
+    // claimPayout: processes group cycle and directly adds to user's flexible plan (bypass deposit request for thrift earnings)
     async function claimPayout(groupId) {
         try {
             const groupRef = doc(db, "groups", groupId);
@@ -316,32 +392,29 @@
             const group = groupSnap.data();
             const members = group.members || [];
             const idx = group.currentPayoutIndex || 0;
-            if (members[idx] !== currentUser.uid) return showMessage("Not your turn");
+            if (members[idx] !== currentUser.uid) return showMessage("Not your turn for payout.");
             const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
             const contribSnap = await getDocs(contribQuery);
             const counts = {};
             contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
-            for (let m of members) if ((counts[m] || 0) <= idx) return showMessage("Not all members have paid this cycle");
+            for (let m of members) if ((counts[m] || 0) <= idx) return showMessage("Not all members have contributed for this cycle.");
             const pot = group.contributionAmount * members.length;
+            // find or create flexible plan to receive payout
             const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
             const flexSnap = await getDocs(flexQuery);
-            if (flexSnap.empty) await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
-            else await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+            if (flexSnap.empty) {
+                await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
+            } else {
+                await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+            }
             await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
             await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString(), description: `Payout from group ${group.name}` });
-            showMessage(`🎉 You received ₦${pot.toFixed(2)} payout!`, false);
+            showMessage(`🎉 Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
             renderUserPlans();
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // ----- CREATE PLAN / GROUP MODALS (unchanged) -----
-    document.getElementById('createFlexBtn')?.addEventListener('click', () => showModal("Flexible Plan", `<input type="number" id="flexDeposit" placeholder="Initial deposit (₦)" value="0">`, "Create").then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('flexDeposit')?.value)||0; await addDoc(collection(db,"savings_plans"),{userId:currentUser.uid,type:"flex",balance:amt,createdAt:new Date().toISOString()}); renderUserPlans(); } }));
-    document.getElementById('createLockedBtn')?.addEventListener('click', () => showModal("Locked Plan", `<div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, "Create").then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('lockAmount')?.value)||0; let until = document.getElementById('lockUntil')?.value; if(!until) return; await addDoc(collection(db,"savings_plans"),{userId:currentUser.uid,type:"locked",balance:amt,lockUntil:until,createdAt:new Date().toISOString()}); renderUserPlans(); } }));
-    document.getElementById('createTargetBtn')?.addEventListener('click', () => showModal("Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="targetDeposit" value="0"></div>`, "Create").then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value)||0; if(!target||!date) return; await addDoc(collection(db,"savings_plans"),{userId:currentUser.uid,type:"target",balance:deposit,targetAmount:target,targetDate:date,createdAt:new Date().toISOString()}); renderUserPlans(); } }));
-    document.getElementById('showCreateGroupBtn')?.addEventListener('click', () => showModal("Create Thrift Group", `<div class="form-group"><label>Group Name</label><input id="groupName"></div><div class="form-group"><label>Contribution (₦)</label><input type="number" id="groupContrib"></div><div class="form-group"><label>Frequency (days)</label><input type="number" id="groupFreq"></div><div class="form-group"><label>Max Members</label><input type="number" id="groupMax"></div>`, "Create Group").then(async ok => { if(ok && currentUser) { let name = document.getElementById('groupName')?.value; let contrib = parseFloat(document.getElementById('groupContrib')?.value); let freq = parseInt(document.getElementById('groupFreq')?.value); let max = parseInt(document.getElementById('groupMax')?.value); if(!name||!contrib||!freq||!max) return; await addDoc(collection(db,"groups"),{name,contributionAmount:contrib,frequencyDays:freq,maxMembers:max,creatorId:currentUser.uid,members:[currentUser.uid],currentPayoutIndex:0,createdAt:new Date().toISOString()}); showMessage(`Group "${name}" created`, false); } }));
-    document.getElementById('showJoinGroupBtn')?.addEventListener('click', () => showModal("Join Thrift Group", `<input placeholder="Group ID" id="joinGroupId">`, "Join").then(async ok => { if(ok && currentUser) { let gid = document.getElementById('joinGroupId')?.value; if(gid) await joinGroup(gid); } }));
-
-    // ----- ADMIN ACCOUNT CREATION (fallback) -----
+    // ========== 4. ADMIN ACCOUNT FALLBACK ==========
     async function createAdminAccountManually() {
         try {
             const userCred = await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123");
@@ -356,7 +429,7 @@
     }
     document.getElementById('createAdminBtn').onclick = createAdminAccountManually;
 
-    // ----- LOGIN / REGISTER -----
+    // ========== 5. AUTH FLOW (Regular vs Admin redirection) ==========
     document.getElementById('showLoginBtn').onclick = () => { loginForm.classList.remove('hidden'); registerForm.classList.add('hidden'); };
     document.getElementById('showRegisterBtn').onclick = () => { registerForm.classList.remove('hidden'); loginForm.classList.add('hidden'); };
     document.getElementById('doLoginBtn').onclick = async () => {
@@ -376,24 +449,19 @@
     };
     logoutBtn.onclick = () => signOut(auth);
 
-    // ----- AUTH STATE CHANGE (redirect admin to admin.html) -----
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
-            // Check if user is admin by fetching role from Firestore
             const userDoc = await getDoc(doc(db, "users", user.uid));
             let role = userDoc.exists() ? userDoc.data().role : null;
-            // Special case for admin email if role not set
             if (user.email === "admin@omaposhsmartsavings.com" && role !== 'admin') {
                 await setDoc(doc(db, "users", user.uid), { fullName: "Administrator", email: user.email, role: "admin", createdAt: new Date().toISOString() }, { merge: true });
                 role = 'admin';
             }
             if (role === 'admin') {
-                // Redirect to admin dashboard page (admin.html)
                 window.location.href = "admin.html";
                 return;
             } else {
-                // Regular user: show normal dashboard
                 authSection.classList.add('hidden');
                 dashboardSection.classList.remove('hidden');
                 const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
