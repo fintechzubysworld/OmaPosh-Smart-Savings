@@ -19,6 +19,8 @@
         .btn-outline:hover { background: rgba(255,255,255,0.1); }
         .btn-danger { background: #dc3545; color: white; }
         .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
         .btn-sm { padding: 5px 12px; font-size: 0.8rem; margin: 0 3px; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
@@ -35,6 +37,7 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #f5f5f5; }
         .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
+        .badge { background: #ffc107; color: #856404; padding: 4px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
         .hidden { display: none !important; }
         #modal {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -57,7 +60,7 @@
         </div>
     </header>
     <div class="main-content">
-        <!-- Login Section (shown if not authenticated or not admin) -->
+        <!-- Login Section -->
         <div id="loginSection" class="auth-box" style="max-width:400px; margin:40px auto;">
             <h2>Admin Login</h2>
             <div class="form-group"><label>Email</label><input type="email" id="adminEmail" placeholder="admin@omaposhsmartsavings.com"></div>
@@ -66,9 +69,15 @@
             <div id="loginError" class="alert hidden" style="margin-top:15px;"></div>
         </div>
 
-        <!-- Admin Dashboard Content -->
+        <!-- Admin Dashboard -->
         <div id="dashboardContent" class="hidden">
             <div class="stats-row" id="statsCards"></div>
+
+            <!-- NEW: Withdrawal Requests Section -->
+            <div class="section">
+                <div class="section-title">💰 Pending Withdrawal Requests</div>
+                <div id="withdrawalRequestsTable"></div>
+            </div>
 
             <div class="section">
                 <div class="section-title">👥 Staff Management</div>
@@ -110,7 +119,6 @@
 </div>
 
 <script type="module">
-    // Firebase configuration (same as your main app)
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -122,7 +130,7 @@
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -163,19 +171,122 @@
         setTimeout(() => loginError.classList.add('hidden'), 4000);
     }
 
-    // Load all admin data
+    // Load withdrawal requests
+    async function loadWithdrawalRequests() {
+        const requestsQuery = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
+        const snapshot = await getDocs(requestsQuery);
+        if (snapshot.empty) {
+            document.getElementById('withdrawalRequestsTable').innerHTML = '<p>No pending withdrawal requests.</p>';
+            return;
+        }
+        let html = '</table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
+        for (const docSnap of snapshot.docs) {
+            const req = docSnap.data();
+            // Get user full name
+            const userDoc = await getDoc(doc(db, "users", req.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
+            html += `<tr>
+                <td>${userName}</td>
+                <td>${req.planType}</td>
+                <td>₦${req.amount.toFixed(2)}</td>
+                <td>${new Date(req.createdAt).toLocaleString()}</td>
+                <td>${req.planId}</td>
+                <td>
+                    <button class="btn btn-sm btn-success" data-request="${docSnap.id}" data-action="approve">Approve</button>
+                    <button class="btn btn-sm btn-danger" data-request="${docSnap.id}" data-action="reject">Reject</button>
+                </td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        document.getElementById('withdrawalRequestsTable').innerHTML = html;
+        // Attach event handlers
+        document.querySelectorAll('[data-action="approve"]').forEach(btn => btn.onclick = () => approveWithdrawal(btn.dataset.request));
+        document.querySelectorAll('[data-action="reject"]').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.request));
+    }
+
+    // Approve withdrawal: transfer money from plan to user's flexible plan
+    async function approveWithdrawal(requestId) {
+        if (!confirm("Approve this withdrawal request? The amount will be moved to the user's flexible savings.")) return;
+        const requestRef = doc(db, "withdrawal_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const request = requestSnap.data();
+        const { userId, planId, amount } = request;
+        
+        try {
+            await runTransaction(db, async (transaction) => {
+                // 1. Get the source plan (locked/target)
+                const planRef = doc(db, "savings_plans", planId);
+                const planSnap = await transaction.get(planRef);
+                if (!planSnap.exists()) throw new Error("Plan not found");
+                const plan = planSnap.data();
+                if (plan.userId !== userId) throw new Error("User mismatch");
+                if (plan.balance < amount) throw new Error("Insufficient balance in plan");
+                
+                // 2. Find or create user's flexible plan
+                const plansQuery = query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex"));
+                const flexSnap = await transaction.get(plansQuery);
+                let flexPlanRef;
+                if (flexSnap.empty) {
+                    // Create a new flexible plan for the user
+                    const newFlexRef = doc(collection(db, "savings_plans"));
+                    transaction.set(newFlexRef, {
+                        userId: userId,
+                        type: "flex",
+                        balance: amount,
+                        createdAt: new Date().toISOString()
+                    });
+                    flexPlanRef = newFlexRef;
+                } else {
+                    flexPlanRef = flexSnap.docs[0].ref;
+                    transaction.update(flexPlanRef, { balance: increment(amount) });
+                }
+                // 3. Deduct from source plan
+                transaction.update(planRef, { balance: increment(-amount) });
+                // 4. Mark request as approved
+                transaction.update(requestRef, { status: "approved", processedAt: new Date().toISOString() });
+                // 5. Add transaction record
+                const txRef = doc(collection(db, "transactions"));
+                transaction.set(txRef, {
+                    userId: userId,
+                    planId: planId,
+                    amount: amount,
+                    type: "withdrawal_approved",
+                    description: `Withdrawal approved from ${plan.type} plan`,
+                    date: new Date().toISOString()
+                });
+            });
+            showMessage("Withdrawal approved successfully", false);
+            loadWithdrawalRequests();
+            loadAdminData(); // refresh stats and tables
+        } catch (err) {
+            showMessage("Error approving withdrawal: " + err.message);
+        }
+    }
+
+    async function rejectWithdrawal(requestId) {
+        if (!confirm("Reject this withdrawal request?")) return;
+        const requestRef = doc(db, "withdrawal_requests", requestId);
+        await updateDoc(requestRef, { status: "rejected", processedAt: new Date().toISOString() });
+        showMessage("Request rejected", false);
+        loadWithdrawalRequests();
+    }
+
+    // Load all admin data (stats, staff, users, plans, groups)
     async function loadAdminData() {
         if (!currentAdmin) return;
-        // Stats
         const usersSnap = await getDocs(collection(db, "users"));
         const plansSnap = await getDocs(collection(db, "savings_plans"));
         const groupsSnap = await getDocs(collection(db, "groups"));
+        // Count pending withdrawal requests
+        const pendingRequestsSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")));
         let totalSavings = 0;
         plansSnap.forEach(d => totalSavings += d.data().balance || 0);
         document.getElementById('statsCards').innerHTML = `
             <div class="stat-card"><div class="stat-number">${usersSnap.size}</div><div class="stat-label">Total Users</div></div>
             <div class="stat-card"><div class="stat-number">₦${totalSavings.toLocaleString()}</div><div class="stat-label">Total Savings</div></div>
             <div class="stat-card"><div class="stat-number">${groupsSnap.size}</div><div class="stat-label">Thrift Groups</div></div>
+            <div class="stat-card"><div class="stat-number">${pendingRequestsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
         `;
 
         // Staff table (collector & supervisor)
@@ -232,7 +343,7 @@
         document.getElementById('allPlansTable').innerHTML = plansHtml;
 
         // All groups
-        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Action</th></tr></thead><tbody>';
+        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Action</th></table></thead><tbody>';
         for (const docSnap of groupsSnap.docs) {
             const g = docSnap.data();
             const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
@@ -245,7 +356,7 @@
                 <td><button class="btn btn-sm btn-danger" data-group="${docSnap.id}" data-action="deleteGroup">Delete</button></td>
             </tr>`;
         }
-        groupsHtml += '</tbody></table>';
+        groupsHtml += '</tbody></tr>';
         document.getElementById('allGroupsTable').innerHTML = groupsHtml;
         document.querySelectorAll('[data-action="deleteGroup"]').forEach(btn => btn.onclick = async () => {
             if (confirm("Permanently delete this group?")) {
@@ -274,7 +385,7 @@
     }
 
     async function disableStaff(uid) {
-        if (confirm("Disable this staff member? They will no longer have access.")) {
+        if (confirm("Disable this staff member? They will lose access.")) {
             await updateDoc(doc(db, "users", uid), { role: 'disabled' });
             loadAdminData();
             showMessage("Staff disabled", false);
@@ -329,24 +440,23 @@
     // Auth state observer
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            // Check if user is admin in Firestore
             const userDoc = await getDoc(doc(db, "users", user.uid));
             const role = userDoc.exists() ? userDoc.data().role : null;
             if (role === 'admin') {
                 currentAdmin = user;
-                // Display the full name from Firestore (fallback to email)
                 const fullName = userDoc.data().fullName || user.email;
-                adminNameSpan.innerHTML = `👋 ${fullName}`;   // <-- full name displayed here
+                adminNameSpan.innerHTML = `👋 ${fullName}`;
                 loginSection.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
                 await loadAdminData();
-                // Listen for realtime updates
+                await loadWithdrawalRequests();
+                // Realtime listeners
                 const unsubUsers = onSnapshot(collection(db, "users"), () => loadAdminData());
                 const unsubPlans = onSnapshot(collection(db, "savings_plans"), () => loadAdminData());
                 const unsubGroups = onSnapshot(collection(db, "groups"), () => loadAdminData());
-                window.adminListeners = [unsubUsers, unsubPlans, unsubGroups];
+                const unsubRequests = onSnapshot(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")), () => loadWithdrawalRequests());
+                window.adminListeners = [unsubUsers, unsubPlans, unsubGroups, unsubRequests];
             } else {
-                // Not admin – sign out and show login
                 await signOut(auth);
                 loginSection.classList.remove('hidden');
                 dashboardContent.classList.add('hidden');
