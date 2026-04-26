@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmaPosh Admin Dashboard</title>
+    <title>OmaPosh Admin Dashboard | Deposit & Withdrawal Approval</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; padding: 20px; }
@@ -58,7 +58,7 @@
     <header>
         <div class="logo">
             <h1>👑 OmaPosh Admin Portal</h1>
-            <p>co-operative management • full admin control</p>
+            <p>co-operative management • deposit & withdrawal approval</p>
         </div>
         <div class="user-info">
             <span id="adminName"></span>
@@ -82,7 +82,7 @@
         <div id="dashboardContent" class="hidden">
             <div class="stats-row" id="statsCards"></div>
 
-            <!-- NEW: System Accounts & Financial Models -->
+            <!-- System Accounts & Financial Models -->
             <div class="section">
                 <div class="section-title">🏦 System Accounts & Financial Models</div>
                 <div id="systemAccountsView"></div>
@@ -91,9 +91,15 @@
                 </div>
             </div>
 
-            <!-- Pending Withdrawal Requests (existing) -->
+            <!-- NEW: Pending Deposit Requests -->
             <div class="section">
-                <div class="section-title">💰 Pending Withdrawal Requests</div>
+                <div class="section-title">💰 Pending Deposit Requests</div>
+                <div id="depositRequestsTable"></div>
+            </div>
+
+            <!-- Pending Withdrawal Requests -->
+            <div class="section">
+                <div class="section-title">💸 Pending Withdrawal Requests</div>
                 <div id="withdrawalRequestsTable"></div>
             </div>
 
@@ -107,7 +113,7 @@
                     <button class="btn btn-outline" id="resetPasswordBtn">🔑 Reset Password</button>
                     <button class="btn btn-danger" id="wipeUserDataBtn">⚠️ Wipe User Data</button>
                 </div>
-                <div id="userManagementTable">用户</div>
+                <div id="userManagementTable"></div>
             </div>
 
             <!-- Deposit Creation -->
@@ -142,11 +148,9 @@
                     <button class="btn btn-outline" id="viewStatementBtn">View User Statement</button>
                     <button class="btn btn-outline" id="viewAuditTrailBtn">View Audit Trail</button>
                 </div>
-                <div id="statementView"></div>
-                <div id="auditTrailView"></div>
             </div>
 
-            <!-- Staff Management (existing) -->
+            <!-- Staff Management -->
             <div class="section">
                 <div class="section-title">👥 Staff Management</div>
                 <button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button>
@@ -158,7 +162,7 @@
                 </div>
             </div>
 
-            <!-- All Users, Plans, Groups (existing) -->
+            <!-- All Users, Plans, Groups -->
             <div class="section">
                 <div class="section-title">👥 All Users</div>
                 <div id="allUsersTable"></div>
@@ -197,7 +201,7 @@
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, addDoc, writeBatch, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, addDoc, writeBatch, arrayRemove, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -218,7 +222,7 @@
 
     let currentAdmin = null;
     let modalResolve = null;
-    let esusuFraction = 0.01; // default 1%
+    let esusuFraction = 0.01;
 
     function showModal(title, bodyHtml, confirmText = "Confirm") {
         return new Promise(resolve => {
@@ -265,7 +269,6 @@
         if (!esusuSnap.exists()) {
             await setDoc(esusuRef, { name: "OmaPosh Rotating Esusu Account", accountNumber: generate10Digit(), balance: 0, createdAt: new Date().toISOString() });
         }
-        // Load esusu fraction from Firestore if exists
         const configRef = doc(db, "system_config", "financial_models");
         const configSnap = await getDoc(configRef);
         if (configSnap.exists()) {
@@ -317,7 +320,7 @@
         }
     }
 
-    // ======================= MODIFIED GROUP CREATION (with models) =======================
+    // ======================= GROUP CREATION WITH MODELS =======================
     async function createThriftGroupWithModels() {
         const result = await showModal("Create Thrift Group", `
             <div class="form-group"><label>Group Name</label><input id="groupName"></div>
@@ -350,78 +353,161 @@
         }
     }
 
-    // ======================= HELPER: Apply models on contribution =======================
-    async function applyGroupFinancialModels(groupId, userId, contributionAmount) {
-        const groupRef = doc(db, "groups", groupId);
-        const groupSnap = await getDoc(groupRef);
-        if (!groupSnap.exists()) return;
-        const group = groupSnap.data();
-        // Track user contribution count for this group (for profit/loss model)
-        const userStatRef = doc(db, "group_user_stats", `${groupId}_${userId}`);
-        const statSnap = await getDoc(userStatRef);
-        let count = statSnap.exists() ? statSnap.data().count : 0;
-        count++;
-        await setDoc(userStatRef, { groupId, userId, count }, { merge: true });
-
-        // 1. Profit/Loss Model: on every 30th contribution, take 1/30 of that contribution
-        if (group.applyProfitLoss && count % 30 === 0) {
-            const takeAmount = contributionAmount / 30;
-            const profitLossRef = doc(db, "system_accounts", "profit_loss");
-            await runTransaction(db, async (transaction) => {
-                const plSnap = await transaction.get(profitLossRef);
-                if (!plSnap.exists()) throw new Error("Profit/Loss account not found");
-                const newBalance = (plSnap.data().balance || 0) + takeAmount;
-                transaction.update(profitLossRef, { balance: newBalance });
-            });
-            await addDoc(collection(db, "transactions"), {
-                userId: "system",
-                groupId,
-                amount: takeAmount,
-                type: "profit_loss_transfer",
-                description: `1/30 of 30th contribution (${contributionAmount}) from user ${userId} in group ${groupId}`,
-                date: new Date().toISOString()
-            });
-            await logAudit("profit_loss_transfer", userId, { groupId, amount: takeAmount, contributionCount: count });
+    // ======================= DEPOSIT REQUEST APPROVAL (NEW) =======================
+    async function loadDepositRequests() {
+        const requestsQuery = query(collection(db, "deposit_requests"), where("status", "==", "pending"));
+        const snapshot = await getDocs(requestsQuery);
+        if (snapshot.empty) {
+            document.getElementById('depositRequestsTable').innerHTML = '<p>No pending deposit requests.</p>';
+            return;
         }
-
-        // 2. Esusu Model: take fraction from every contribution
-        if (group.applyEsusu) {
-            const takeAmount = contributionAmount * esusuFraction;
-            if (takeAmount > 0) {
-                const esusuRef = doc(db, "system_accounts", "esusu");
-                await runTransaction(db, async (transaction) => {
-                    const esusuSnap = await transaction.get(esusuRef);
-                    if (!esusuSnap.exists()) throw new Error("Esusu account not found");
-                    const newBalance = (esusuSnap.data().balance || 0) + takeAmount;
-                    transaction.update(esusuRef, { balance: newBalance });
-                });
-                await addDoc(collection(db, "transactions"), {
-                    userId: "system",
-                    groupId,
-                    amount: takeAmount,
-                    type: "esusu_transfer",
-                    description: `${esusuFraction*100}% of contribution (${contributionAmount}) from user ${userId} in group ${groupId}`,
-                    date: new Date().toISOString()
-                });
-                await logAudit("esusu_transfer", userId, { groupId, amount: takeAmount, fraction: esusuFraction });
-            }
+        let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
+        for (const docSnap of snapshot.docs) {
+            const req = docSnap.data();
+            const userDoc = await getDoc(doc(db, "users", req.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
+            html += `<tr>
+                <td>${userName}</td>
+                <td>${req.planType || 'N/A'}</td>
+                <td>₦${req.amount.toFixed(2)}</td>
+                <td>${new Date(req.requestDate).toLocaleString()}</td>
+                <td>${req.planId}</td>
+                <td><button class="btn btn-sm btn-success" data-request="${docSnap.id}" data-action="approveDeposit">Approve</button> <button class="btn btn-sm btn-danger" data-request="${docSnap.id}" data-action="rejectDeposit">Reject</button></td>
+            </tr>`;
         }
+        html += '</tbody></table>';
+        document.getElementById('depositRequestsTable').innerHTML = html;
+        document.querySelectorAll('[data-action="approveDeposit"]').forEach(btn => btn.onclick = () => approveDeposit(btn.dataset.request));
+        document.querySelectorAll('[data-action="rejectDeposit"]').forEach(btn => btn.onclick = () => rejectDeposit(btn.dataset.request));
     }
 
-    // ======================= LOAD ALL EXISTING DATA (keep original) =======================
+    async function approveDeposit(requestId) {
+        if (!confirm("Approve this deposit request?")) return;
+        const requestRef = doc(db, "deposit_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const request = requestSnap.data();
+        const { userId, planId, amount } = request;
+        try {
+            await runTransaction(db, async (transaction) => {
+                const planRef = doc(db, "savings_plans", planId);
+                const planSnap = await transaction.get(planRef);
+                if (!planSnap.exists()) throw new Error("Plan not found");
+                if (planSnap.data().userId !== userId) throw new Error("User mismatch");
+                transaction.update(planRef, { balance: increment(amount) });
+                transaction.update(requestRef, { status: "approved", processedAt: new Date().toISOString() });
+                const txRef = doc(collection(db, "transactions"));
+                transaction.set(txRef, {
+                    userId, planId, amount, type: "deposit_approved",
+                    description: `Deposit approved for ${request.planType} plan`,
+                    date: new Date().toISOString()
+                });
+            });
+            await logAudit("approve_deposit", userId, { requestId, amount });
+            showMessage(`Deposit request of ₦${amount.toFixed(2)} approved`, false);
+            loadDepositRequests();
+            loadAdminData();
+        } catch (err) { showMessage(err.message); }
+    }
+
+    async function rejectDeposit(requestId) {
+        if (!confirm("Reject this deposit request?")) return;
+        const requestRef = doc(db, "deposit_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const { userId } = requestSnap.data();
+        await updateDoc(requestRef, { status: "rejected", processedAt: new Date().toISOString() });
+        await logAudit("reject_deposit", userId, { requestId });
+        showMessage("Deposit request rejected", false);
+        loadDepositRequests();
+    }
+
+    // ======================= WITHDRAWAL REQUEST APPROVAL =======================
+    async function loadWithdrawalRequests() {
+        const requestsQuery = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
+        const snapshot = await getDocs(requestsQuery);
+        if (snapshot.empty) {
+            document.getElementById('withdrawalRequestsTable').innerHTML = '<p>No pending withdrawal requests.</p>';
+            return;
+        }
+        let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
+        for (const docSnap of snapshot.docs) {
+            const req = docSnap.data();
+            const userDoc = await getDoc(doc(db, "users", req.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
+            html += `<tr>
+                <td>${userName}</td>
+                <td>${req.planType}</td>
+                <td>₦${req.amount.toFixed(2)}</td>
+                <td>${new Date(req.requestedAt).toLocaleString()}</td>
+                <td>${req.planId}</td>
+                <td><button class="btn btn-sm btn-success" data-request="${docSnap.id}" data-action="approveWithdrawal">Approve</button> <button class="btn btn-sm btn-danger" data-request="${docSnap.id}" data-action="rejectWithdrawal">Reject</button></td>
+            </tr>`;
+        }
+        html += '</tbody><tr>';
+        document.getElementById('withdrawalRequestsTable').innerHTML = html;
+        document.querySelectorAll('[data-action="approveWithdrawal"]').forEach(btn => btn.onclick = () => approveWithdrawal(btn.dataset.request));
+        document.querySelectorAll('[data-action="rejectWithdrawal"]').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.request));
+    }
+
+    async function approveWithdrawal(requestId) {
+        if (!confirm("Approve this withdrawal request?")) return;
+        const requestRef = doc(db, "withdrawal_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const request = requestSnap.data();
+        const { userId, planId, amount } = request;
+        try {
+            await runTransaction(db, async (transaction) => {
+                const planRef = doc(db, "savings_plans", planId);
+                const planSnap = await transaction.get(planRef);
+                if (!planSnap.exists()) throw new Error("Plan not found");
+                if (planSnap.data().userId !== userId) throw new Error("User mismatch");
+                if ((planSnap.data().balance || 0) < amount) throw new Error("Insufficient balance");
+                transaction.update(planRef, { balance: increment(-amount) });
+                transaction.update(requestRef, { status: "approved", processedAt: new Date().toISOString() });
+                const txRef = doc(collection(db, "transactions"));
+                transaction.set(txRef, {
+                    userId, planId, amount, type: "withdrawal_approved",
+                    description: `Withdrawal approved from ${request.planType} plan`,
+                    date: new Date().toISOString()
+                });
+            });
+            await logAudit("approve_withdrawal", userId, { requestId, amount });
+            showMessage(`Withdrawal request of ₦${amount.toFixed(2)} approved`, false);
+            loadWithdrawalRequests();
+            loadAdminData();
+        } catch (err) { showMessage(err.message); }
+    }
+
+    async function rejectWithdrawal(requestId) {
+        if (!confirm("Reject this withdrawal request?")) return;
+        const requestRef = doc(db, "withdrawal_requests", requestId);
+        const requestSnap = await getDoc(requestRef);
+        if (!requestSnap.exists()) return showMessage("Request not found");
+        const { userId } = requestSnap.data();
+        await updateDoc(requestRef, { status: "rejected", processedAt: new Date().toISOString() });
+        await logAudit("reject_withdrawal", userId, { requestId });
+        showMessage("Withdrawal request rejected", false);
+        loadWithdrawalRequests();
+    }
+
+    // ======================= LOAD ALL DATA =======================
     async function loadAdminData() {
         if (!currentAdmin) return;
         const usersSnap = await getDocs(collection(db, "users"));
         const plansSnap = await getDocs(collection(db, "savings_plans"));
         const groupsSnap = await getDocs(collection(db, "groups"));
-        const pendingRequestsSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")));
+        const pendingWithdrawalsSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")));
+        const pendingDepositsSnap = await getDocs(query(collection(db, "deposit_requests"), where("status", "==", "pending")));
         let totalSavings = 0;
         plansSnap.forEach(d => totalSavings += d.data().balance || 0);
         document.getElementById('statsCards').innerHTML = `
             <div class="stat-card"><div class="stat-number">${usersSnap.size}</div><div class="stat-label">Total Users</div></div>
             <div class="stat-card"><div class="stat-number">₦${totalSavings.toLocaleString()}</div><div class="stat-label">Total Savings</div></div>
             <div class="stat-card"><div class="stat-number">${groupsSnap.size}</div><div class="stat-label">Thrift Groups</div></div>
-            <div class="stat-card"><div class="stat-number">${pendingRequestsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
+            <div class="stat-card"><div class="stat-number">${pendingWithdrawalsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
+            <div class="stat-card"><div class="stat-number">${pendingDepositsSnap.size}</div><div class="stat-label">Pending Deposits</div></div>
         `;
 
         // User management table
@@ -434,9 +520,9 @@
                 <td>${u.email}</td>
                 <td>${status}</td>
                 <td class="action-group"><button class="btn btn-sm btn-outline" data-uid="${docSnap.id}" data-action="selectUserStatement">Statement</button></td>
-            </tr>`;
+            </table>`;
         }
-        userMgmtHtml += '</tbody></tr>';
+        userMgmtHtml += '</tbody></table>';
         document.getElementById('userManagementTable').innerHTML = userMgmtHtml;
         document.querySelectorAll('[data-action="selectUserStatement"]').forEach(btn => btn.onclick = () => showStatement(btn.dataset.uid));
 
@@ -444,7 +530,12 @@
         let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
-            usersHtml += `<tr><td>${u.fullName || 'N/A'}</td><td>${u.email}</td><td>${u.role || 'user'}</td><td>${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
+            usersHtml += `<tr>
+                <td>${u.fullName || 'N/A'}</td>
+                <td>${u.email}</td>
+                <td>${u.role || 'user'}</td>
+                <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+            </tr>`;
         }
         usersHtml += '</tbody></table>';
         document.getElementById('allUsersTable').innerHTML = usersHtml;
@@ -467,7 +558,7 @@
         document.querySelectorAll('[data-action="deleteStaff"]').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
 
         // All plans
-        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
+        let plansHtml = '树<thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
         for (const docSnap of plansSnap.docs) {
             const p = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", p.userId));
@@ -485,8 +576,8 @@
         plansHtml += '</tbody></table>';
         document.getElementById('allPlansTable').innerHTML = plansHtml;
 
-        // Groups table (display model flags)
-        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Action</th></tr></thead><tbody>';
+        // Groups table
+        let groupsHtml = '树<thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Action</th></tr></thead><tbody>';
         for (const docSnap of groupsSnap.docs) {
             const g = docSnap.data();
             const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
@@ -515,78 +606,24 @@
         });
     }
 
-    // Withdrawal requests (same as before)
-    async function loadWithdrawalRequests() {
-        const requestsQuery = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
-        const snapshot = await getDocs(requestsQuery);
-        if (snapshot.empty) {
-            document.getElementById('withdrawalRequestsTable').innerHTML = '<p>No pending withdrawal requests.</p>';
-            return;
-        }
-        let html = '</table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
-        for (const docSnap of snapshot.docs) {
-            const req = docSnap.data();
-            const userDoc = await getDoc(doc(db, "users", req.userId));
-            const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
+    async function loadLoans() {
+        const loansSnap = await getDocs(collection(db, "loans"));
+        let html = '树<thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Repayment Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+        for (const docSnap of loansSnap.docs) {
+            const l = docSnap.data();
+            const userDoc = await getDoc(doc(db, "users", l.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : l.userId;
             html += `<tr>
                 <td>${userName}</td>
-                <td>${req.planType}</td>
-                <td>₦${req.amount.toFixed(2)}</td>
-                <td>${new Date(req.createdAt).toLocaleString()}</td>
-                <td>${req.planId}</td>
-                <td><button class="btn btn-sm btn-success" data-request="${docSnap.id}" data-action="approve">Approve</button> <button class="btn btn-sm btn-danger" data-request="${docSnap.id}" data-action="reject">Reject</button></td>
+                <td>₦${l.amount}</td>
+                <td>${l.interestRate}%</td>
+                <td>${l.repayMonths}</td>
+                <td>₦${l.remainingBalance.toFixed(2)}</td>
+                <td>${l.status}</td>
             </tr>`;
         }
         html += '</tbody></table>';
-        document.getElementById('withdrawalRequestsTable').innerHTML = html;
-        document.querySelectorAll('[data-action="approve"]').forEach(btn => btn.onclick = () => approveWithdrawal(btn.dataset.request));
-        document.querySelectorAll('[data-action="reject"]').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.request));
-    }
-
-    async function approveWithdrawal(requestId) {
-        if (!confirm("Approve this withdrawal request?")) return;
-        const requestRef = doc(db, "withdrawal_requests", requestId);
-        const requestSnap = await getDoc(requestRef);
-        if (!requestSnap.exists()) return showMessage("Request not found");
-        const request = requestSnap.data();
-        const { userId, planId, amount } = request;
-        try {
-            await runTransaction(db, async (transaction) => {
-                const planRef = doc(db, "savings_plans", planId);
-                const planSnap = await transaction.get(planRef);
-                if (!planSnap.exists()) throw new Error("Plan not found");
-                const plan = planSnap.data();
-                if (plan.userId !== userId) throw new Error("User mismatch");
-                if (plan.balance < amount) throw new Error("Insufficient balance");
-                const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", userId), where("type", "==", "flex"));
-                const flexSnap = await transaction.get(flexQuery);
-                if (flexSnap.empty) {
-                    const newFlexRef = doc(collection(db, "savings_plans"));
-                    transaction.set(newFlexRef, { userId, type: "flex", balance: amount, createdAt: new Date().toISOString() });
-                } else {
-                    transaction.update(flexSnap.docs[0].ref, { balance: increment(amount) });
-                }
-                transaction.update(planRef, { balance: increment(-amount) });
-                transaction.update(requestRef, { status: "approved", processedAt: new Date().toISOString() });
-                await addDoc(collection(db, "transactions"), { userId, planId, amount, type: "withdrawal_approved", description: `Withdrawal approved from ${plan.type} plan`, date: new Date().toISOString() });
-            });
-            await logAudit("approve_withdrawal", userId, { requestId, amount });
-            showMessage("Withdrawal approved", false);
-            loadWithdrawalRequests();
-            loadAdminData();
-        } catch (err) { showMessage(err.message); }
-    }
-
-    async function rejectWithdrawal(requestId) {
-        if (!confirm("Reject this withdrawal request?")) return;
-        const requestRef = doc(db, "withdrawal_requests", requestId);
-        const requestSnap = await getDoc(requestRef);
-        if (!requestSnap.exists()) return showMessage("Request not found");
-        const { userId } = requestSnap.data();
-        await updateDoc(requestRef, { status: "rejected", processedAt: new Date().toISOString() });
-        await logAudit("reject_withdrawal", userId, { requestId });
-        showMessage("Request rejected", false);
-        loadWithdrawalRequests();
+        document.getElementById('loanList').innerHTML = html;
     }
 
     // User Management Functions
@@ -666,7 +703,6 @@
         loadAdminData();
     }
 
-    // Deposit, loan, withdraw functions (unchanged except minor)
     async function manualDeposit() {
         const email = prompt("User email:");
         if (!email) return;
@@ -776,25 +812,6 @@
         loadAdminData();
         loadLoans();
     }
-    async function loadLoans() {
-        const loansSnap = await getDocs(collection(db, "loans"));
-        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Repayment Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
-        for (const docSnap of loansSnap.docs) {
-            const l = docSnap.data();
-            const userDoc = await getDoc(doc(db, "users", l.userId));
-            const userName = userDoc.exists() ? userDoc.data().fullName : l.userId;
-            html += `<tr>
-                <td>${userName}</td>
-                <td>₦${l.amount}</td>
-                <td>${l.interestRate}%</td>
-                <td>${l.repayMonths}</td>
-                <td>₦${l.remainingBalance.toFixed(2)}</td>
-                <td>${l.status}</td>
-            </tr>`;
-        }
-        html += '</tbody></table>';
-        document.getElementById('loanList').innerHTML = html;
-    }
     async function directWithdraw() {
         const email = prompt("User email:");
         if (!email) return;
@@ -837,7 +854,6 @@
         showModal("Audit Trail (last 100)", html, "Close");
     }
 
-    // Staff management
     async function editStaffRole(uid) {
         const userDoc = await getDoc(doc(db, "users", uid));
         const currentRole = userDoc.data().role;
@@ -856,35 +872,8 @@
             loadAdminData();
         }
     }
-    document.getElementById('createStaffBtn').onclick = () => {
-        showModal("Create Staff", `<div class="form-group"><label>Full Name</label><input id="staffFullName"></div><div class="form-group"><label>Email</label><input id="staffEmail"></div><div class="form-group"><label>Password</label><input type="password" id="staffPassword"></div><div class="form-group"><label>Role</label><select id="staffRoleSelect"><option value="collector">Collector</option><option value="supervisor">Supervisor</option></select></div>`, "Create").then(async (ok) => {
-            if (ok) {
-                const name = document.getElementById('staffFullName').value;
-                const email = document.getElementById('staffEmail').value;
-                const pwd = document.getElementById('staffPassword').value;
-                const role = document.getElementById('staffRoleSelect').value;
-                if (!email || !pwd) return showMessage("Email and password required");
-                try {
-                    const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
-                    await setDoc(doc(db, "users", userCred.user.uid), { fullName: name, email, role, createdAt: new Date().toISOString() });
-                    await logAudit("create_staff", userCred.user.uid, { role });
-                    showMessage(`Staff ${name} created`, false);
-                    loadAdminData();
-                } catch(e) { showMessage(e.message); }
-            }
-        });
-    };
 
-    // Admin creation
-    document.getElementById('createAdminBtn').onclick = async () => {
-        try {
-            const userCred = await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123");
-            await setDoc(doc(db, "users", userCred.user.uid), { fullName: "Super Administrator", email: "admin@omaposhsmartsavings.com", role: "admin", createdAt: new Date().toISOString() });
-            showMessage("Admin account created! Please login.", false);
-        } catch(e) { showMessage(e.message); }
-    };
-
-    // Login handler
+    // Admin login & auth observer
     document.getElementById('adminLoginBtn').onclick = async () => {
         const email = document.getElementById('adminEmail').value;
         const password = document.getElementById('adminPassword').value;
@@ -893,8 +882,14 @@
         } catch(e) { showMessage(e.message); }
     };
     logoutBtn.onclick = async () => { await signOut(auth); };
+    document.getElementById('createAdminBtn').onclick = async () => {
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123");
+            await setDoc(doc(db, "users", userCred.user.uid), { fullName: "Super Administrator", email: "admin@omaposhsmartsavings.com", role: "admin", createdAt: new Date().toISOString() });
+            showMessage("Admin account created! Please login.", false);
+        } catch(e) { showMessage(e.message); }
+    };
 
-    // Auth observer
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             const userRef = doc(db, "users", user.uid);
@@ -914,6 +909,7 @@
                 await initSystemAccounts();
                 await loadSystemAccounts();
                 await loadAdminData();
+                await loadDepositRequests();
                 await loadWithdrawalRequests();
                 await loadLoans();
                 loadingSpinner.classList.add('hidden');
@@ -921,9 +917,10 @@
                 const unsubUsers = onSnapshot(collection(db, "users"), () => loadAdminData());
                 const unsubPlans = onSnapshot(collection(db, "savings_plans"), () => loadAdminData());
                 const unsubGroups = onSnapshot(collection(db, "groups"), () => loadAdminData());
-                const unsubRequests = onSnapshot(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")), () => loadWithdrawalRequests());
+                const unsubDepRequests = onSnapshot(query(collection(db, "deposit_requests"), where("status", "==", "pending")), () => loadDepositRequests());
+                const unsubWdRequests = onSnapshot(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")), () => loadWithdrawalRequests());
                 const unsubLoans = onSnapshot(collection(db, "loans"), () => loadLoans());
-                window.adminListeners = [unsubUsers, unsubPlans, unsubGroups, unsubRequests, unsubLoans];
+                window.adminListeners = [unsubUsers, unsubPlans, unsubGroups, unsubDepRequests, unsubWdRequests, unsubLoans];
             } else {
                 await signOut(auth);
                 loginSection.classList.remove('hidden');
@@ -940,7 +937,7 @@
         }
     });
 
-    // Attach new buttons
+    // Attach event listeners
     document.getElementById('configureEsusuModelBtn').onclick = configureEsusuFraction;
     document.getElementById('createUserBtn').onclick = createUserAccount;
     document.getElementById('closeUserBtn').onclick = closeUserAccount;
@@ -962,9 +959,25 @@
         }
     };
     document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
-    // Override group creation button (since there is no existing group creation in admin.html originally, we add it now)
-    // Actually admin.html did not have a group creation button before – we'll add one in the "All Thrift Groups" section? The original had no create group button.
-    // We'll add a button to create groups with models at the top of the groups section.
+    document.getElementById('createStaffBtn').onclick = () => {
+        showModal("Create Staff", `<div class="form-group"><label>Full Name</label><input id="staffFullName"></div><div class="form-group"><label>Email</label><input id="staffEmail"></div><div class="form-group"><label>Password</label><input type="password" id="staffPassword"></div><div class="form-group"><label>Role</label><select id="staffRoleSelect"><option value="collector">Collector</option><option value="supervisor">Supervisor</option></select></div>`, "Create").then(async (ok) => {
+            if (ok) {
+                const name = document.getElementById('staffFullName').value;
+                const email = document.getElementById('staffEmail').value;
+                const pwd = document.getElementById('staffPassword').value;
+                const role = document.getElementById('staffRoleSelect').value;
+                if (!email || !pwd) return showMessage("Email and password required");
+                try {
+                    const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
+                    await setDoc(doc(db, "users", userCred.user.uid), { fullName: name, email, role, createdAt: new Date().toISOString() });
+                    await logAudit("create_staff", userCred.user.uid, { role });
+                    showMessage(`Staff ${name} created`, false);
+                    loadAdminData();
+                } catch(e) { showMessage(e.message); }
+            }
+        });
+    };
+    // Add group creation button
     const groupsSection = document.querySelector('#allGroupsTable').parentElement;
     const createGroupBtn = document.createElement('button');
     createGroupBtn.className = 'btn btn-primary';
