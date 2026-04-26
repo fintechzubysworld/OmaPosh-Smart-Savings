@@ -5,294 +5,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .logo h1 { font-size: 1.8rem; letter-spacing: 1px; }
+        .logo p { font-size: 0.8rem; opacity: 0.8; }
+        .user-info { display: flex; gap: 15px; align-items: center; }
+        .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background: #ffb347; color: #1e2a3e; }
+        .btn-primary:hover { background: #ff9f1a; }
+        .btn-outline { background: transparent; border: 1px solid white; color: white; }
+        .btn-outline:hover { background: rgba(255,255,255,0.1); }
+        .main-content { padding: 30px; }
+        .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
+        .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 15px; }
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; }
+        .plan-type { display: inline-block; background: #e9f0ff; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: bold; color: #1e3c72; margin-bottom: 12px; }
+        .amount { font-size: 1.8rem; font-weight: bold; margin: 10px 0; }
+        .progress-bar { background: #e9ecef; border-radius: 20px; height: 8px; margin: 15px 0; overflow: hidden; }
+        .progress-fill { background: #28a745; height: 100%; width: 0%; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; margin-top: 10px; margin-right: 8px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 12px; }
+        .flex-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+        .auth-box { max-width: 400px; margin: 40px auto; background: white; padding: 30px; border-radius: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        .alert { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 12px; margin-bottom: 15px; }
+        .info-banner { background: #d1ecf1; color: #0c5460; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; }
+        footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
+        /* Modal styling */
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
         }
-        body {
-            background: #f0f2f5;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: auto;
+        #modal > div {
             background: white;
+            max-width: 500px;
+            width: 90%;
             border-radius: 24px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        header {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-            padding: 20px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .logo h1 {
-            font-size: 1.8rem;
-            letter-spacing: 1px;
-        }
-        .logo p {
-            font-size: 0.8rem;
-            opacity: 0.8;
-        }
-        .user-info {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 40px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: 0.2s;
-        }
-        .btn-primary {
-            background: #ffb347;
-            color: #1e2a3e;
-        }
-        .btn-primary:hover {
-            background: #ff9f1a;
-        }
-        .btn-outline {
-            background: transparent;
-            border: 1px solid white;
-            color: white;
-        }
-        .btn-outline:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-        .main-content {
-            padding: 30px;
-        }
-        .section {
-            margin-bottom: 40px;
-            border-bottom: 1px solid #e0e0e0;
-            padding-bottom: 20px;
-        }
-        .section-title {
-            font-size: 1.6rem;
-            margin-bottom: 20px;
-            color: #1e3c72;
-        }
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 15px;
-        }
-        .card {
-            background: #fff;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             padding: 20px;
-            border: 1px solid #eaeef2;
-            transition: 0.2s;
-        }
-        .card:hover {
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-        }
-        .plan-type {
-            display: inline-block;
-            background: #e9f0ff;
-            padding: 4px 12px;
-            border-radius: 30px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            color: #1e3c72;
-            margin-bottom: 12px;
-        }
-        .amount {
-            font-size: 1.8rem;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .progress-bar {
-            background: #e9ecef;
-            border-radius: 20px;
-            height: 8px;
-            margin: 15px 0;
-            overflow: hidden;
-        }
-        .progress-fill {
-            background: #28a745;
-            height: 100%;
-            width: 0%;
-        }
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            margin-top: 10px;
-            margin-right: 8px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        input, select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 12px;
-        }
-        .flex-btns {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .auth-box {
-            max-width: 400px;
-            margin: 40px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 30px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        .hidden {
-            display: none;
-        }
-        .alert {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            border-radius: 12px;
-            margin-bottom: 15px;
-        }
-        .info-banner {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 12px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-        footer {
-            text-align: center;
-            padding: 20px;
-            font-size: 0.8rem;
-            color: #666;
-            background: #f8f9fa;
+            pointer-events: auto;
         }
     </style>
 </head>
 <body>
-<div class="container" id="app">
+<div class="container">
     <header>
-        <div class="logo">
-            <h1>💰 OmaPosh Smart Savings</h1>
-            <p>thrift • co-operative • smart investing</p>
-        </div>
-        <div class="user-info" id="userInfo">
-            <span id="userName"></span>
-            <button class="btn btn-outline" id="logoutBtn" style="display:none;">Logout</button>
-        </div>
+        <div class="logo"><h1>💰 OmaPosh Smart Savings</h1><p>thrift • co-operative • smart investing</p></div>
+        <div class="user-info"><span id="userName"></span><button class="btn btn-outline" id="logoutBtn" style="display:none;">Logout</button></div>
     </header>
-
     <div class="main-content">
-        <!-- AUTH SECTION (shown when not logged in) -->
+        <!-- AUTH SECTION -->
         <div id="authSection" class="auth-box">
             <h2>Welcome to OmaPosh</h2>
-            <div class="flex-btns" style="margin-bottom: 20px;">
+            <div class="flex-btns" style="margin-bottom:20px;">
                 <button class="btn btn-primary" id="showLoginBtn">Login</button>
                 <button class="btn btn-outline" id="showRegisterBtn" style="background:#eee; color:#333;">Register</button>
             </div>
             <div id="loginForm">
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="loginEmail" placeholder="you@example.com">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="loginPassword" placeholder="••••••">
-                </div>
+                <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••"></div>
                 <button class="btn btn-primary" id="doLoginBtn">Login</button>
             </div>
             <div id="registerForm" class="hidden">
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" id="regFullName" placeholder="John Doe">
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="regEmail" placeholder="you@example.com">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="regPassword" placeholder="min 6 chars">
-                </div>
+                <div class="form-group"><label>Full Name</label><input type="text" id="regFullName" placeholder="John Doe"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="regEmail" placeholder="you@example.com"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="regPassword" placeholder="min 6 chars"></div>
                 <button class="btn btn-primary" id="doRegisterBtn">Create Account</button>
             </div>
             <div id="authMessage" class="alert hidden"></div>
         </div>
 
-        <!-- DASHBOARD (shown after login) -->
+        <!-- DASHBOARD (initially hidden) -->
         <div id="dashboardSection" class="hidden">
-            <div class="info-banner" id="permWarning" style="display:none;">
-                ⚠️ Firestore permissions error. Please update your security rules in Firebase Console:
-                <code style="background:#fff; display:block; margin-top:8px; padding:8px; border-radius:8px;">
-                rules_version = '2';<br>
-                service cloud.firestore {<br>
-                &nbsp;&nbsp;match /databases/{database}/documents {<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;match /{document=**} {<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if request.auth != null;<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;}<br>
-                &nbsp;&nbsp;}<br>
-                }
-                </code>
-            </div>
-            <!-- Savings Plans -->
+            <div class="info-banner" id="permWarning" style="display:none;">⚠️ Firestore permission error – update rules: allow read, write if request.auth != null</div>
             <div class="section">
                 <div class="section-title">📈 My Savings Plans</div>
-                <div class="flex-btns" style="margin-bottom: 20px;">
+                <div class="flex-btns" style="margin-bottom:20px;">
                     <button class="btn btn-primary" id="createFlexBtn">+ Flexible Plan</button>
                     <button class="btn btn-primary" id="createLockedBtn">🔒 Locked Plan</button>
                     <button class="btn btn-primary" id="createTargetBtn">🎯 Target Plan</button>
                 </div>
                 <div id="plansList" class="card-grid">Loading plans...</div>
             </div>
-
-            <!-- Thrift Groups -->
             <div class="section">
-                <div class="section-title">👥 Thrift Groups (Ajo/Esusu)</div>
-                <div class="flex-btns" style="margin-bottom: 20px;">
+                <div class="section-title">👥 Thrift Groups</div>
+                <div class="flex-btns" style="margin-bottom:20px;">
                     <button class="btn btn-primary" id="showCreateGroupBtn">➕ Create Group</button>
                     <button class="btn btn-outline" id="showJoinGroupBtn">🔍 Join Group</button>
                 </div>
                 <div id="groupsList" class="card-grid">Loading groups...</div>
             </div>
-
-            <!-- Modals (hidden by default) -->
-            <div id="modal" class="hidden" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;">
-                <div style="background:white; max-width:500px; width:90%; border-radius:24px; padding:20px;">
-                    <h3 id="modalTitle"></h3>
-                    <div id="modalBody"></div>
-                    <div class="flex-btns" style="margin-top:20px;">
-                        <button class="btn btn-outline" id="closeModalBtn">Cancel</button>
-                        <button class="btn btn-primary" id="modalConfirmBtn">Confirm</button>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
-    <footer>© 2026 OmaPosh Smart Savings — Save together, grow together.</footer>
+    <footer>© 2026 OmaPosh Smart Savings</footer>
+</div>
+
+<!-- SIMPLE MODAL (hidden by default) -->
+<div id="modal" class="hidden">
+    <div>
+        <h3 id="modalTitle"></h3>
+        <div id="modalBody"></div>
+        <div class="flex-btns" style="margin-top:20px;">
+            <button class="btn btn-outline" id="closeModalBtn">Cancel</button>
+            <button class="btn btn-primary" id="modalConfirmBtn">Confirm</button>
+        </div>
+    </div>
 </div>
 
 <script type="module">
-    // -------------------- FIREBASE CONFIG (YOUR CREDENTIALS) -----------------
+    // Firebase config
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -303,70 +136,93 @@
         measurementId: "G-T4JFTLRP9V"
     };
 
-    // Import Firebase modules
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, arrayUnion, arrayRemove, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, onSnapshot, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // -------------------- DOM Elements --------------------
+    // DOM elements
     const authSection = document.getElementById('authSection');
     const dashboardSection = document.getElementById('dashboardSection');
-    const loginFormDiv = document.getElementById('loginForm');
-    const registerFormDiv = document.getElementById('registerForm');
-    const authMessageDiv = document.getElementById('authMessage');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const authMsg = document.getElementById('authMessage');
     const userNameSpan = document.getElementById('userName');
     const logoutBtn = document.getElementById('logoutBtn');
-    const plansContainer = document.getElementById('plansList');
-    const groupsContainer = document.getElementById('groupsList');
-    const modal = document.getElementById('modal');
+    const plansList = document.getElementById('plansList');
+    const groupsList = document.getElementById('groupsList');
     const permWarning = document.getElementById('permWarning');
+
+    // Modal elements
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const confirmModalBtn = document.getElementById('modalConfirmBtn');
 
     let currentUser = null;
     let unsubscribeGroups = null;
     let modalResolve = null;
 
-    // Helper: show modal and wait for confirm
+    // Safe modal show (prevents blank modals)
     function showModal(title, bodyHtml, confirmText = "Confirm") {
+        if (!title || !bodyHtml) {
+            console.error("showModal called with empty title or body");
+            return Promise.resolve(false);
+        }
         return new Promise((resolve) => {
-            document.getElementById('modalTitle').innerText = title;
-            document.getElementById('modalBody').innerHTML = bodyHtml;
-            document.getElementById('modalConfirmBtn').innerText = confirmText;
+            modalTitle.innerText = title;
+            modalBody.innerHTML = bodyHtml;
+            confirmModalBtn.innerText = confirmText;
             modal.classList.remove('hidden');
             modalResolve = resolve;
+            setTimeout(() => {
+                const inp = modalBody.querySelector('input');
+                if (inp) inp.focus();
+            }, 50);
         });
     }
+
     function closeModal() {
         modal.classList.add('hidden');
-        if (modalResolve) modalResolve(false);
-        modalResolve = null;
+        if (modalResolve) {
+            modalResolve(false);
+            modalResolve = null;
+        }
     }
-    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
-    document.getElementById('modalConfirmBtn').addEventListener('click', () => {
-        if (modalResolve) modalResolve(true);
+
+    // Confirm button handler
+    confirmModalBtn.onclick = () => {
+        console.log("Confirm clicked");
+        if (modalResolve) {
+            modalResolve(true);
+            modalResolve = null;
+        }
         closeModal();
-    });
+    };
+    closeModalBtn.onclick = closeModal;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    // Ensure modal is hidden on page load
+    modal.classList.add('hidden');
 
     function showMessage(text, isError = true) {
-        const msgDiv = authMessageDiv;
-        msgDiv.innerText = text;
-        msgDiv.classList.remove('hidden');
-        setTimeout(() => msgDiv.classList.add('hidden'), 4000);
+        authMsg.innerText = text;
+        authMsg.classList.remove('hidden');
+        setTimeout(() => authMsg.classList.add('hidden'), 4000);
     }
 
-    // Error handler for Firestore permission errors
     function handleFirestoreError(err) {
+        console.error(err);
         if (err.code === 'permission-denied') {
             permWarning.style.display = 'block';
-            showMessage('Permission denied. Please update Firestore security rules (see yellow box above).', true);
+            showMessage('Firestore permission denied. Update security rules.');
         } else {
-            showMessage(err.message, true);
+            showMessage(err.message);
         }
-        console.error(err);
     }
 
     // Render savings plans
@@ -374,178 +230,124 @@
         if (!currentUser) return;
         try {
             const q = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid));
-            const querySnapshot = await getDocs(q);
-            if (querySnapshot.empty) {
-                plansContainer.innerHTML = '<p>No savings plans yet. Create one above.</p>';
+            const snap = await getDocs(q);
+            if (snap.empty) {
+                plansList.innerHTML = '<p>No savings plans yet. Create one above.</p>';
                 return;
             }
             let html = '';
-            for (const docSnap of querySnapshot.docs) {
-                const plan = { id: docSnap.id, ...docSnap.data() };
-                let progressHtml = '';
-                if (plan.type === 'target') {
-                    const percent = (plan.balance / plan.targetAmount) * 100;
-                    progressHtml = `<div class="progress-bar"><div class="progress-fill" style="width: ${percent}%;"></div></div>
-                                    <div>₦${plan.balance.toFixed(2)} / ₦${plan.targetAmount.toFixed(2)} (${percent.toFixed(1)}%)</div>`;
+            for (const docSnap of snap.docs) {
+                const p = { id: docSnap.id, ...docSnap.data() };
+                let progress = '';
+                if (p.type === 'target') {
+                    const percent = (p.balance / p.targetAmount) * 100;
+                    progress = `<div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+                                <div>₦${p.balance.toFixed(2)} / ₦${p.targetAmount.toFixed(2)} (${percent.toFixed(1)}%)</div>`;
                 } else {
-                    progressHtml = `<div class="amount">₦${plan.balance.toFixed(2)}</div>`;
+                    progress = `<div class="amount">₦${p.balance.toFixed(2)}</div>`;
                 }
-                let extraInfo = '';
-                if (plan.type === 'locked') {
-                    extraInfo = `<div>🔓 Available after: ${new Date(plan.lockUntil).toLocaleDateString()}</div>`;
-                } else if (plan.type === 'target') {
-                    extraInfo = `<div>🎯 Target date: ${new Date(plan.targetDate).toLocaleDateString()}</div>`;
-                }
-                html += `
-                    <div class="card">
-                        <div class="plan-type">${plan.type.toUpperCase()}</div>
-                        ${progressHtml}
-                        ${extraInfo}
+                let extra = '';
+                if (p.type === 'locked') extra = `<div>🔓 Available after: ${new Date(p.lockUntil).toLocaleDateString()}</div>`;
+                if (p.type === 'target') extra = `<div>🎯 Target date: ${new Date(p.targetDate).toLocaleDateString()}</div>`;
+                html += `<div class="card"><div class="plan-type">${p.type.toUpperCase()}</div>
+                        ${progress}${extra}
                         <div class="flex-btns">
-                            <button class="btn btn-sm btn-primary" data-action="deposit" data-plan-id="${plan.id}">Deposit</button>
-                            <button class="btn btn-sm btn-outline" data-action="withdraw" data-plan-id="${plan.id}">Withdraw</button>
-                            <button class="btn btn-sm btn-outline" data-action="history" data-plan-id="${plan.id}">History</button>
-                        </div>
-                    </div>
-                `;
+                            <button class="btn btn-sm btn-primary" data-plan="${p.id}" data-action="deposit">Deposit</button>
+                            <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw">Withdraw</button>
+                            <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history">History</button>
+                        </div></div>`;
             }
-            plansContainer.innerHTML = html;
-            // Attach event listeners after rendering
-            document.querySelectorAll('[data-action="deposit"]').forEach(btn => {
-                btn.addEventListener('click', () => depositToPlan(btn.dataset.planId));
-            });
-            document.querySelectorAll('[data-action="withdraw"]').forEach(btn => {
-                btn.addEventListener('click', () => withdrawFromPlan(btn.dataset.planId));
-            });
-            document.querySelectorAll('[data-action="history"]').forEach(btn => {
-                btn.addEventListener('click', () => viewPlanHistory(btn.dataset.planId));
-            });
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+            plansList.innerHTML = html;
+            // Attach events
+            document.querySelectorAll('[data-action="deposit"]').forEach(btn => btn.onclick = () => depositToPlan(btn.dataset.plan));
+            document.querySelectorAll('[data-action="withdraw"]').forEach(btn => btn.onclick = () => withdrawFromPlan(btn.dataset.plan));
+            document.querySelectorAll('[data-action="history"]').forEach(btn => btn.onclick = () => viewPlanHistory(btn.dataset.plan));
+        } catch(err) { handleFirestoreError(err); }
     }
 
     async function depositToPlan(planId) {
-        const amount = parseFloat(prompt("Enter amount to deposit (₦):"));
-        if (isNaN(amount) || amount <= 0) return showMessage("Invalid amount");
+        const amount = parseFloat(prompt("Enter deposit amount (₦):"));
+        if (isNaN(amount) || amount <= 0) return;
         try {
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
-            if (!planSnap.exists()) return showMessage("Plan not found");
-            const planData = planSnap.data();
-            if (planData.userId !== currentUser.uid) return showMessage("Not your plan");
+            if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showMessage("Invalid plan");
             await updateDoc(planRef, { balance: increment(amount) });
-            await addDoc(collection(db, "transactions"), {
-                planId, userId: currentUser.uid, amount, type: "deposit",
-                date: new Date().toISOString(), description: `Deposit to ${planData.type} plan`
-            });
-            showMessage(`₦${amount.toFixed(2)} deposited successfully`, false);
+            await addDoc(collection(db, "transactions"), { planId, userId: currentUser.uid, amount, type: "deposit", date: new Date().toISOString() });
+            showMessage(`₦${amount.toFixed(2)} deposited`, false);
             renderPlans();
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+        } catch(err) { handleFirestoreError(err); }
     }
 
     async function withdrawFromPlan(planId) {
         try {
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
-            if (!planSnap.exists()) return showMessage("Plan not found");
+            if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showMessage("Not your plan");
             const plan = planSnap.data();
-            if (plan.userId !== currentUser.uid) return showMessage("Not yours");
-            if (plan.type === "locked") {
-                const lockDate = new Date(plan.lockUntil);
-                if (new Date() < lockDate) {
-                    return showMessage(`Locked until ${lockDate.toLocaleDateString()}. Cannot withdraw.`);
-                }
-            }
+            if (plan.type === 'locked' && new Date() < new Date(plan.lockUntil)) return showMessage(`Locked until ${new Date(plan.lockUntil).toLocaleDateString()}`);
             const amount = parseFloat(prompt("Withdraw amount (₦):"));
-            if (isNaN(amount) || amount <= 0) return;
-            if (amount > plan.balance) return showMessage("Insufficient balance");
+            if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showMessage("Invalid amount");
             await updateDoc(planRef, { balance: increment(-amount) });
-            await addDoc(collection(db, "transactions"), {
-                planId, userId: currentUser.uid, amount, type: "withdrawal",
-                date: new Date().toISOString(), description: `Withdraw from ${plan.type}`
-            });
+            await addDoc(collection(db, "transactions"), { planId, userId: currentUser.uid, amount, type: "withdrawal", date: new Date().toISOString() });
             showMessage(`₦${amount.toFixed(2)} withdrawn`, false);
             renderPlans();
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+        } catch(err) { handleFirestoreError(err); }
     }
 
     async function viewPlanHistory(planId) {
         try {
             const q = query(collection(db, "transactions"), where("planId", "==", planId));
             const snap = await getDocs(q);
-            let history = "<ul>";
-            snap.forEach(doc => {
-                const t = doc.data();
-                history += `<li>${new Date(t.date).toLocaleString()} - ${t.type}: ₦${t.amount.toFixed(2)}</li>`;
-            });
-            history += "</ul>";
-            showModal("Transaction History", history, "Close");
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+            let list = "<ul>";
+            snap.forEach(d => { const t = d.data(); list += `<li>${new Date(t.date).toLocaleString()} - ${t.type}: ₦${t.amount.toFixed(2)}</li>`; });
+            list += "</ul>";
+            showModal("Transaction History", list, "Close");
+        } catch(err) { handleFirestoreError(err); }
     }
 
-    // Group real-time listener
+    // Groups real-time listener
     function listenGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
-        unsubscribeGroups = onSnapshot(q, async (snapshot) => {
+        unsubscribeGroups = onSnapshot(q, (snapshot) => {
+            if (!currentUser) return;
             let html = '';
-            for (const docSnap of snapshot.docs) {
-                const group = { id: docSnap.id, ...docSnap.data() };
-                const isMember = group.members && group.members.includes(currentUser.uid);
-                const memberCount = group.members ? group.members.length : 0;
-                let actionButton = '';
+            snapshot.forEach(docSnap => {
+                const g = { id: docSnap.id, ...docSnap.data() };
+                const isMember = g.members?.includes(currentUser.uid);
+                const count = g.members?.length || 0;
+                let btns = '';
                 if (isMember) {
-                    actionButton = `<button class="btn btn-sm btn-primary" data-group-contribute="${group.id}">Contribute (₦${group.contributionAmount})</button>
-                                    <button class="btn btn-sm btn-outline" data-group-claim="${group.id}">Claim Payout</button>`;
+                    btns = `<button class="btn btn-sm btn-primary" data-group="${g.id}" data-gaction="contribute">Contribute (₦${g.contributionAmount})</button>
+                            <button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="claim">Claim Payout</button>`;
                 } else {
-                    actionButton = `<button class="btn btn-sm btn-outline" data-group-join="${group.id}">Join Group</button>`;
+                    btns = `<button class="btn btn-sm btn-outline" data-group="${g.id}" data-gaction="join">Join Group</button>`;
                 }
-                html += `
-                    <div class="card">
-                        <div class="plan-type">Group: ${group.name}</div>
-                        <div>💰 Contribution: ₦${group.contributionAmount} every ${group.frequencyDays} days</div>
-                        <div>👥 Members: ${memberCount}/${group.maxMembers}</div>
-                        <div>🔄 Next payout index: ${group.currentPayoutIndex}</div>
-                        ${actionButton}
-                    </div>
-                `;
-            }
-            groupsContainer.innerHTML = html || "<p>No groups available. Create one!</p>";
-            // Attach group event handlers
-            document.querySelectorAll('[data-group-contribute]').forEach(btn => {
-                btn.addEventListener('click', () => contributeToGroup(btn.dataset.groupContribute));
+                html += `<div class="card"><div class="plan-type">Group: ${g.name}</div>
+                        <div>💰 Contribution: ₦${g.contributionAmount} every ${g.frequencyDays} days</div>
+                        <div>👥 Members: ${count}/${g.maxMembers}</div>
+                        <div>🔄 Next payout index: ${g.currentPayoutIndex}</div>
+                        ${btns}</div>`;
             });
-            document.querySelectorAll('[data-group-claim]').forEach(btn => {
-                btn.addEventListener('click', () => claimPayout(btn.dataset.groupClaim));
-            });
-            document.querySelectorAll('[data-group-join]').forEach(btn => {
-                btn.addEventListener('click', () => joinGroup(btn.dataset.groupJoin));
-            });
-        }, (err) => {
-            handleFirestoreError(err);
-        });
+            groupsList.innerHTML = html || "<p>No groups yet. Create one!</p>";
+            document.querySelectorAll('[data-gaction="join"]').forEach(btn => btn.onclick = () => joinGroup(btn.dataset.group));
+            document.querySelectorAll('[data-gaction="contribute"]').forEach(btn => btn.onclick = () => contributeToGroup(btn.dataset.group));
+            document.querySelectorAll('[data-gaction="claim"]').forEach(btn => btn.onclick = () => claimPayout(btn.dataset.group));
+        }, (err) => handleFirestoreError(err));
     }
 
     async function joinGroup(groupId) {
         try {
             const groupRef = doc(db, "groups", groupId);
             const groupSnap = await getDoc(groupRef);
-            if (!groupSnap.exists()) return showMessage("Group does not exist");
+            if (!groupSnap.exists()) return showMessage("Group not found");
             const group = groupSnap.data();
-            if (group.members && group.members.includes(currentUser.uid)) return showMessage("Already a member");
-            if (group.members && group.members.length >= group.maxMembers) return showMessage("Group is full");
+            if (group.members?.includes(currentUser.uid)) return showMessage("Already a member");
+            if (group.members?.length >= group.maxMembers) return showMessage("Group is full");
             await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
-            showMessage(`Joined group ${group.name}`, false);
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+            showMessage(`Joined ${group.name}`, false);
+        } catch(err) { handleFirestoreError(err); }
     }
 
     async function contributeToGroup(groupId) {
@@ -553,15 +355,10 @@
             const groupRef = doc(db, "groups", groupId);
             const groupSnap = await getDoc(groupRef);
             const group = groupSnap.data();
-            if (!group.members.includes(currentUser.uid)) return showMessage("You are not a member");
-            const contributionAmount = group.contributionAmount;
-            await addDoc(collection(db, "contributions"), {
-                groupId, userId: currentUser.uid, amount: contributionAmount, date: new Date().toISOString()
-            });
-            showMessage(`Contributed ₦${contributionAmount} to ${group.name}`, false);
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+            if (!group.members?.includes(currentUser.uid)) return showMessage("Not a member");
+            await addDoc(collection(db, "contributions"), { groupId, userId: currentUser.uid, amount: group.contributionAmount, date: new Date().toISOString() });
+            showMessage(`Contributed ₦${group.contributionAmount} to ${group.name}`, false);
+        } catch(err) { handleFirestoreError(err); }
     }
 
     async function claimPayout(groupId) {
@@ -570,122 +367,116 @@
             const groupSnap = await getDoc(groupRef);
             const group = groupSnap.data();
             const members = group.members || [];
-            const currentIdx = group.currentPayoutIndex || 0;
-            if (members[currentIdx] !== currentUser.uid) return showMessage("Not your turn to receive payout");
-            // Count contributions per member
+            const idx = group.currentPayoutIndex || 0;
+            if (members[idx] !== currentUser.uid) return showMessage("Not your turn");
             const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
             const contribSnap = await getDocs(contribQuery);
-            const userContribCount = {};
-            contribSnap.forEach(doc => {
-                const c = doc.data();
-                userContribCount[c.userId] = (userContribCount[c.userId] || 0) + 1;
-            });
-            const requiredCount = currentIdx + 1;
-            for (let m of members) {
-                if ((userContribCount[m] || 0) < requiredCount) return showMessage("Not all members have contributed for this cycle");
-            }
+            const counts = {};
+            contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
+            for (let m of members) if ((counts[m] || 0) <= idx) return showMessage("Not all members have paid this cycle");
             const pot = group.contributionAmount * members.length;
-            // Add pot to user's first flexible plan or create one
-            const plansQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
-            const planSnap = await getDocs(plansQuery);
-            if (planSnap.empty) {
-                await addDoc(collection(db, "savings_plans"), {
-                    userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString()
-                });
-            } else {
-                const flexPlan = planSnap.docs[0];
-                await updateDoc(flexPlan.ref, { balance: increment(pot) });
-            }
-            // Update group's payout index
-            await updateDoc(groupRef, { currentPayoutIndex: (currentIdx + 1) % members.length });
-            await addDoc(collection(db, "transactions"), {
-                userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString()
-            });
-            showMessage(`🎉 You received ₦${pot.toFixed(2)} as group payout!`, false);
+            const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+            const flexSnap = await getDocs(flexQuery);
+            if (flexSnap.empty) await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
+            else await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+            await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
+            await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString() });
+            showMessage(`🎉 You received ₦${pot.toFixed(2)} payout!`, false);
             renderPlans();
-        } catch (err) {
-            handleFirestoreError(err);
-        }
+        } catch(err) { handleFirestoreError(err); }
     }
 
-    // Create savings plan modals
-    document.getElementById('createFlexBtn').onclick = () => showModal("Create Flexible Plan", `<input type="number" id="initialDeposit" placeholder="Initial deposit (₦)" value="0">`, "Create").then(async (confirmed) => {
-        if (confirmed && currentUser) {
-            const amount = parseFloat(document.getElementById('initialDeposit').value) || 0;
+    // Button handlers for creating plans and groups (using modal)
+    document.getElementById('createFlexBtn').onclick = () => showModal("Create Flexible Plan", `<input type="number" id="flexDeposit" placeholder="Initial deposit (₦)" value="0">`, "Create").then(async (ok) => {
+        if (ok && currentUser) {
+            const amt = parseFloat(document.getElementById('flexDeposit')?.value) || 0;
             try {
-                await addDoc(collection(db, "savings_plans"), {
-                    userId: currentUser.uid, type: "flex", balance: amount, createdAt: new Date().toISOString()
-                });
+                await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: amt, createdAt: new Date().toISOString() });
                 renderPlans();
-            } catch (err) { handleFirestoreError(err); }
+                showMessage("Flexible plan created", false);
+            } catch(e) { handleFirestoreError(e); }
         }
     });
-    document.getElementById('createLockedBtn').onclick = () => showModal("Locked Plan", `
+    document.getElementById('createLockedBtn').onclick = () => showModal("Create Locked Plan", `
         <div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="lockAmount" value="0"></div>
         <div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>
-    `, "Create").then(async (confirmed) => {
-        if (confirmed && currentUser) {
-            const amount = parseFloat(document.getElementById('lockAmount').value) || 0;
-            const lockUntil = document.getElementById('lockUntil').value;
-            if (!lockUntil) return showMessage("Date required");
+    `, "Create").then(async (ok) => {
+        if (ok && currentUser) {
+            const amt = parseFloat(document.getElementById('lockAmount')?.value) || 0;
+            const until = document.getElementById('lockUntil')?.value;
+            if (!until) return showMessage("Lock date required");
             try {
-                await addDoc(collection(db, "savings_plans"), {
-                    userId: currentUser.uid, type: "locked", balance: amount, lockUntil, createdAt: new Date().toISOString()
-                });
+                await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "locked", balance: amt, lockUntil: until, createdAt: new Date().toISOString() });
                 renderPlans();
-            } catch (err) { handleFirestoreError(err); }
+                showMessage("Locked plan created", false);
+            } catch(e) { handleFirestoreError(e); }
         }
     });
-    document.getElementById('createTargetBtn').onclick = () => showModal("Target Plan", `
+    document.getElementById('createTargetBtn').onclick = () => showModal("Create Target Plan", `
         <div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div>
         <div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div>
         <div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="targetDeposit" value="0"></div>
-    `, "Create").then(async (confirmed) => {
-        if (confirmed && currentUser) {
-            const targetAmount = parseFloat(document.getElementById('targetAmount').value);
-            const targetDate = document.getElementById('targetDate').value;
-            const deposit = parseFloat(document.getElementById('targetDeposit').value) || 0;
-            if (!targetAmount || !targetDate) return showMessage("All fields required");
+    `, "Create").then(async (ok) => {
+        if (ok && currentUser) {
+            const target = parseFloat(document.getElementById('targetAmount')?.value);
+            const date = document.getElementById('targetDate')?.value;
+            const deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0;
+            if (!target || !date) return showMessage("Target amount and date required");
             try {
-                await addDoc(collection(db, "savings_plans"), {
-                    userId: currentUser.uid, type: "target", balance: deposit, targetAmount, targetDate, createdAt: new Date().toISOString()
-                });
+                await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "target", balance: deposit, targetAmount: target, targetDate: date, createdAt: new Date().toISOString() });
                 renderPlans();
-            } catch (err) { handleFirestoreError(err); }
+                showMessage("Target plan created", false);
+            } catch(e) { handleFirestoreError(e); }
         }
     });
-
     document.getElementById('showCreateGroupBtn').onclick = () => showModal("Create Thrift Group", `
         <div class="form-group"><label>Group Name</label><input id="groupName"></div>
-        <div class="form-group"><label>Contribution Amount (₦)</label><input id="groupContrib" type="number"></div>
-        <div class="form-group"><label>Frequency (days between contributions)</label><input id="groupFreq" type="number"></div>
-        <div class="form-group"><label>Max Members</label><input id="groupMax" type="number"></div>
-    `, "Create Group").then(async (confirmed) => {
-        if (confirmed && currentUser) {
-            const name = document.getElementById('groupName').value;
-            const amount = parseFloat(document.getElementById('groupContrib').value);
-            const freq = parseInt(document.getElementById('groupFreq').value);
-            const max = parseInt(document.getElementById('groupMax').value);
-            if (!name || !amount || !freq || !max) return showMessage("All fields required");
+        <div class="form-group"><label>Contribution (₦)</label><input type="number" id="groupContrib"></div>
+        <div class="form-group"><label>Frequency (days)</label><input type="number" id="groupFreq"></div>
+        <div class="form-group"><label>Max Members</label><input type="number" id="groupMax"></div>
+    `, "Create Group").then(async (ok) => {
+        if (ok && currentUser) {
+            const name = document.getElementById('groupName')?.value;
+            const contrib = parseFloat(document.getElementById('groupContrib')?.value);
+            const freq = parseInt(document.getElementById('groupFreq')?.value);
+            const max = parseInt(document.getElementById('groupMax')?.value);
+            if (!name || !contrib || !freq || !max) return showMessage("All fields required");
             try {
                 await addDoc(collection(db, "groups"), {
-                    name, contributionAmount: amount, frequencyDays: freq, maxMembers: max,
+                    name, contributionAmount: contrib, frequencyDays: freq, maxMembers: max,
                     creatorId: currentUser.uid, members: [currentUser.uid], currentPayoutIndex: 0,
                     createdAt: new Date().toISOString()
                 });
-                showMessage(`Group "${name}" created!`, false);
-            } catch (err) { handleFirestoreError(err); }
+                showMessage(`Group "${name}" created`, false);
+            } catch(e) { handleFirestoreError(e); }
         }
     });
-    document.getElementById('showJoinGroupBtn').onclick = () => showModal("Join Group", `<input placeholder="Group ID" id="joinGroupId">`, "Join").then(async (confirmed) => {
-        if (confirmed && currentUser) {
-            const gid = document.getElementById('joinGroupId').value;
-            if (!gid) return;
-            await joinGroup(gid);
+    document.getElementById('showJoinGroupBtn').onclick = () => showModal("Join Thrift Group", `<input placeholder="Group ID" id="joinGroupId">`, "Join").then(async (ok) => {
+        if (ok && currentUser) {
+            const gid = document.getElementById('joinGroupId')?.value;
+            if (gid) await joinGroup(gid);
         }
     });
 
-    // Auth state listener
+    // Auth UI toggles
+    document.getElementById('showLoginBtn').onclick = () => { loginForm.classList.remove('hidden'); registerForm.classList.add('hidden'); };
+    document.getElementById('showRegisterBtn').onclick = () => { registerForm.classList.remove('hidden'); loginForm.classList.add('hidden'); };
+    document.getElementById('doLoginBtn').onclick = async () => {
+        try {
+            await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPassword').value);
+            showMessage("Logged in", false);
+        } catch(e) { showMessage(e.message); }
+    };
+    document.getElementById('doRegisterBtn').onclick = async () => {
+        try {
+            const cred = await createUserWithEmailAndPassword(auth, document.getElementById('regEmail').value, document.getElementById('regPassword').value);
+            await setDoc(doc(db, "users", cred.user.uid), { fullName: document.getElementById('regFullName').value, email: cred.user.email, createdAt: new Date().toISOString() });
+            showMessage("Registration successful! Please login.", false);
+        } catch(e) { showMessage(e.message); }
+    };
+    logoutBtn.onclick = () => signOut(auth);
+
+    // Auth state change
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
@@ -695,48 +486,29 @@
             logoutBtn.style.display = 'inline-block';
             try {
                 const userRef = doc(db, "users", user.uid);
-                const userSnap = await getDoc(userRef);
-                if (!userSnap.exists()) {
-                    await setDoc(userRef, { email: user.email, fullName: user.email, createdAt: new Date().toISOString() });
-                }
+                if (!(await getDoc(userRef)).exists()) await setDoc(userRef, { email: user.email, fullName: user.email, createdAt: new Date().toISOString() });
                 renderPlans();
                 listenGroups();
-            } catch (err) {
-                handleFirestoreError(err);
-            }
+            } catch(e) { handleFirestoreError(e); }
         } else {
+            // Reset everything
             currentUser = null;
             authSection.classList.remove('hidden');
             dashboardSection.classList.add('hidden');
             if (unsubscribeGroups) unsubscribeGroups();
             logoutBtn.style.display = 'none';
-            permWarning.style.display = 'none';
+            // Ensure modal is hidden
+            modal.classList.add('hidden');
+            // Clear any pending modal promise
+            if (modalResolve) {
+                modalResolve(false);
+                modalResolve = null;
+            }
         }
     });
 
-    logoutBtn.onclick = () => signOut(auth);
-
-    // Login/Register UI
-    document.getElementById('showLoginBtn').onclick = () => { loginFormDiv.classList.remove('hidden'); registerFormDiv.classList.add('hidden'); };
-    document.getElementById('showRegisterBtn').onclick = () => { registerFormDiv.classList.remove('hidden'); loginFormDiv.classList.add('hidden'); };
-    document.getElementById('doLoginBtn').onclick = async () => {
-        const email = document.getElementById('loginEmail').value;
-        const pwd = document.getElementById('loginPassword').value;
-        try {
-            await signInWithEmailAndPassword(auth, email, pwd);
-            showMessage("Login successful", false);
-        } catch(e) { showMessage(e.message); }
-    };
-    document.getElementById('doRegisterBtn').onclick = async () => {
-        const fullName = document.getElementById('regFullName').value;
-        const email = document.getElementById('regEmail').value;
-        const pwd = document.getElementById('regPassword').value;
-        try {
-            const cred = await createUserWithEmailAndPassword(auth, email, pwd);
-            await setDoc(doc(db, "users", cred.user.uid), { fullName, email, createdAt: new Date().toISOString() });
-            showMessage("Registration successful! You can now login.", false);
-        } catch(e) { showMessage(e.message); }
-    };
+    // Force modal hidden on initial load
+    modal.classList.add('hidden');
 </script>
 </body>
 </html>
