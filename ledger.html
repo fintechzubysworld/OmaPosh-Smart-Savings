@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>OmaPosh | My Ledger</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        .container { max-width: 1300px; margin: auto; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .logo h1 { font-size: 1.6rem; letter-spacing: 1px; }
+        .logo p { font-size: 0.8rem; opacity: 0.8; }
+        .user-info { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; }
+        .btn-primary { background: #ffb347; color: #1e2a3e; }
+        .btn-primary:hover { background: #ff9f1a; }
+        .btn-outline { background: transparent; border: 1px solid white; color: white; }
+        .btn-outline:hover { background: rgba(255,255,255,0.1); }
+        .btn-secondary { background: #17a2b8; color: white; }
+        .btn-secondary:hover { background: #138496; }
+        .main-content { padding: 30px; }
+        .section { margin-bottom: 40px; }
+        .section-title { font-size: 1.5rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; transition: 0.2s; }
+        .card h3 { color: #1e3c72; margin-bottom: 12px; font-size: 1.2rem; }
+        .stat-row { display: flex; justify-content: space-between; margin: 12px 0; padding: 8px 0; border-bottom: 1px solid #edf2f7; flex-wrap: wrap; gap: 8px; }
+        .stat-label { font-weight: 600; color: #2d3748; }
+        .stat-value { font-weight: 700; color: #2a5298; }
+        .pending-badge { background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin: 4px 4px 0 0; }
+        .history-list { list-style: none; padding-left: 0; margin-top: 12px; max-height: 200px; overflow-y: auto; }
+        .history-list li { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 0.85rem; }
+        .text-right { text-align: right; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .info-banner { background: #e2f0e6; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
+        footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .main-content { padding: 20px 16px; }
+            .card-grid { grid-template-columns: 1fr; }
+            .btn { width: 100%; justify-content: center; }
+            .flex-between { flex-direction: column; align-items: stretch; }
+        }
+        .back-btn { background: #6c757d; color: white; margin-bottom: 20px; }
+        .back-btn:hover { background: #5a6268; }
+        .pending-list { background: #f8f9fa; border-radius: 16px; padding: 16px; margin-top: 16px; }
+        .pending-item { padding: 8px; border-bottom: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="logo"><h1>📒 OmaPosh Ledger</h1><p>your complete financial view</p></div>
+        <div class="user-info"><span id="userName"></span><button class="btn btn-outline" id="logoutBtn">Logout</button></div>
+    </header>
+    <div class="main-content">
+        <button class="btn back-btn" id="backToDashboardBtn">← Back to Dashboard</button>
+        <div id="ledgerContent">
+            <div class="info-banner" id="loadingMsg">Loading your financial data...</div>
+        </div>
+    </div>
+    <footer>© 2026 OmaPosh Smart Savings — Your Personal Ledger</footer>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const userNameSpan = document.getElementById('userName');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const ledgerContent = document.getElementById('ledgerContent');
+    const loadingMsg = document.getElementById('loadingMsg');
+
+    let currentUser = null;
+
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
+
+    async function fetchUserLedger(userId) {
+        // Fetch all savings plans
+        const plansSnap = await getDocs(query(collection(db, "savings_plans"), where("userId", "==", userId)));
+        const plans = [];
+        plansSnap.forEach(doc => plans.push({ id: doc.id, ...doc.data() }));
+
+        // Fetch deposit requests (pending and approved)
+        const depositReqsSnap = await getDocs(query(collection(db, "deposit_requests"), where("userId", "==", userId)));
+        const depositRequests = [];
+        depositReqsSnap.forEach(doc => depositRequests.push({ id: doc.id, ...doc.data() }));
+
+        // Fetch withdrawal requests
+        const withdrawalReqsSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("userId", "==", userId)));
+        const withdrawalRequests = [];
+        withdrawalReqsSnap.forEach(doc => withdrawalRequests.push({ id: doc.id, ...doc.data() }));
+
+        // Fetch approved transactions (for history)
+        const transactionsSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
+        const transactions = [];
+        transactionsSnap.forEach(doc => transactions.push({ id: doc.id, ...doc.data() }));
+
+        // Thrift groups where user is a member
+        const groupsSnap = await getDocs(collection(db, "groups"));
+        const userGroups = [];
+        for (const doc of groupsSnap.docs) {
+            const group = doc.data();
+            if (group.members && group.members.includes(userId)) {
+                userGroups.push({ id: doc.id, ...group });
+            }
+        }
+
+        // Get contributions (approved contributions)
+        const contributionsSnap = await getDocs(query(collection(db, "contributions"), where("userId", "==", userId)));
+        const contributions = [];
+        contributionsSnap.forEach(doc => contributions.push({ id: doc.id, ...doc.data() }));
+
+        // Pending contribution requests
+        const contribReqsSnap = await getDocs(query(collection(db, "contribution_requests"), where("userId", "==", userId), where("status", "==", "pending")));
+        const pendingContribRequests = [];
+        contribReqsSnap.forEach(doc => pendingContribRequests.push({ id: doc.id, ...doc.data() }));
+
+        // Pending payout requests
+        const payoutReqsSnap = await getDocs(query(collection(db, "payout_requests"), where("userId", "==", userId), where("status", "==", "pending")));
+        const pendingPayoutRequests = [];
+        payoutReqsSnap.forEach(doc => pendingPayoutRequests.push({ id: doc.id, ...doc.data() }));
+
+        return { plans, depositRequests, withdrawalRequests, transactions, userGroups, contributions, pendingContribRequests, pendingPayoutRequests };
+    }
+
+    function renderSavingsPlanCard(plan, depositRequests, withdrawalRequests, transactions) {
+        const planDeposits = depositRequests.filter(r => r.planId === plan.id && r.status === 'approved').reduce((sum, r) => sum + r.amount, 0);
+        const planWithdrawals = withdrawalRequests.filter(r => r.planId === plan.id && r.status === 'approved').reduce((sum, r) => sum + r.amount, 0);
+        const pendingDeposits = depositRequests.filter(r => r.planId === plan.id && r.status === 'pending');
+        const pendingWithdrawals = withdrawalRequests.filter(r => r.planId === plan.id && r.status === 'pending');
+        const planTransactions = transactions.filter(t => t.planId === plan.id).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        let detailsHtml = '';
+        if (plan.type === 'locked') detailsHtml = `<div class="stat-row"><span class="stat-label">🔒 Unlock date:</span><span class="stat-value">${new Date(plan.lockUntil).toLocaleDateString()}</span></div>`;
+        if (plan.type === 'target') detailsHtml = `<div class="stat-row"><span class="stat-label">🎯 Target:</span><span class="stat-value">₦${plan.targetAmount.toFixed(2)} by ${new Date(plan.targetDate).toLocaleDateString()}</span></div>`;
+
+        return `
+            <div class="card">
+                <h3>${plan.type.toUpperCase()} PLAN</h3>
+                <div class="stat-row"><span class="stat-label">💰 Current Balance:</span><span class="stat-value">₦${(plan.balance || 0).toFixed(2)}</span></div>
+                ${detailsHtml}
+                <div class="stat-row"><span class="stat-label">📥 Total Deposits:</span><span class="stat-value">₦${planDeposits.toFixed(2)}</span></div>
+                <div class="stat-row"><span class="stat-label">📤 Total Withdrawals:</span><span class="stat-value">₦${planWithdrawals.toFixed(2)}</span></div>
+                ${pendingDeposits.length ? `<div class="stat-row"><span class="stat-label">⏳ Pending Deposits:</span><span class="stat-value">${pendingDeposits.map(d => `₦${d.amount}`).join(', ')}</span></div>` : ''}
+                ${pendingWithdrawals.length ? `<div class="stat-row"><span class="stat-label">⏳ Pending Withdrawals:</span><span class="stat-value">${pendingWithdrawals.map(w => `₦${w.amount}`).join(', ')}</span></div>` : ''}
+                <div><strong>📜 Transaction History</strong></div>
+                <ul class="history-list">
+                    ${planTransactions.length === 0 ? '<li>No transactions yet.</li>' : planTransactions.map(t => `<li>${new Date(t.date).toLocaleString()} — ${t.type}: ₦${t.amount.toFixed(2)} (${t.description || ''})</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    function renderGroupCard(group, contributions, pendingContribRequests, pendingPayoutRequests) {
+        const groupContributions = contributions.filter(c => c.groupId === group.id);
+        const totalContributed = groupContributions.reduce((sum, c) => sum + (c.amount || 0), 0);
+        const pendingForGroup = pendingContribRequests.filter(r => r.groupId === group.id);
+        const pendingPayoutForGroup = pendingPayoutRequests.filter(r => r.groupId === group.id);
+        const contribHistory = groupContributions.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        return `
+            <div class="card">
+                <h3>👥 Thrift Group: ${escapeHtml(group.name)}</h3>
+                <div class="stat-row"><span class="stat-label">💰 Total Contribution:</span><span class="stat-value">₦${totalContributed.toFixed(2)}</span></div>
+                <div class="stat-row"><span class="stat-label">💵 Contribution Amount per Cycle:</span><span class="stat-value">₦${group.contributionAmount}</span></div>
+                ${pendingForGroup.length ? `<div class="stat-row"><span class="stat-label">⏳ Pending Contribution Requests:</span><span class="stat-value">${pendingForGroup.map(r => `₦${r.amount}`).join(', ')}</span></div>` : ''}
+                ${pendingPayoutForGroup.length ? `<div class="stat-row"><span class="stat-label">⏳ Pending Payout Requests:</span><span class="stat-value">${pendingPayoutForGroup.map(r => `₦${r.amount}`).join(', ')}</span></div>` : ''}
+                <div><strong>📜 Contribution History</strong></div>
+                <ul class="history-list">
+                    ${contribHistory.length === 0 ? '<li>No contributions recorded.</li>' : contribHistory.map(c => `<li>${new Date(c.date).toLocaleString()} — ₦${c.amount.toFixed(2)}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    function renderPendingTransactions(depositRequests, withdrawalRequests, pendingContribRequests, pendingPayoutRequests) {
+        const allPending = [
+            ...depositRequests.filter(r => r.status === 'pending').map(r => ({ type: 'Deposit Request', amount: r.amount, date: r.requestDate, details: `Plan: ${r.planId}` })),
+            ...withdrawalRequests.filter(r => r.status === 'pending').map(r => ({ type: 'Withdrawal Request', amount: r.amount, date: r.requestedAt, details: `Plan: ${r.planId}` })),
+            ...pendingContribRequests.map(r => ({ type: 'Thrift Contribution Request', amount: r.amount, date: r.requestedAt, details: `Group: ${r.groupName || r.groupId}` })),
+            ...pendingPayoutRequests.map(r => ({ type: 'Thrift Payout Request', amount: r.amount, date: r.requestedAt, details: `Group: ${r.groupName || r.groupId}, Expected index: ${r.expectedPayoutIndex}` }))
+        ];
+        if (allPending.length === 0) return '<p>✅ No pending transactions.</p>';
+        return `
+            <div class="pending-list">
+                ${allPending.sort((a,b) => new Date(b.date) - new Date(a.date)).map(p => `
+                    <div class="pending-item">
+                        <strong>${p.type}</strong> – ₦${p.amount.toFixed(2)}<br>
+                        <small>${new Date(p.date).toLocaleString()} | ${p.details}</small>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async function loadLedger() {
+        if (!currentUser) return;
+        loadingMsg.innerText = 'Fetching your financial data...';
+        loadingMsg.style.display = 'block';
+        const data = await fetchUserLedger(currentUser.uid);
+        
+        let savingsHtml = '';
+        for (const plan of data.plans) {
+            savingsHtml += renderSavingsPlanCard(plan, data.depositRequests, data.withdrawalRequests, data.transactions);
+        }
+        if (data.plans.length === 0) savingsHtml = '<p>You have no savings plans yet. <a href="index.html">Create a plan</a> to get started.</p>';
+
+        let groupsHtml = '';
+        for (const group of data.userGroups) {
+            groupsHtml += renderGroupCard(group, data.contributions, data.pendingContribRequests, data.pendingPayoutRequests);
+        }
+        if (data.userGroups.length === 0) groupsHtml = '<p>You are not a member of any thrift group yet. <a href="index.html">Join a group</a> to start contributing.</p>';
+
+        // Total balance across all plans
+        const totalBalance = data.plans.reduce((sum, p) => sum + (p.balance || 0), 0);
+        const totalDeposits = data.depositRequests.filter(r => r.status === 'approved').reduce((s, r) => s + r.amount, 0);
+        const totalWithdrawals = data.withdrawalRequests.filter(r => r.status === 'approved').reduce((s, r) => s + r.amount, 0);
+
+        const pendingHtml = renderPendingTransactions(data.depositRequests, data.withdrawalRequests, data.pendingContribRequests, data.pendingPayoutRequests);
+
+        const summaryHtml = `
+            <div class="info-banner" style="background:#e9ecef;">
+                <div class="flex-between">
+                    <div><strong>💰 Total Balance Across All Plans:</strong> ₦${totalBalance.toFixed(2)}</div>
+                    <div><strong>📥 Total Deposits (approved):</strong> ₦${totalDeposits.toFixed(2)}</div>
+                    <div><strong>📤 Total Withdrawals (approved):</strong> ₦${totalWithdrawals.toFixed(2)}</div>
+                </div>
+            </div>
+        `;
+
+        ledgerContent.innerHTML = `
+            ${summaryHtml}
+            <div class="section">
+                <div class="section-title">📈 My Savings Plans</div>
+                <div class="card-grid">${savingsHtml}</div>
+            </div>
+            <div class="section">
+                <div class="section-title">👥 My Thrift Groups</div>
+                <div class="card-grid">${groupsHtml}</div>
+            </div>
+            <div class="section">
+                <div class="section-title">⏳ Pending Transactions (awaiting admin approval)</div>
+                ${pendingHtml}
+            </div>
+        `;
+        loadingMsg.style.display = 'none';
+    }
+
+    function getGreeting() { const h = new Date().getHours(); if (h<12) return "Good morning"; if (h<18) return "Good afternoon"; return "Good evening"; }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            const role = userDoc.exists() ? userDoc.data().role : null;
+            if (role === 'admin') {
+                // Admin should not use this page – redirect to admin dashboard
+                window.location.href = 'admin.html';
+                return;
+            }
+            currentUser = user;
+            const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
+            userNameSpan.innerText = `${getGreeting()}, ${fullName}`;
+            await loadLedger();
+        } else {
+            window.location.href = 'index.html';
+        }
+    });
+
+    logoutBtn.onclick = () => signOut(auth);
+    document.getElementById('backToDashboardBtn').onclick = () => window.location.href = 'index.html';
+</script>
+</body>
+</html>
