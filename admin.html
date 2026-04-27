@@ -122,8 +122,25 @@
             <!-- Statements & Audit -->
             <div class="section"><div class="section-title">📜 Statements & Audit Trail</div><div class="flex-btns"><button class="btn btn-outline" id="viewStatementBtn">View User Statement</button><button class="btn btn-outline" id="viewAuditTrailBtn">View Audit Trail</button></div></div>
 
-            <!-- Staff Management -->
-            <div class="section"><div class="section-title">👥 Staff Management</div><button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button><div style="overflow-x:auto; margin-top:20px;"><table id="staffTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+            <!-- Staff Management (UPDATED: Added User Management and Statement & Audit Trail buttons) -->
+            <div class="section">
+                <div class="section-title">👥 Staff Management</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button>
+                    <!-- New button: User Management → points to data.html#user-management -->
+                    <button class="btn btn-primary" id="userManagementRedirectBtn">👥 User Management & Privileges</button>
+                    <!-- New button: Statement & Audit Trail → points to data.html#transactions -->
+                    <button class="btn btn-primary" id="statementAuditRedirectBtn">📜 Statement & Audit Trail</button>
+                </div>
+                <div style="overflow-x:auto; margin-top:20px;">
+                    <table id="staffTable">
+                        <thead>
+                            <tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
 
             <!-- All Users, Plans, Groups -->
             <div class="section"><div class="section-title">👥 All Users</div><div id="allUsersTable"></div></div>
@@ -262,7 +279,7 @@
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('withdrawalRequestsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending withdrawal requests.</p>'; return; }
-            let html = '<table><thead>运转<th>User</th><th>Plan Type</th><th>Amount</th><th>Request Date</th><th>Plan ID</th><th>Actions</th> </thead><tbody>';
+            let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
@@ -309,7 +326,7 @@
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingContributionsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending contribution requests.</p>'; return; }
-            let html = '</table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
+            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Actions</th></tr></thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
@@ -366,7 +383,7 @@
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingPayoutsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending payout requests.</p>'; return; }
-            let html = '</table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Expected Index</th><th>Actions</th> </thead><tbody>';
+            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Expected Index</th><th>Actions</th></tr></thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
@@ -440,7 +457,7 @@
         `;
 
         // User management table
-        let userMgmtHtml = '<td><thead>运转<th>Name</th><th>Email</th><th>Status</th><th>Actions</th> </thead><tbody>';
+        let userMgmtHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             const status = u.disabled ? "Disabled" : "Active";
@@ -451,7 +468,7 @@
         document.querySelectorAll('[data-action="selectUserStatement"]').forEach(btn => btn.onclick = () => showStatement(btn.dataset.uid));
 
         // All users table
-        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th> </thead><tbody>';
+        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             usersHtml += `<tr><td data-label="Name">${u.fullName || 'N/A'}</td><td data-label="Email">${u.email}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Joined">${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
@@ -472,7 +489,7 @@
         document.querySelectorAll('[data-action="deleteStaff"]').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
 
         // All plans
-        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th> </thead><tbody>';
+        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
         for (const docSnap of plansSnap.docs) {
             const p = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", p.userId));
@@ -486,7 +503,7 @@
         document.getElementById('allPlansTable').innerHTML = plansHtml;
 
         // Groups table with "View Members" button
-        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Actions</th> </thead><tbody>';
+        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Actions</th></tr></thead><tbody>';
         for (const docSnap of groupsSnap.docs) {
             const g = docSnap.data();
             const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
@@ -676,7 +693,7 @@
     }
     async function loadLoans() {
         const loans = await getDocs(collection(db, "loans"));
-        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th> </thead><tbody>';
+        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
         for(const doc of loans.docs){
             const l = doc.data();
             const userDoc = await getDoc(doc(db, "users", l.userId));
@@ -706,14 +723,14 @@
         const userDoc = await getDoc(doc(db, "users", userId));
         const userName = userDoc.exists() ? userDoc.data().fullName : userId;
         const txns = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
-        let html = `<h4>Statement for ${userName}</h4><tr><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody>`;
+        let html = `<h4>Statement for ${userName}</h4><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody>`;
         txns.forEach(d => { const t = d.data(); html += `<tr><td data-label="Date">${new Date(t.date).toLocaleString()}</td><td data-label="Type">${t.type}</td><td data-label="Amount">₦${t.amount.toFixed(2)}</td><td data-label="Description">${t.description || ''}</td></tr>`; });
         html += '</tbody></table>';
         showModal("User Statement", html);
     }
     async function viewAuditTrail() {
         const audit = await getDocs(query(collection(db, "audit_logs"), where("adminId", "==", currentAdmin?.uid)));
-        let html = '<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th> </thead><tbody>';
+        let html = '<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody>';
         audit.forEach(d => { const a = d.data(); html += `<tr><td data-label="Time">${new Date(a.timestamp).toLocaleString()}</td><td data-label="Action">${a.action}</td><td data-label="Target">${a.targetUserId || '-'}</td><td data-label="Details">${JSON.stringify(a.details)}</td></tr>`; });
         html += '</tbody></table>';
         showModal("Audit Trail", html);
@@ -739,6 +756,14 @@
                 loadAdminData();
             } catch(e) { showMessage(e.message); }
         }
+    };
+
+    // New redirect buttons for User Management & Statement/Audit (point to data.html)
+    document.getElementById('userManagementRedirectBtn').onclick = () => {
+        window.location.href = 'data.html#user-management';
+    };
+    document.getElementById('statementAuditRedirectBtn').onclick = () => {
+        window.location.href = 'data.html#transactions';
     };
 
     // ======================= AUTH & INIT =======================
