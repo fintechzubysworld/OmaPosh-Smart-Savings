@@ -130,7 +130,7 @@
             <div class="section">
                 <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
                 <div id="groupsList" class="card-grid">Loading groups...</div>
-                <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse all groups below. Click "Join Group" to become a member instantly. After joining you can deposit contributions and withdraw payouts when it's your turn.</p>
+                <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse all groups below. Click "Join Group" to become a member instantly. After joining you can request to deposit contributions and request to withdraw payouts – both require admin approval.</p>
             </div>
         </div>
     </div>
@@ -394,7 +394,7 @@
         .then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be >0", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
     });
 
-    // Enhanced Thrift Groups: spelled-out deposit/withdrawal, join by users
+    // Enhanced Thrift Groups: ALL group actions require admin approval
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
@@ -417,6 +417,16 @@
                     return m;
                 });
                 
+                // Count pending requests for this group by current user
+                let pendingContributionCount = 0;
+                let pendingPayoutCount = 0;
+                try {
+                    const contrReqSnap = await getDocs(query(collection(db, "contribution_requests"), where("groupId", "==", group.id), where("userId", "==", currentUser.uid), where("status", "==", "pending")));
+                    pendingContributionCount = contrReqSnap.size;
+                    const payoutReqSnap = await getDocs(query(collection(db, "payout_requests"), where("groupId", "==", group.id), where("userId", "==", currentUser.uid), where("status", "==", "pending")));
+                    pendingPayoutCount = payoutReqSnap.size;
+                } catch(e) { /* ignore */ }
+                
                 let joinButton = '';
                 if (!isMember) {
                     if (isFull) {
@@ -432,8 +442,12 @@
                 if (isMember) {
                     actionButtons = `
                         <div class="flex-btns" style="margin-top:12px;">
-                            <button class="btn btn-sm btn-primary contribute-group-btn" data-group-id="${group.id}">💰 Deposit Contribution (₦${group.contributionAmount})</button>
-                            <button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${group.id}" style="background:#f8f9fa; color:#333; border:1px solid #ccc;">💸 Withdraw Payout (Claim my turn)</button>
+                            <button class="btn btn-sm btn-primary contribute-group-btn" data-group-id="${group.id}">💰 Request Deposit Contribution (₦${group.contributionAmount})</button>
+                            <button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${group.id}" style="background:#f8f9fa; color:#333; border:1px solid #ccc;">💸 Request Withdrawal (Claim Payout)</button>
+                        </div>
+                        <div class="pending-badge" style="margin-top:8px;">
+                            ${pendingContributionCount > 0 ? `<span class="request-badge">⏳ ${pendingContributionCount} pending contribution request(s)</span>` : ''}
+                            ${pendingPayoutCount > 0 ? `<span class="request-badge">⏳ ${pendingPayoutCount} pending withdrawal request(s)</span>` : ''}
                         </div>
                     `;
                 }
@@ -450,7 +464,7 @@
             }
             groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups available yet. Admin will create groups soon. Stay tuned!</p>';
             
-            // Join group handler
+            // Join group handler (no approval needed, stays instant)
             document.querySelectorAll('.join-group-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const groupId = btn.dataset.groupId;
@@ -462,12 +476,12 @@
                         if (groupData.members?.includes(currentUser.uid)) return showToast("You are already a member", false);
                         if (groupData.members?.length >= groupData.maxMembers) return showToast("Group is full", true);
                         await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
-                        showToast(`Successfully joined "${groupData.name}"! You can now deposit and withdraw.`, false);
+                        showToast(`Successfully joined "${groupData.name}"! You can now request to contribute and withdraw.`, false);
                     } catch (err) { showToast(`Join failed: ${err.message}`, true); }
                 });
             });
             
-            // Deposit (contribute) handler
+            // Request contribution (requires admin approval)
             document.querySelectorAll('.contribute-group-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const groupId = btn.dataset.groupId;
@@ -477,18 +491,20 @@
                         if (!groupSnap.exists()) return showToast("Group not found", true);
                         const group = groupSnap.data();
                         if (!group.members?.includes(currentUser.uid)) return showToast("You are not a member. Please join first.", true);
-                        await addDoc(collection(db, "contributions"), {
+                        await addDoc(collection(db, "contribution_requests"), {
                             groupId: groupId,
                             userId: currentUser.uid,
                             amount: group.contributionAmount,
-                            date: new Date().toISOString()
+                            status: "pending",
+                            requestedAt: new Date().toISOString(),
+                            userEmail: currentUser.email
                         });
-                        showToast(`Deposit of ₦${group.contributionAmount} recorded for group "${group.name}".`, false);
-                    } catch (err) { showToast(`Deposit failed: ${err.message}`, true); }
+                        showToast(`Contribution request of ₦${group.contributionAmount} submitted for admin approval.`, false);
+                    } catch (err) { showToast(`Request failed: ${err.message}`, true); }
                 });
             });
             
-            // Withdraw (claim payout) handler
+            // Request payout (withdrawal from thrift group, requires admin approval)
             document.querySelectorAll('.claim-group-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const groupId = btn.dataset.groupId;
@@ -499,42 +515,18 @@
                         const group = groupSnap.data();
                         const members = group.members || [];
                         const idx = group.currentPayoutIndex || 0;
-                        if (members[idx] !== currentUser.uid) return showToast("It is not your turn to withdraw the payout yet.", true);
-                        
-                        const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
-                        const contribSnap = await getDocs(contribQuery);
-                        const counts = {};
-                        contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
-                        for (let m of members) {
-                            if ((counts[m] || 0) <= idx) {
-                                return showToast("Some members haven't completed all contributions for this cycle. Please wait.", true);
-                            }
-                        }
-                        const pot = group.contributionAmount * members.length;
-                        const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
-                        const flexSnap = await getDocs(flexQuery);
-                        if (flexSnap.empty) {
-                            await addDoc(collection(db, "savings_plans"), {
-                                userId: currentUser.uid,
-                                type: "flex",
-                                balance: pot,
-                                createdAt: new Date().toISOString()
-                            });
-                        } else {
-                            await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
-                        }
-                        await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
-                        await addDoc(collection(db, "transactions"), {
-                            userId: currentUser.uid,
-                            amount: pot,
-                            type: "payout",
+                        if (members[idx] !== currentUser.uid) return showToast("It is not your turn to request a payout yet. Wait for your turn.", true);
+                        await addDoc(collection(db, "payout_requests"), {
                             groupId: groupId,
-                            date: new Date().toISOString(),
-                            description: `Payout from thrift group ${group.name}`
+                            userId: currentUser.uid,
+                            amount: group.contributionAmount * members.length,
+                            status: "pending",
+                            requestedAt: new Date().toISOString(),
+                            userEmail: currentUser.email,
+                            expectedPayoutIndex: idx
                         });
-                        showToast(`Withdrawal successful! ₦${pot.toFixed(2)} credited to your Flexible Savings Plan.`, false);
-                        if (typeof renderUserPlans === 'function') renderUserPlans();
-                    } catch (err) { showToast(`Withdrawal failed: ${err.message}`, true); }
+                        showToast(`Payout withdrawal request submitted for admin approval.`, false);
+                    } catch (err) { showToast(`Request failed: ${err.message}`, true); }
                 });
             });
         }, err => handleFirestoreError(err));
