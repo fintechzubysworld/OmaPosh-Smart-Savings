@@ -38,21 +38,25 @@
         th { background: #f5f5f5; }
         .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
         .hidden { display: none !important; }
-        #modal {
+        #modal, #reviewModal, #statementModal {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000;
             backdrop-filter: blur(2px); padding: 16px;
         }
-        #modal > div { background: white; max-width: 700px; width: 100%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 30px rgba(0,0,0,0.2); }
+        #modal > div, #reviewModal > div, #statementModal > div {
+            background: white; max-width: 700px; width: 100%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 30px rgba(0,0,0,0.2);
+        }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
         .loader { text-align: center; padding: 50px; font-size: 1.2rem; }
         .action-group { display: flex; gap: 5px; flex-wrap: wrap; }
         .system-account-card { background: #f8f9fa; border-radius: 16px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #ffb347; }
         .account-number { font-family: monospace; font-size: 1.1rem; background: white; padding: 5px 10px; border-radius: 8px; display: inline-block; margin: 5px 0; }
-        .copy-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; margin-left: 10px; }
         .member-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #edf2f7; gap: 10px; flex-wrap: wrap; }
         .member-name { font-weight: 600; color: #0f172a; }
         .member-email { font-size: 0.75rem; color: #475569; }
+        .statement-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .statement-table th, .statement-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .statement-table th { background: #f2f2f2; }
         
         @media (max-width: 768px) {
             body { padding: 12px; }
@@ -97,7 +101,7 @@
             <!-- Pending Thrift Payout Requests -->
             <div class="section"><div class="section-title">💎 Pending Thrift Payout Requests</div><div id="pendingPayoutsTable"></div></div>
 
-            <!-- User Management -->
+            <!-- User Management (with Member Statement button) -->
             <div class="section">
                 <div class="section-title">👥 User Management</div>
                 <div class="flex-btns">
@@ -122,14 +126,12 @@
             <!-- Statements & Audit -->
             <div class="section"><div class="section-title">📜 Statements & Audit Trail</div><div class="flex-btns"><button class="btn btn-outline" id="viewStatementBtn">View User Statement</button><button class="btn btn-outline" id="viewAuditTrailBtn">View Audit Trail</button></div></div>
 
-            <!-- Staff Management (UPDATED: Added User Management and Statement & Audit Trail buttons) -->
+            <!-- Staff Management (with extra redirect buttons) -->
             <div class="section">
                 <div class="section-title">👥 Staff Management</div>
                 <div class="flex-btns">
                     <button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button>
-                    <!-- New button: User Management → points to data.html#user-management -->
                     <button class="btn btn-primary" id="userManagementRedirectBtn">👥 User Management & Privileges</button>
-                    <!-- New button: Statement & Audit Trail → points to data.html#transactions -->
                     <button class="btn btn-primary" id="statementAuditRedirectBtn">📜 Statement & Audit Trail</button>
                 </div>
                 <div style="overflow-x:auto; margin-top:20px;">
@@ -151,9 +153,35 @@
     <footer>© 2026 OmaPosh Smart Savings — Admin Control with Thrift Approvals</footer>
 </div>
 
+<!-- Generic Modal -->
 <div id="modal" class="hidden"><div><h3 id="modalTitle"></h3><div id="modalBody"></div><div class="flex-btns"><button class="btn btn-outline" id="closeModalBtn">Close</button></div></div></div>
 
+<!-- Transaction Review Modal (for approval confirmation) -->
+<div id="reviewModal" class="hidden">
+    <div>
+        <h3 id="reviewModalTitle">Confirm Approval</h3>
+        <div id="reviewModalContent"></div>
+        <div class="flex-btns" style="margin-top:20px;">
+            <button class="btn btn-outline" id="cancelReviewBtn">Cancel</button>
+            <button class="btn btn-success" id="confirmReviewBtn">✅ Confirm Approval</button>
+        </div>
+    </div>
+</div>
+
+<!-- Member Statement Modal -->
+<div id="statementModal" class="hidden">
+    <div>
+        <h3 id="statementModalTitle">Member Statement</h3>
+        <div id="statementContent" style="max-height: 65vh; overflow-y: auto;"></div>
+        <button class="btn btn-outline" id="closeStatementBtn">Close</button>
+    </div>
+</div>
+
 <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, addDoc, writeBatch, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -162,10 +190,6 @@
         messagingSenderId: "469614412839",
         appId: "1:469614412839:web:d51a47b468daad6184fa02"
     };
-
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, increment, runTransaction, addDoc, writeBatch, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -180,14 +204,41 @@
     const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
     const closeModalBtn = document.getElementById('closeModalBtn');
+    const reviewModal = document.getElementById('reviewModal');
+    const reviewModalTitle = document.getElementById('reviewModalTitle');
+    const reviewModalContent = document.getElementById('reviewModalContent');
+    const cancelReviewBtn = document.getElementById('cancelReviewBtn');
+    const confirmReviewBtn = document.getElementById('confirmReviewBtn');
+    const statementModalEl = document.getElementById('statementModal');
+    const statementModalTitle = document.getElementById('statementModalTitle');
+    const statementContent = document.getElementById('statementContent');
+    const closeStatementBtn = document.getElementById('closeStatementBtn');
 
     let currentAdmin = null;
     let esusuFraction = 0.01;
+    let pendingApprovalCallback = null;
 
     function showModal(title, bodyHtml) { modalTitle.innerText = title; modalBody.innerHTML = bodyHtml; modal.classList.remove('hidden'); }
     function closeModal() { modal.classList.add('hidden'); }
     closeModalBtn.onclick = closeModal;
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+    
+    function showReviewModal(title, contentHtml, onConfirm) {
+        reviewModalTitle.innerText = title;
+        reviewModalContent.innerHTML = contentHtml;
+        reviewModal.classList.remove('hidden');
+        pendingApprovalCallback = onConfirm;
+    }
+    cancelReviewBtn.onclick = () => { reviewModal.classList.add('hidden'); pendingApprovalCallback = null; };
+    confirmReviewBtn.onclick = async () => {
+        if (pendingApprovalCallback) {
+            await pendingApprovalCallback();
+            pendingApprovalCallback = null;
+        }
+        reviewModal.classList.add('hidden');
+    };
+    reviewModal.addEventListener('click', (e) => { if(e.target === reviewModal) reviewModal.classList.add('hidden'); });
+
     function showMessage(msg, isError = true) { alert(msg); }
     async function logAudit(action, targetUserId = null, details = {}) {
         if (!currentAdmin) return;
@@ -231,40 +282,137 @@
         document.getElementById('cancelFractionBtn').onclick = closeModal;
     }
 
-    // ======================= DEPOSIT REQUESTS =======================
+    // ======================= FETCH ALL TRANSACTIONS FOR STATEMENT =======================
+    async function fetchAllTransactionsForUser(userId) {
+        const transactions = [];
+        // Deposit requests
+        const depSnap = await getDocs(query(collection(db, "deposit_requests"), where("userId", "==", userId)));
+        depSnap.forEach(doc => {
+            const d = doc.data();
+            transactions.push({ type: "deposit", amount: d.amount, date: d.requestDate, status: d.status, particulars: `Deposit to plan ${d.planId}`, reference: doc.id });
+        });
+        // Withdrawal requests
+        const wdSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("userId", "==", userId)));
+        wdSnap.forEach(doc => {
+            const d = doc.data();
+            transactions.push({ type: "withdrawal", amount: d.amount, date: d.requestedAt, status: d.status, particulars: `Withdrawal from ${d.planType} plan`, reference: doc.id });
+        });
+        // Contribution requests & approved contributions
+        const contribReq = await getDocs(query(collection(db, "contribution_requests"), where("userId", "==", userId)));
+        contribReq.forEach(doc => {
+            const d = doc.data();
+            transactions.push({ type: "contribution", amount: d.amount, date: d.requestedAt, status: d.status, particulars: `Contribution to group ${d.groupName}`, reference: doc.id });
+        });
+        const contribApproved = await getDocs(query(collection(db, "contributions"), where("userId", "==", userId)));
+        contribApproved.forEach(doc => {
+            const d = doc.data();
+            transactions.push({ type: "contribution", amount: d.amount, date: d.date, status: "approved", particulars: `Approved contribution to group`, reference: doc.id });
+        });
+        // Payout transactions
+        const payouts = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId), where("type", "==", "payout")));
+        payouts.forEach(doc => {
+            const d = doc.data();
+            transactions.push({ type: "payout", amount: d.amount, date: d.date, status: "approved", particulars: d.description, reference: doc.id });
+        });
+        // Loan disbursements and recoveries
+        const loans = await getDocs(query(collection(db, "loans"), where("userId", "==", userId)));
+        loans.forEach(doc => {
+            const l = doc.data();
+            if (l.disbursedAt) transactions.push({ type: "loan_disbursement", amount: l.amount, date: l.disbursedAt, status: "approved", particulars: "Loan disbursement", reference: doc.id });
+            if (l.recoveredAt && l.recoveredAmount) transactions.push({ type: "loan_recovery", amount: l.recoveredAmount, date: l.recoveredAt, status: "approved", particulars: "Loan recovery", reference: doc.id });
+        });
+        // Manual deposits/withdrawals from admin
+        const adminTx = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId), where("type", "in", ["admin_deposit", "admin_withdrawal"])));
+        adminTx.forEach(doc => {
+            const d = doc.data();
+            transactions.push({ type: d.type, amount: d.amount, date: d.date, status: "approved", particulars: d.description, reference: doc.id });
+        });
+        transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+        return transactions;
+    }
+
+    async function showMemberStatement(userId, userName) {
+        const transactions = await fetchAllTransactionsForUser(userId);
+        if (transactions.length === 0) {
+            statementModalTitle.innerText = `Statement: ${userName}`;
+            statementContent.innerHTML = `<p>No transaction history found for ${escapeHtml(userName)}.</p>`;
+            statementModalEl.classList.remove('hidden');
+            return;
+        }
+        let html = `<h4>Full Transaction Statement for ${escapeHtml(userName)}</h4>
+                    <table class="statement-table">
+                        <thead><tr><th>Date/Time</th><th>Type</th><th>Particulars</th><th>Amount (₦)</th><th>Status</th></tr></thead>
+                        <tbody>`;
+        let totalCredits = 0, totalDebits = 0;
+        transactions.forEach(t => {
+            const isCredit = (t.type === 'deposit' || t.type === 'contribution' || t.type === 'loan_disbursement' || t.type === 'payout' || t.type === 'admin_deposit');
+            if (isCredit) totalCredits += t.amount;
+            else totalDebits += t.amount;
+            const amountDisplay = `${isCredit ? '+' : '-'}₦${t.amount.toFixed(2)}`;
+            html += `<tr>
+                        <tr>${new Date(t.date).toLocaleString()}</td>
+                        <td>${t.type.replace(/_/g, ' ')}</td>
+                        <td>${escapeHtml(t.particulars)}</td>
+                        <td>${amountDisplay}</td>
+                        <td>${t.status}</td>
+                     </tr>`;
+        });
+        html += `</tbody></table>
+                <div style="margin-top:20px; padding:12px; background:#f0f0f0; border-radius:12px;">
+                    <strong>Summary:</strong><br>
+                    Total Credits: ₦${totalCredits.toFixed(2)}<br>
+                    Total Debits: ₦${totalDebits.toFixed(2)}<br>
+                    <strong>Net Balance: ₦${(totalCredits - totalDebits).toFixed(2)}</strong>
+                </div>`;
+        statementModalTitle.innerText = `Statement: ${userName}`;
+        statementContent.innerHTML = html;
+        statementModalEl.classList.remove('hidden');
+    }
+    closeStatementBtn.onclick = () => statementModalEl.classList.add('hidden');
+    statementModalEl.addEventListener('click', (e) => { if(e.target === statementModalEl) statementModalEl.classList.add('hidden'); });
+
+    // ======================= PENDING REQUESTS WITH REVIEW CONFIRMATION =======================
     async function loadPendingDeposits() {
         const q = query(collection(db, "deposit_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingDepositsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending deposit requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Plan ID</th><th>Amount</th><th>Request Date</th><th>Actions</th></tr></thead><tbody>';
+            let html = '</td><thead><tr><th>User</th><th>Plan ID</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan ID">${req.planId}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestDate).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success" data-id="${docSnap.id}" data-action="approve-deposit">Approve</button> <button class="btn btn-sm btn-danger" data-id="${docSnap.id}" data-action="reject-deposit">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan ID">${req.planId}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestDate).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-deposit" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-deposit" data-id="${docSnap.id}">Reject</button></td></tr>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
-            document.querySelectorAll('[data-action="approve-deposit"]').forEach(btn => btn.onclick = () => approveDeposit(btn.dataset.id));
-            document.querySelectorAll('[data-action="reject-deposit"]').forEach(btn => btn.onclick = () => rejectDeposit(btn.dataset.id));
+            document.querySelectorAll('.approve-deposit').forEach(btn => btn.onclick = () => {
+                const reqData = JSON.parse(btn.dataset.req);
+                const requestId = btn.dataset.id;
+                showReviewModal("Approve Deposit Request", `
+                    <p><strong>User:</strong> ${escapeHtml(reqData.userId)}</p>
+                    <p><strong>Plan ID:</strong> ${reqData.planId}</p>
+                    <p><strong>Amount:</strong> ₦${reqData.amount.toFixed(2)}</p>
+                    <p><strong>Request Date:</strong> ${new Date(reqData.requestDate).toLocaleString()}</p>
+                    <p><strong>Reference:</strong> ${reqData.transactionReference || 'N/A'}</p>
+                    <p>⚠️ This action will credit the user's savings plan.</p>
+                `, () => approveDeposit(requestId));
+            });
+            document.querySelectorAll('.reject-deposit').forEach(btn => btn.onclick = () => rejectDeposit(btn.dataset.id));
         });
     }
     async function approveDeposit(requestId) {
-        if (!confirm("Approve deposit?")) return;
         try {
             const reqRef = doc(db, "deposit_requests", requestId);
             const reqSnap = await getDoc(reqRef);
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
-            if (!req.planId) return showMessage("Missing planId");
             const planRef = doc(db, "savings_plans", req.planId);
             await updateDoc(planRef, { balance: increment(req.amount) });
             await addDoc(collection(db, "transactions"), { userId: req.userId, planId: req.planId, amount: req.amount, type: "deposit", date: new Date().toISOString(), description: "Admin approved deposit" });
             await updateDoc(reqRef, { status: "approved", processedAt: new Date().toISOString() });
             await logAudit("approve_deposit", req.userId, { amount: req.amount });
             showMessage("Deposit approved", false);
-            loadAdminData();
         } catch(e) { showMessage(e.message); }
     }
     async function rejectDeposit(requestId) {
@@ -273,33 +421,39 @@
         showMessage("Deposit rejected", false);
     }
 
-    // ======================= WITHDRAWAL REQUESTS =======================
     async function loadWithdrawalRequests() {
         const q = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('withdrawalRequestsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending withdrawal requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount</th><th>Request Date</th><th>Plan ID</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan Type">${req.planType}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Plan ID">${req.planId || 'MISSING'}</td><td data-label="Actions"><button class="btn btn-sm btn-success" data-id="${docSnap.id}" data-action="approve-withdrawal">Approve</button> <button class="btn btn-sm btn-danger" data-id="${docSnap.id}" data-action="reject-withdrawal">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan Type">${req.planType}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Plan ID">${req.planId || 'MISSING'}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-withdrawal" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-withdrawal" data-id="${docSnap.id}">Reject</button></td></tr>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
-            document.querySelectorAll('[data-action="approve-withdrawal"]').forEach(btn => btn.onclick = () => approveWithdrawal(btn.dataset.id));
-            document.querySelectorAll('[data-action="reject-withdrawal"]').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.id));
+            document.querySelectorAll('.approve-withdrawal').forEach(btn => btn.onclick = () => {
+                const req = JSON.parse(btn.dataset.req);
+                showReviewModal("Approve Withdrawal Request", `
+                    <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
+                    <p><strong>Plan Type:</strong> ${req.planType}</p>
+                    <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
+                    <p><strong>Request Date:</strong> ${new Date(req.requestedAt).toLocaleString()}</p>
+                    <p>⚠️ This will deduct from the user's savings plan.</p>
+                `, () => approveWithdrawal(btn.dataset.id));
+            });
+            document.querySelectorAll('.reject-withdrawal').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.id));
         });
     }
     async function approveWithdrawal(requestId) {
-        if (!confirm("Approve withdrawal?")) return;
         try {
             const reqRef = doc(db, "withdrawal_requests", requestId);
             const reqSnap = await getDoc(reqRef);
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
-            if (!req.planId) return showMessage("Missing planId – reject instead");
             const planRef = doc(db, "savings_plans", req.planId);
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists()) return showMessage("Plan not found");
@@ -311,7 +465,6 @@
             await addDoc(collection(db, "transactions"), { userId: req.userId, planId: req.planId, amount: req.amount, type: "withdrawal", date: new Date().toISOString(), description: "Admin approved withdrawal" });
             await logAudit("approve_withdrawal", req.userId, { amount: req.amount });
             showMessage("Withdrawal approved", false);
-            loadAdminData();
         } catch(e) { showMessage(e.message); }
     }
     async function rejectWithdrawal(requestId) {
@@ -320,29 +473,36 @@
         showMessage("Withdrawal rejected", false);
     }
 
-    // ======================= THRIFT CONTRIBUTION REQUESTS =======================
     async function loadPendingContributions() {
         const q = query(collection(db, "contribution_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingContributionsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending contribution requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Actions</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const groupDoc = await getDoc(doc(db, "groups", req.groupId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
                 const groupName = groupDoc.exists() ? groupDoc.data().name : "Unknown";
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success" data-id="${docSnap.id}" data-action="approve-contribution">Approve</button> <button class="btn btn-sm btn-danger" data-id="${docSnap.id}" data-action="reject-contribution">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-contribution" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-contribution" data-id="${docSnap.id}">Reject</button></td></tr>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
-            document.querySelectorAll('[data-action="approve-contribution"]').forEach(btn => btn.onclick = () => approveContribution(btn.dataset.id));
-            document.querySelectorAll('[data-action="reject-contribution"]').forEach(btn => btn.onclick = () => rejectContribution(btn.dataset.id));
+            document.querySelectorAll('.approve-contribution').forEach(btn => btn.onclick = () => {
+                const req = JSON.parse(btn.dataset.req);
+                showReviewModal("Approve Thrift Contribution", `
+                    <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
+                    <p><strong>Group:</strong> ${req.groupName || req.groupId}</p>
+                    <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
+                    <p><strong>Request Date:</strong> ${new Date(req.requestedAt).toLocaleString()}</p>
+                    <p>⚠️ This will add the contribution to the group's cycle after deductions (Esusu/Profit).</p>
+                `, () => approveContribution(btn.dataset.id));
+            });
+            document.querySelectorAll('.reject-contribution').forEach(btn => btn.onclick = () => rejectContribution(btn.dataset.id));
         });
     }
     async function approveContribution(requestId) {
-        if (!confirm("Approve this thrift contribution?")) return;
         try {
             const reqRef = doc(db, "contribution_requests", requestId);
             const reqSnap = await getDoc(reqRef);
@@ -377,29 +537,36 @@
         showMessage("Contribution rejected", false);
     }
 
-    // ======================= THRIFT PAYOUT REQUESTS =======================
     async function loadPendingPayouts() {
         const q = query(collection(db, "payout_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingPayoutsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending payout requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Expected Index</th><th>Actions</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Expected Index</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const groupDoc = await getDoc(doc(db, "groups", req.groupId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
                 const groupName = groupDoc.exists() ? groupDoc.data().name : "Unknown";
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Expected Index">${req.expectedPayoutIndex}</td><td data-label="Actions"><button class="btn btn-sm btn-success" data-id="${docSnap.id}" data-action="approve-payout">Approve</button> <button class="btn btn-sm btn-danger" data-id="${docSnap.id}" data-action="reject-payout">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Expected Index">${req.expectedPayoutIndex}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-payout" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-payout" data-id="${docSnap.id}">Reject</button></td></tr>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
-            document.querySelectorAll('[data-action="approve-payout"]').forEach(btn => btn.onclick = () => approvePayout(btn.dataset.id));
-            document.querySelectorAll('[data-action="reject-payout"]').forEach(btn => btn.onclick = () => rejectPayout(btn.dataset.id));
+            document.querySelectorAll('.approve-payout').forEach(btn => btn.onclick = () => {
+                const req = JSON.parse(btn.dataset.req);
+                showReviewModal("Approve Thrift Payout", `
+                    <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
+                    <p><strong>Group:</strong> ${req.groupName || req.groupId}</p>
+                    <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
+                    <p><strong>Expected Payout Index:</strong> ${req.expectedPayoutIndex}</p>
+                    <p>⚠️ This will credit the user's flexible plan with the full pot.</p>
+                `, () => approvePayout(btn.dataset.id));
+            });
+            document.querySelectorAll('.reject-payout').forEach(btn => btn.onclick = () => rejectPayout(btn.dataset.id));
         });
     }
     async function approvePayout(requestId) {
-        if (!confirm("Approve this thrift payout? The user will receive funds in their flexible plan.")) return;
         try {
             const reqRef = doc(db, "payout_requests", requestId);
             const reqSnap = await getDoc(reqRef);
@@ -431,7 +598,6 @@
             await updateDoc(reqRef, { status: "approved", processedAt: new Date().toISOString() });
             await logAudit("approve_thrift_payout", req.userId, { groupId: req.groupId, amount: pot });
             showMessage(`Payout of ₦${pot.toFixed(2)} approved and credited.`, false);
-            loadAdminData();
         } catch(e) { showMessage(e.message); }
     }
     async function rejectPayout(requestId) {
@@ -440,7 +606,7 @@
         showMessage("Payout request rejected", false);
     }
 
-    // ======================= ADMIN DATA & USER MANAGEMENT (FULL FEATURES) =======================
+    // ======================= OTHER ADMIN FUNCTIONS =======================
     async function loadAdminData() {
         if (!currentAdmin) return;
         const usersSnap = await getDocs(collection(db, "users"));
@@ -456,19 +622,18 @@
             <div class="stat-card"><div class="stat-number">${pendingRequestsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
         `;
 
-        // User management table
-        let userMgmtHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        let userMgmtHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th> </thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             const status = u.disabled ? "Disabled" : "Active";
-            userMgmtHtml += `<tr><td data-label="Name">${u.fullName || 'N/A'}</td><td data-label="Email">${u.email}</td><td data-label="Status">${status}</td><td data-label="Actions" class="action-group"><button class="btn btn-sm btn-outline" data-uid="${docSnap.id}" data-action="selectUserStatement">Statement</button></td></tr>`;
+            userMgmtHtml += `<tr><td data-label="Name">${u.fullName || 'N/A'}</td><td data-label="Email">${u.email}</td><td data-label="Status">${status}</td><td data-label="Actions" class="action-group"><button class="btn btn-sm btn-outline view-member-statement" data-uid="${docSnap.id}" data-name="${escapeHtml(u.fullName || u.email)}">Statement</button></td></tr>`;
         }
         userMgmtHtml += '</tbody></table>';
         document.getElementById('userManagementTable').innerHTML = userMgmtHtml;
-        document.querySelectorAll('[data-action="selectUserStatement"]').forEach(btn => btn.onclick = () => showStatement(btn.dataset.uid));
+        document.querySelectorAll('.view-member-statement').forEach(btn => btn.onclick = () => showMemberStatement(btn.dataset.uid, btn.dataset.name));
 
         // All users table
-        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
+        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th> </thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             usersHtml += `<tr><td data-label="Name">${u.fullName || 'N/A'}</td><td data-label="Email">${u.email}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Joined">${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
@@ -481,15 +646,15 @@
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             if (u.role === 'collector' || u.role === 'supervisor') {
-                staffHtml += `<tr><td data-label="Name">${u.fullName || 'No name'}</td><td data-label="Email">${u.email}</td><td data-label="Role">${u.role}</td><td data-label="Actions"><button class="btn btn-sm btn-primary" data-uid="${docSnap.id}" data-action="editRole">Edit Role</button> <button class="btn btn-sm btn-danger" data-uid="${docSnap.id}" data-action="deleteStaff">Disable</button></td></tr>`;
+                staffHtml += `<tr><td data-label="Name">${u.fullName || 'No name'}</td><td data-label="Email">${u.email}</td><td data-label="Role">${u.role}</td><td data-label="Actions"><button class="btn btn-sm btn-primary edit-role" data-uid="${docSnap.id}">Edit Role</button> <button class="btn btn-sm btn-danger disable-staff" data-uid="${docSnap.id}">Disable</button></td></tr>`;
             }
         }
         document.querySelector('#staffTable tbody').innerHTML = staffHtml;
-        document.querySelectorAll('[data-action="editRole"]').forEach(btn => btn.onclick = () => editStaffRole(btn.dataset.uid));
-        document.querySelectorAll('[data-action="deleteStaff"]').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
+        document.querySelectorAll('.edit-role').forEach(btn => btn.onclick = () => editStaffRole(btn.dataset.uid));
+        document.querySelectorAll('.disable-staff').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
 
         // All plans
-        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
+        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th> </thead><tbody>';
         for (const docSnap of plansSnap.docs) {
             const p = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", p.userId));
@@ -502,8 +667,8 @@
         plansHtml += '</tbody></table>';
         document.getElementById('allPlansTable').innerHTML = plansHtml;
 
-        // Groups table with "View Members" button
-        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Actions</th></tr></thead><tbody>';
+        // Groups table
+        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Actions</th> </thead><tbody>';
         for (const docSnap of groupsSnap.docs) {
             const g = docSnap.data();
             const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
@@ -512,11 +677,11 @@
             if (g.applyProfitLoss) models += '📊 Profit/Loss ';
             if (g.applyEsusu) models += '🔄 Esusu ';
             if (!models) models = 'None';
-            groupsHtml += `<tr><td data-label="Group Name">${g.name}</td><td data-label="Contribution">₦${g.contributionAmount}</td><td data-label="Members">${g.members?.length||0}/${g.maxMembers}</td><td data-label="Created By">${creatorName}</td><td data-label="Models">${models}</td><td data-label="Actions"><button class="btn btn-sm btn-primary view-members-btn" data-group-id="${docSnap.id}" data-group-name="${g.name.replace(/"/g, '&quot;')}">👥 View Members</button> <button class="btn btn-sm btn-danger" data-group="${docSnap.id}" data-action="deleteGroup">Delete</button></td></tr>`;
+            groupsHtml += `<tr><td data-label="Group Name">${g.name}</td><td data-label="Contribution">₦${g.contributionAmount}</td><td data-label="Members">${g.members?.length||0}/${g.maxMembers}</td><td data-label="Created By">${creatorName}</td><td data-label="Models">${models}</td><td data-label="Actions"><button class="btn btn-sm btn-primary view-members-btn" data-group-id="${docSnap.id}" data-group-name="${g.name.replace(/"/g, '&quot;')}">👥 View Members</button> <button class="btn btn-sm btn-danger delete-group" data-group="${docSnap.id}">Delete</button></td></tr>`;
         }
         groupsHtml += '</tbody></table>';
         document.getElementById('allGroupsTable').innerHTML = groupsHtml;
-        document.querySelectorAll('[data-action="deleteGroup"]').forEach(btn => btn.onclick = async () => { if(confirm("Delete group?")) { await deleteDoc(doc(db, "groups", btn.dataset.group)); await logAudit("delete_group", null, { groupId: btn.dataset.group }); loadAdminData(); } });
+        document.querySelectorAll('.delete-group').forEach(btn => btn.onclick = async () => { if(confirm("Delete group?")) { await deleteDoc(doc(db, "groups", btn.dataset.group)); await logAudit("delete_group", null, { groupId: btn.dataset.group }); loadAdminData(); } });
         rebindGroupMemberButtons();
     }
 
@@ -559,7 +724,7 @@
         });
     }
 
-    // ======================= USER MANAGEMENT FUNCTIONS =======================
+    // ======================= USER & STAFF MANAGEMENT =======================
     async function createUserAccount() {
         const email = prompt("Email:"); if(!email) return;
         const password = prompt("Temp password (min 6):"); if(!password || password.length<6) return showMessage("Min 6 chars");
@@ -684,7 +849,7 @@
         if(flex.docs[0].data().balance < amount) return showMessage("Insufficient balance");
         await updateDoc(flex.docs[0].ref, { balance: increment(-amount) });
         const newBal = loan.remainingBalance - amount;
-        if(newBal <= 0) await updateDoc(loanDoc.ref, { status: "paid", recoveredAt: new Date().toISOString(), remainingBalance: 0 });
+        if(newBal <= 0) await updateDoc(loanDoc.ref, { status: "paid", recoveredAt: new Date().toISOString(), remainingBalance: 0, recoveredAmount: amount });
         else await updateDoc(loanDoc.ref, { remainingBalance: newBal });
         await addDoc(collection(db, "transactions"), { userId, amount, type: "loan_recovery", date: new Date().toISOString() });
         showMessage(`Recovered ₦${amount}`, false);
@@ -693,7 +858,7 @@
     }
     async function loadLoans() {
         const loans = await getDocs(collection(db, "loans"));
-        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th> </thead><tbody>';
         for(const doc of loans.docs){
             const l = doc.data();
             const userDoc = await getDoc(doc(db, "users", l.userId));
@@ -719,18 +884,9 @@
         showMessage(`Withdrew ₦${amount}`, false);
         loadAdminData();
     }
-    async function showStatement(userId) {
-        const userDoc = await getDoc(doc(db, "users", userId));
-        const userName = userDoc.exists() ? userDoc.data().fullName : userId;
-        const txns = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
-        let html = `<h4>Statement for ${userName}</h4><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody>`;
-        txns.forEach(d => { const t = d.data(); html += `<tr><td data-label="Date">${new Date(t.date).toLocaleString()}</td><td data-label="Type">${t.type}</td><td data-label="Amount">₦${t.amount.toFixed(2)}</td><td data-label="Description">${t.description || ''}</td></tr>`; });
-        html += '</tbody></table>';
-        showModal("User Statement", html);
-    }
     async function viewAuditTrail() {
         const audit = await getDocs(query(collection(db, "audit_logs"), where("adminId", "==", currentAdmin?.uid)));
-        let html = '<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th> </thead><tbody>';
         audit.forEach(d => { const a = d.data(); html += `<tr><td data-label="Time">${new Date(a.timestamp).toLocaleString()}</td><td data-label="Action">${a.action}</td><td data-label="Target">${a.targetUserId || '-'}</td><td data-label="Details">${JSON.stringify(a.details)}</td></tr>`; });
         html += '</tbody></table>';
         showModal("Audit Trail", html);
@@ -757,14 +913,8 @@
             } catch(e) { showMessage(e.message); }
         }
     };
-
-    // New redirect buttons for User Management & Statement/Audit (point to data.html)
-    document.getElementById('userManagementRedirectBtn').onclick = () => {
-        window.location.href = 'data.html#user-management';
-    };
-    document.getElementById('statementAuditRedirectBtn').onclick = () => {
-        window.location.href = 'data.html#transactions';
-    };
+    document.getElementById('userManagementRedirectBtn').onclick = () => window.location.href = 'data.html#user-management';
+    document.getElementById('statementAuditRedirectBtn').onclick = () => window.location.href = 'data.html#transactions';
 
     // ======================= AUTH & INIT =======================
     onAuthStateChanged(auth, async (user) => {
@@ -789,7 +939,7 @@
                 await loadLoans();
                 loadingSpinner.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
-                // real-time listeners for live updates
+                // real-time listeners
                 onSnapshot(collection(db, "users"), () => loadAdminData());
                 onSnapshot(collection(db, "savings_plans"), () => loadAdminData());
                 onSnapshot(collection(db, "groups"), () => loadAdminData());
@@ -818,7 +968,7 @@
     document.getElementById('directWithdrawBtn').onclick = directWithdraw;
     document.getElementById('viewStatementBtn').onclick = () => {
         const email = prompt("User email:");
-        if(email) getDocs(query(collection(db,"users"),where("email","==",email))).then(snap => { if(snap.empty) showMessage("User not found"); else showStatement(snap.docs[0].id); });
+        if(email) getDocs(query(collection(db,"users"),where("email","==",email))).then(snap => { if(snap.empty) showMessage("User not found"); else showMemberStatement(snap.docs[0].id, snap.docs[0].data().fullName); });
     };
     document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
 </script>
