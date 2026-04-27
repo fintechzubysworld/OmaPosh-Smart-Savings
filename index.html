@@ -577,6 +577,77 @@
             paymentModal.classList.add('hidden');
         }
     });
+    // ============================================================
+// Floating "My Ledger" Button for index.html
+// Appears only when a non-admin user is logged in.
+// Clicking navigates to ledger.html
+// ============================================================
+
+(function addLedgerFloatingButton() {
+  // Wait for Firebase to be ready (assumes Firebase already initialised)
+  const waitForAuth = setInterval(() => {
+    if (typeof auth !== 'undefined' && auth.currentUser) {
+      clearInterval(waitForAuth);
+      initButton();
+    } else if (typeof auth !== 'undefined' && auth.currentUser === null) {
+      // Not logged in – remove button if exists
+      const existing = document.getElementById('ledgerFloatingBtn');
+      if (existing) existing.remove();
+    }
+  }, 500);
+
+  function initButton() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Check if user is admin (redirects to admin.html, so we show only for non-admin)
+    // We'll also check role from Firestore if available
+    getDoc(doc(db, "users", user.uid)).then(userDoc => {
+      const role = userDoc.exists() ? userDoc.data().role : null;
+      if (role === 'admin') return; // Do not show for admins
+
+      // Create floating button if not already present
+      if (document.getElementById('ledgerFloatingBtn')) return;
+
+      const btn = document.createElement('button');
+      btn.id = 'ledgerFloatingBtn';
+      btn.innerHTML = '📒 My Ledger';
+      btn.style.position = 'fixed';
+      btn.style.bottom = '20px';
+      btn.style.right = '20px';
+      btn.style.zIndex = '1000';
+      btn.style.backgroundColor = '#ffb347';
+      btn.style.color = '#1e2a3e';
+      btn.style.border = 'none';
+      btn.style.borderRadius = '50px';
+      btn.style.padding = '12px 20px';
+      btn.style.fontSize = '1rem';
+      btn.style.fontWeight = 'bold';
+      btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+      btn.style.cursor = 'pointer';
+      btn.style.transition = 'all 0.2s ease';
+      btn.style.display = 'flex';
+      btn.style.alignItems = 'center';
+      btn.style.gap = '8px';
+      btn.onmouseenter = () => btn.style.transform = 'scale(1.02)';
+      btn.onmouseleave = () => btn.style.transform = 'scale(1)';
+      btn.onclick = () => window.location.href = 'ledger.html';
+      document.body.appendChild(btn);
+    }).catch(err => console.warn("Could not check user role:", err));
+  }
+
+  // Listen for auth state changes to add/remove button
+  if (typeof onAuthStateChanged === 'function') {
+    onAuthStateChanged(auth, (user) => {
+      const existing = document.getElementById('ledgerFloatingBtn');
+      if (user && user.email !== 'admin@omaposhsmartsavings.com') {
+        if (!existing) initButton();
+      } else if (existing) {
+        existing.remove();
+      }
+    });
+  }
+})();
 </script>
 </body>
 </html>
