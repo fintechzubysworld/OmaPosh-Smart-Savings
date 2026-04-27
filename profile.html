@@ -1,1 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>My Profile | OmaPosh Smart Savings</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .profile-container {
+            max-width: 700px;
+            width: 100%;
+            margin: auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 24px 30px;
+            text-align: center;
+        }
+        header h1 { font-size: 1.8rem; letter-spacing: 1px; }
+        header p { font-size: 0.8rem; opacity: 0.8; margin-top: 5px; }
+        .profile-content { padding: 30px; }
+        .avatar-section {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        .avatar {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.8rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; color: #1e3c72; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 16px; font-size: 1rem; transition: 0.2s; }
+        input:focus, select:focus { outline: none; border-color: #ffb347; box-shadow: 0 0 0 3px rgba(255,179,71,0.2); }
+        input:disabled, select:disabled { background: #f5f5f5; color: #666; cursor: not-allowed; }
+        .flex-btns { display: flex; gap: 15px; margin-top: 25px; flex-wrap: wrap; }
+        .btn { padding: 12px 24px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 1rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: #ffb347; color: #1e2a3e; }
+        .btn-primary:hover { background: #ff9f1a; transform: translateY(-2px); }
+        .btn-outline { background: transparent; border: 1px solid #1e3c72; color: #1e3c72; }
+        .btn-outline:hover { background: #eef2ff; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 16px; margin-bottom: 20px; display: none; }
+        .alert.show { display: block; }
+        .info-text { background: #e9f0ff; padding: 12px; border-radius: 16px; margin-bottom: 20px; font-size: 0.9rem; color: #1e3c72; text-align: center; }
+        .loading { text-align: center; padding: 40px; font-size: 1.2rem; color: #666; }
+        footer { text-align: center; padding: 20px; font-size: 0.75rem; color: #888; background: #f8f9fa; border-top: 1px solid #e0e0e0; }
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .profile-content { padding: 20px; }
+            .flex-btns { flex-direction: column; }
+            .btn { width: 100%; }
+            header h1 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="profile-container">
+    <header>
+        <h1>👤 My Profile</h1>
+        <p>Manage your personal and banking details</p>
+    </header>
+    <div class="profile-content">
+        <div class="avatar-section">
+            <div class="avatar" id="avatar">👤</div>
+        </div>
+        <div id="alertBox" class="alert"></div>
+        <div id="loadingSpinner" class="loading">Loading profile...</div>
+        <form id="profileForm" style="display: none;">
+            <div class="form-group">
+                <label>📛 Full Name</label>
+                <input type="text" id="fullName" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label>📧 Email Address</label>
+                <input type="email" id="email" disabled placeholder="Email cannot be changed">
+            </div>
+            <div class="form-group">
+                <label>📞 Phone Number</label>
+                <input type="tel" id="phone" placeholder="+234 123 456 7890">
+            </div>
+            <div class="form-group">
+                <label>🎂 Date of Birth</label>
+                <input type="date" id="dob">
+            </div>
+            <div class="form-group">
+                <label>🏦 Bank Name</label>
+                <input type="text" id="bank" placeholder="e.g., First Bank, GTBank, UBA">
+            </div>
+            <div class="form-group">
+                <label>🔢 Account Number</label>
+                <input type="text" id="accountNumber" placeholder="10-digit account number">
+            </div>
+            <div class="form-group">
+                <label>👤 Account Name</label>
+                <input type="text" id="accountName" placeholder="Name on bank account">
+            </div>
+            <div class="flex-btns">
+                <button type="button" class="btn btn-primary" id="saveBtn">💾 Save Changes</button>
+                <button type="button" class="btn btn-outline" id="cancelBtn">↩️ Cancel</button>
+                <button type="button" class="btn btn-outline" id="backToDashboardBtn">🏠 Back to Dashboard</button>
+            </div>
+        </form>
+        <div id="readonlyView" style="display: none;">
+            <div class="info-text">Your profile information is shown below. Click "Edit Profile" to make changes.</div>
+            <div class="form-group"><label>📛 Full Name</label><p id="viewFullName" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="form-group"><label>📧 Email</label><p id="viewEmail" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="form-group"><label>📞 Phone</label><p id="viewPhone" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="form-group"><label>🎂 Date of Birth</label><p id="viewDob" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="form-group"><label>🏦 Bank Name</label><p id="viewBank" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="form-group"><label>🔢 Account Number</label><p id="viewAccountNumber" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="form-group"><label>👤 Account Name</label><p id="viewAccountName" style="background:#f8f9fa; padding:10px; border-radius:12px;"></p></div>
+            <div class="flex-btns">
+                <button type="button" class="btn btn-primary" id="editBtn">✏️ Edit Profile</button>
+                <button type="button" class="btn btn-outline" id="backToDashboardBtn2">🏠 Back to Dashboard</button>
+            </div>
+        </div>
+    </div>
+    <footer>© 2026 OmaPosh Smart Savings — Secure profile management</footer>
+</div>
 
+<script type="module">
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // DOM elements
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const profileForm = document.getElementById('profileForm');
+    const readonlyView = document.getElementById('readonlyView');
+    const alertBox = document.getElementById('alertBox');
+    const avatarDiv = document.getElementById('avatar');
+
+    // Form fields
+    const fullNameInput = document.getElementById('fullName');
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+    const dobInput = document.getElementById('dob');
+    const bankInput = document.getElementById('bank');
+    const accountNumberInput = document.getElementById('accountNumber');
+    const accountNameInput = document.getElementById('accountName');
+
+    // View fields
+    const viewFullName = document.getElementById('viewFullName');
+    const viewEmail = document.getElementById('viewEmail');
+    const viewPhone = document.getElementById('viewPhone');
+    const viewDob = document.getElementById('viewDob');
+    const viewBank = document.getElementById('viewBank');
+    const viewAccountNumber = document.getElementById('viewAccountNumber');
+    const viewAccountName = document.getElementById('viewAccountName');
+
+    let currentUserId = null;
+    let currentUserData = {};
+
+    function showAlert(message, isError = true) {
+        alertBox.innerText = message;
+        alertBox.className = 'alert ' + (isError ? 'alert-danger' : 'alert-success');
+        alertBox.classList.add('show');
+        setTimeout(() => alertBox.classList.remove('show'), 5000);
+    }
+
+    function updateAvatar(name) {
+        if (name && name.length > 0) {
+            avatarDiv.innerText = name.charAt(0).toUpperCase();
+        } else {
+            avatarDiv.innerText = '👤';
+        }
+    }
+
+    async function loadProfile() {
+        if (!currentUserId) return;
+        try {
+            const userDoc = await getDoc(doc(db, "users", currentUserId));
+            if (!userDoc.exists()) throw new Error("User document not found");
+            const data = userDoc.data();
+            currentUserData = data;
+            
+            // Update form fields
+            fullNameInput.value = data.fullName || '';
+            emailInput.value = data.email || '';
+            phoneInput.value = data.phone || '';
+            dobInput.value = data.dateOfBirth || '';
+            bankInput.value = data.bank || '';
+            accountNumberInput.value = data.accountNumber || '';
+            accountNameInput.value = data.accountName || '';
+            
+            // Update readonly view
+            viewFullName.innerText = data.fullName || 'Not set';
+            viewEmail.innerText = data.email || 'Not set';
+            viewPhone.innerText = data.phone || 'Not set';
+            viewDob.innerText = data.dateOfBirth ? new Date(data.dateOfBirth).toLocaleDateString() : 'Not set';
+            viewBank.innerText = data.bank || 'Not set';
+            viewAccountNumber.innerText = data.accountNumber || 'Not set';
+            viewAccountName.innerText = data.accountName || 'Not set';
+            
+            updateAvatar(data.fullName || 'User');
+            loadingSpinner.style.display = 'none';
+            readonlyView.style.display = 'block';
+            profileForm.style.display = 'none';
+        } catch (error) {
+            console.error("Load profile error:", error);
+            showAlert("Failed to load profile: " + error.message);
+            loadingSpinner.style.display = 'none';
+        }
+    }
+
+    async function saveProfile() {
+        // Validate required fields
+        const fullName = fullNameInput.value.trim();
+        if (!fullName) {
+            showAlert("Full name is required", true);
+            return;
+        }
+        
+        const updates = {
+            fullName: fullName,
+            phone: phoneInput.value.trim(),
+            dateOfBirth: dobInput.value,
+            bank: bankInput.value.trim(),
+            accountNumber: accountNumberInput.value.trim(),
+            accountName: accountNameInput.value.trim()
+        };
+        
+        try {
+            await updateDoc(doc(db, "users", currentUserId), updates);
+            showAlert("Profile updated successfully!", false);
+            // Refresh displayed data
+            await loadProfile();
+            // Switch back to read-only mode
+            readonlyView.style.display = 'block';
+            profileForm.style.display = 'none';
+        } catch (error) {
+            console.error("Save error:", error);
+            showAlert("Failed to save: " + error.message);
+        }
+    }
+
+    function enableEditMode() {
+        readonlyView.style.display = 'none';
+        profileForm.style.display = 'block';
+        // Populate form with current data again
+        fullNameInput.value = currentUserData.fullName || '';
+        phoneInput.value = currentUserData.phone || '';
+        dobInput.value = currentUserData.dateOfBirth || '';
+        bankInput.value = currentUserData.bank || '';
+        accountNumberInput.value = currentUserData.accountNumber || '';
+        accountNameInput.value = currentUserData.accountName || '';
+    }
+
+    function cancelEdit() {
+        readonlyView.style.display = 'block';
+        profileForm.style.display = 'none';
+        // Reset form to original data
+        fullNameInput.value = currentUserData.fullName || '';
+        phoneInput.value = currentUserData.phone || '';
+        dobInput.value = currentUserData.dateOfBirth || '';
+        bankInput.value = currentUserData.bank || '';
+        accountNumberInput.value = currentUserData.accountNumber || '';
+        accountNameInput.value = currentUserData.accountName || '';
+    }
+
+    function goBackToDashboard() {
+        window.location.href = "index.html";
+    }
+
+    // Authentication check
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUserId = user.uid;
+            await loadProfile();
+        } else {
+            // Not logged in, redirect to main page (login)
+            window.location.href = "index.html";
+        }
+    });
+
+    // Event listeners
+    document.getElementById('saveBtn').addEventListener('click', saveProfile);
+    document.getElementById('cancelBtn').addEventListener('click', cancelEdit);
+    document.getElementById('editBtn').addEventListener('click', enableEditMode);
+    document.getElementById('backToDashboardBtn').addEventListener('click', goBackToDashboard);
+    document.getElementById('backToDashboardBtn2').addEventListener('click', goBackToDashboard);
+</script>
+</body>
+</html>
