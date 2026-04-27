@@ -19,11 +19,15 @@
         .btn-danger { background: #dc3545; color: white; }
         .btn-danger:hover { background: #c82333; }
         .btn-sm { padding: 5px 12px; font-size: 0.8rem; min-height: 34px; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
         .section-title { font-size: 1.5rem; margin-bottom: 20px; color: #1e3c72; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 15px; }
-        .card { background: #fff; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 16px; border: 1px solid #eaeef2; }
+        .stats-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 20px; flex: 1; min-width: 150px; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; }
+        .stat-label { font-size: 0.9rem; opacity: 0.9; margin-top: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; overflow-x: auto; display: block; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #f8f9fa; font-weight: 600; }
@@ -33,7 +37,7 @@
         .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
         .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 30px; }
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-        .modal > div { background: white; max-width: 800px; width: 100%; border-radius: 24px; padding: 24px; max-height: 80vh; overflow-y: auto; }
+        .modal > div { background: white; max-width: 900px; width: 100%; border-radius: 24px; padding: 24px; max-height: 85vh; overflow-y: auto; }
         .hidden { display: none !important; }
         .info-banner { background: #d1ecf1; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
         .role-badge { background: #6c757d; color: white; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; }
@@ -42,6 +46,10 @@
         .flex-btns { display: flex; gap: 12px; flex-wrap: wrap; margin: 15px 0; }
         .back-btn { background: #6c757d; color: white; margin-bottom: 20px; }
         .back-btn:hover { background: #5a6268; }
+        .statement-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .statement-table th, .statement-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .statement-table th { background: #f2f2f2; }
+        .duplicate-warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 8px; margin: 4px 0; }
         @media (max-width: 768px) { th, td { font-size: 0.8rem; padding: 8px; } .filter-bar { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -55,12 +63,20 @@
         <!-- Back to Dashboard Button -->
         <button class="btn back-btn" id="backToDashboardBtn">← Back to Dashboard</button>
 
+        <!-- Data Check & Cleanup Button -->
+        <div class="flex-btns">
+            <button class="btn btn-warning" id="dataCheckBtn">🔍 Data Check & Deduplicate</button>
+        </div>
+
+        <!-- Summary Statistics (only approved transactions) -->
+        <div class="stats-row" id="statsSummaryContainer"></div>
+
         <div class="section">
             <div class="section-title">
                 <span>📜 All Transactions</span>
                 <div class="filter-bar">
                     <input type="text" id="searchInput" placeholder="Search by ref, sender, receiver...">
-                    <select id="typeFilter"><option value="">All Types</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="contribution">Contribution</option><option value="payout">Payout</option></select>
+                    <select id="typeFilter"><option value="">All Types</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="contribution">Contribution</option><option value="payout">Payout</option><option value="loan_disbursement">Loan Disbursement</option><option value="loan_recovery">Loan Recovery</option><option value="admin_deposit">Admin Deposit</option><option value="admin_withdrawal">Admin Withdrawal</option></select>
                     <select id="statusFilter"><option value="">All Statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
                     <button class="btn btn-primary" id="refreshBtn">Refresh</button>
                 </div>
@@ -80,7 +96,7 @@
             </div>
             <div id="usersTableContainer" style="overflow-x: auto;">
                 <table id="usersTable">
-                    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Permissions</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Permissions</th><th>Actions</th></thead>
                     <tbody id="usersBody"><tr><td colspan="5">Loading users...</td></tr></tbody>
                 </table>
             </div>
@@ -121,7 +137,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, query, where, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -136,7 +152,7 @@
     const db = getFirestore(app);
 
     let currentAdmin = null;
-    let allTransactions = [];
+    let allTransactions = []; // raw transaction objects
 
     function showToast(msg, isError = false) {
         const toast = document.createElement('div');
@@ -158,128 +174,177 @@
     // Fetch all transactions from various collections
     async function fetchAllTransactions() {
         const transactions = [];
-        // 1. Deposit requests
+        function addTx(obj) { transactions.push(obj); }
+
+        // Deposit requests
         const depSnap = await getDocs(collection(db, "deposit_requests"));
         depSnap.forEach(doc => {
             const d = doc.data();
-            transactions.push({
-                id: doc.id,
-                type: "deposit",
-                sender: d.userName || d.userId || "User",
-                receiver: "OmaPosh Savings",
+            addTx({
+                id: doc.id, collection: "deposit_requests", type: "deposit",
+                sender: d.userName || d.userId || "User", receiver: "OmaPosh Savings",
                 particulars: `Deposit to plan ${d.planId || 'N/A'}`,
-                amount: d.amount,
-                date: d.requestDate || d.createdAt,
-                reference: d.transactionReference || doc.id,
-                confirmation: d.status || "pending",
-                status: d.status,
-                raw: d,
-                userId: d.userId
+                amount: d.amount, date: d.requestDate || d.createdAt,
+                reference: d.transactionReference || doc.id, confirmation: d.status || "pending",
+                userId: d.userId, raw: d
             });
         });
-        // 2. Withdrawal requests
+        // Withdrawal requests
         const wdSnap = await getDocs(collection(db, "withdrawal_requests"));
         wdSnap.forEach(doc => {
             const d = doc.data();
-            transactions.push({
-                id: doc.id,
-                type: "withdrawal",
-                sender: "OmaPosh Savings",
-                receiver: d.userName || d.userId,
+            addTx({
+                id: doc.id, collection: "withdrawal_requests", type: "withdrawal",
+                sender: "OmaPosh Savings", receiver: d.userName || d.userId,
                 particulars: `Withdrawal from ${d.planType || 'savings'} plan`,
-                amount: d.amount,
-                date: d.requestedAt,
-                reference: doc.id,
-                confirmation: d.status,
-                status: d.status,
-                raw: d,
-                userId: d.userId
+                amount: d.amount, date: d.requestedAt, reference: doc.id,
+                confirmation: d.status, userId: d.userId, raw: d
             });
         });
-        // 3. Contribution requests
+        // Contribution requests
         const contribReqSnap = await getDocs(collection(db, "contribution_requests"));
         contribReqSnap.forEach(doc => {
             const d = doc.data();
-            transactions.push({
-                id: doc.id,
-                type: "contribution",
-                sender: d.userId,
-                receiver: `Thrift Group: ${d.groupName || d.groupId}`,
+            addTx({
+                id: doc.id, collection: "contribution_requests", type: "contribution",
+                sender: d.userId, receiver: `Thrift Group: ${d.groupName || d.groupId}`,
                 particulars: `Contribution to group ${d.groupName || d.groupId}`,
-                amount: d.amount,
-                date: d.requestedAt,
-                reference: d.transactionReference || doc.id,
-                confirmation: d.status,
-                status: d.status,
-                raw: d,
-                userId: d.userId
+                amount: d.amount, date: d.requestedAt, reference: d.transactionReference || doc.id,
+                confirmation: d.status, userId: d.userId, raw: d
             });
         });
-        // 4. Approved contributions
+        // Approved contributions
         const contribSnap = await getDocs(collection(db, "contributions"));
         contribSnap.forEach(doc => {
             const d = doc.data();
-            transactions.push({
-                id: doc.id,
-                type: "contribution",
-                sender: d.userId,
-                receiver: `Thrift Group ${d.groupId}`,
-                particulars: "Approved thrift contribution",
-                amount: d.amount,
-                date: d.date,
-                reference: doc.id,
-                confirmation: "approved",
-                status: "approved",
-                raw: d,
-                userId: d.userId
+            addTx({
+                id: doc.id, collection: "contributions", type: "contribution",
+                sender: d.userId, receiver: `Thrift Group ${d.groupId}`,
+                particulars: "Approved thrift contribution", amount: d.amount,
+                date: d.date, reference: doc.id, confirmation: "approved",
+                userId: d.userId, raw: d
             });
         });
-        // 5. Payout transactions
-        const payoutSnap = await getDocs(collection(db, "transactions"));
-        payoutSnap.forEach(doc => {
+        // Transactions collection (payouts, admin, loans)
+        const txSnap = await getDocs(collection(db, "transactions"));
+        txSnap.forEach(doc => {
             const d = doc.data();
-            if (d.type === 'payout') {
-                transactions.push({
-                    id: doc.id,
-                    type: "payout",
-                    sender: `Thrift Group ${d.groupId}`,
-                    receiver: d.userId,
-                    particulars: d.description || "Group payout",
-                    amount: d.amount,
-                    date: d.date,
-                    reference: doc.id,
-                    confirmation: "approved",
-                    status: "approved",
-                    raw: d,
-                    userId: d.userId
-                });
-            } else if (d.type === 'deposit' || d.type === 'withdrawal') {
-                transactions.push({
-                    id: doc.id,
-                    type: d.type,
-                    sender: d.type === 'deposit' ? d.userId : "OmaPosh",
-                    receiver: d.type === 'deposit' ? "OmaPosh" : d.userId,
-                    particulars: d.description || `${d.type} transaction`,
-                    amount: d.amount,
-                    date: d.date,
-                    reference: doc.id,
-                    confirmation: "approved",
-                    status: "approved",
-                    raw: d,
-                    userId: d.userId
+            let txType = d.type;
+            if (d.type === 'payout') txType = 'payout';
+            else if (d.type === 'loan_disbursement') txType = 'loan_disbursement';
+            else if (d.type === 'loan_recovery') txType = 'loan_recovery';
+            else if (d.type === 'admin_deposit') txType = 'admin_deposit';
+            else if (d.type === 'admin_withdrawal') txType = 'admin_withdrawal';
+            addTx({
+                id: doc.id, collection: "transactions", type: txType,
+                sender: d.type === 'deposit' ? d.userId : (d.type === 'payout' ? `Group ${d.groupId}` : "OmaPosh"),
+                receiver: d.type === 'deposit' ? "OmaPosh" : (d.type === 'payout' ? d.userId : d.userId),
+                particulars: d.description || d.type, amount: d.amount,
+                date: d.date, reference: doc.id, confirmation: "approved",
+                userId: d.userId, raw: d
+            });
+        });
+        // Loans (disbursements not captured above)
+        const loansSnap = await getDocs(collection(db, "loans"));
+        for (const loanDoc of loansSnap.docs) {
+            const loan = loanDoc.data();
+            const userDoc = await getDoc(doc(db, "users", loan.userId));
+            const userName = userDoc.exists() ? userDoc.data().fullName : loan.userId;
+            if (loan.disbursedAt) {
+                addTx({
+                    id: loanDoc.id + "_disburse", collection: "loans", type: "loan_disbursement",
+                    sender: "OmaPosh", receiver: userName,
+                    particulars: `Loan disbursement of ₦${loan.amount}`,
+                    amount: loan.amount, date: loan.disbursedAt,
+                    reference: loanDoc.id, confirmation: "approved",
+                    userId: loan.userId, raw: loan
                 });
             }
-        });
+        }
         transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         return transactions;
     }
 
-    function renderTransactionsTable(transactions) {
-        const tbody = document.getElementById('transactionsBody');
-        if (!transactions.length) {
-            tbody.innerHTML = '<tr><td colspan="8">No transactions found.</td></tr>';
+    // Deduplicate transactions based on key fields (userId, type, amount, date within 5 seconds, reference)
+    function findDuplicates(transactions) {
+        const groups = new Map();
+        for (const tx of transactions) {
+            const key = `${tx.userId}|${tx.type}|${tx.amount}|${Math.floor(new Date(tx.date).getTime() / 5000)}|${tx.reference.substring(0, 20)}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(tx);
+        }
+        const duplicates = [];
+        for (const [key, group] of groups.entries()) {
+            if (group.length > 1) duplicates.push(group);
+        }
+        return duplicates;
+    }
+
+    async function removeDuplicateTransactions(duplicateGroups) {
+        if (!duplicateGroups.length) { showToast("No duplicates found."); return false; }
+        let removedCount = 0;
+        const batch = writeBatch(db);
+        for (const group of duplicateGroups) {
+            // Keep the one with 'approved' status if available, otherwise keep the first (by date)
+            let keep = group.find(t => t.confirmation === 'approved') || group[0];
+            for (const dup of group) {
+                if (dup.id !== keep.id && dup.collection) {
+                    const docRef = doc(db, dup.collection, dup.id);
+                    batch.delete(docRef);
+                    removedCount++;
+                }
+            }
+        }
+        if (removedCount > 0) {
+            await batch.commit();
+            showToast(`Removed ${removedCount} duplicate entries.`, false);
+            return true;
+        }
+        return false;
+    }
+
+    async function runDataCheckAndCleanup() {
+        showToast("Running data integrity check...", false);
+        const freshTransactions = await fetchAllTransactions();
+        const duplicates = findDuplicates(freshTransactions);
+        if (duplicates.length === 0) {
+            showToast("✅ No duplicate transactions found.", false);
             return;
         }
+        let msg = `Found ${duplicates.length} duplicate groups.\n`;
+        for (const group of duplicates.slice(0, 5)) {
+            msg += `- ${group[0].type} ₦${group[0].amount} (${group.length} copies)\n`;
+        }
+        if (duplicates.length > 5) msg += `... and ${duplicates.length - 5} more.\n`;
+        const confirmDelete = confirm(msg + "\nDo you want to remove duplicate entries? Only approved transaction will be kept per group.");
+        if (confirmDelete) {
+            const removed = await removeDuplicateTransactions(duplicates);
+            if (removed) await refreshAll();
+            else showToast("No duplicates removed.", false);
+        }
+    }
+
+    // Summary stats (only approved transactions)
+    function updateSummaryStats(transactions) {
+        const approved = transactions.filter(t => t.confirmation === 'approved');
+        const totalDeposits = approved.filter(t => t.type === 'deposit' || t.type === 'admin_deposit').reduce((s, t) => s + t.amount, 0);
+        const totalWithdrawals = approved.filter(t => t.type === 'withdrawal' || t.type === 'admin_withdrawal').reduce((s, t) => s + t.amount, 0);
+        const totalContributions = approved.filter(t => t.type === 'contribution').reduce((s, t) => s + t.amount, 0);
+        const totalPayouts = approved.filter(t => t.type === 'payout').reduce((s, t) => s + t.amount, 0);
+        const pendingCount = transactions.filter(t => t.confirmation === 'pending').length;
+        const container = document.getElementById('statsSummaryContainer');
+        container.innerHTML = `
+            <div class="stat-card"><div class="stat-number">₦${totalDeposits.toLocaleString()}</div><div class="stat-label">Approved Deposits</div></div>
+            <div class="stat-card"><div class="stat-number">₦${totalWithdrawals.toLocaleString()}</div><div class="stat-label">Approved Withdrawals</div></div>
+            <div class="stat-card"><div class="stat-number">₦${totalContributions.toLocaleString()}</div><div class="stat-label">Approved Contributions</div></div>
+            <div class="stat-card"><div class="stat-number">₦${totalPayouts.toLocaleString()}</div><div class="stat-label">Approved Payouts</div></div>
+            <div class="stat-card"><div class="stat-number">${pendingCount}</div><div class="stat-label">Pending Requests</div></div>
+        `;
+    }
+
+    function renderTransactionsTable(transactions) {
+        const tbody = document.getElementById('transactionsBody');
+        if (!transactions.length) { tbody.innerHTML = '<tr><td colspan="8">No transactions found.</td></tr>'; return; }
         tbody.innerHTML = transactions.map(t => `
             <tr>
                 <td data-label="Date/Time">${new Date(t.date).toLocaleString()}</td>
@@ -288,19 +353,16 @@
                 <td data-label="Particulars">${escapeHtml(t.particulars)}</td>
                 <td data-label="Amount">₦${t.amount.toFixed(2)}</td>
                 <td data-label="Reference">${escapeHtml(t.reference.substring(0, 12))}...</td>
-                <td data-label="Confirmation"><span class="status-${t.confirmation}" style="background:${t.confirmation === 'pending' ? '#fff3cd' : (t.confirmation === 'approved' ? '#d4edda' : '#f8d7da')}; padding:4px 8px; border-radius:20px;">${t.confirmation.toUpperCase()}</span></td>
+                <td data-label="Confirmation"><span style="background:${t.confirmation === 'pending' ? '#fff3cd' : (t.confirmation === 'approved' ? '#d4edda' : '#f8d7da')}; padding:4px 8px; border-radius:20px;">${t.confirmation.toUpperCase()}</span></td>
                 <td data-label="Actions"><button class="btn btn-sm btn-primary view-transaction" data-id="${t.id}" data-type="${t.type}">View</button></td>
             </tr>
         `).join('');
-        // Attach view transaction handlers
         document.querySelectorAll('.view-transaction').forEach(btn => {
             btn.addEventListener('click', () => {
                 const id = btn.dataset.id;
                 const type = btn.dataset.type;
                 const transaction = allTransactions.find(t => t.id === id && t.type === type);
-                if (transaction) {
-                    showTransactionDetail(transaction);
-                }
+                if (transaction) showTransactionDetail(transaction);
             });
         });
     }
@@ -343,16 +405,14 @@
         if (type) filtered = filtered.filter(t => t.type === type);
         if (status) filtered = filtered.filter(t => t.confirmation === status);
         renderTransactionsTable(filtered);
+        updateSummaryStats(allTransactions);
     }
 
-    // User management with granular permissions AND member statement button
+    // User management (same as before)
     async function loadUsers() {
         const usersSnap = await getDocs(collection(db, "users"));
         const users = [];
-        usersSnap.forEach(doc => {
-            const u = doc.data();
-            users.push({ id: doc.id, ...u, permissions: u.permissions || {} });
-        });
+        usersSnap.forEach(doc => { users.push({ id: doc.id, ...doc.data(), permissions: doc.data().permissions || {} }); });
         const tbody = document.getElementById('usersBody');
         if (!users.length) { tbody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>'; return; }
         tbody.innerHTML = users.map(user => `
@@ -367,67 +427,43 @@
                 </td>
             </tr>
         `).join('');
-        // Edit permissions handler
         document.querySelectorAll('.edit-permissions').forEach(btn => {
             btn.addEventListener('click', () => {
-                const userId = btn.dataset.userid;
-                const email = btn.dataset.email;
-                const role = btn.dataset.role;
-                const perms = JSON.parse(btn.dataset.perms);
+                const userId = btn.dataset.userid, email = btn.dataset.email, role = btn.dataset.role, perms = JSON.parse(btn.dataset.perms);
                 showUserModal(userId, email, role, perms);
             });
         });
-        // Member Statement handler
         document.querySelectorAll('.view-statement').forEach(btn => {
             btn.addEventListener('click', async () => {
-                const userId = btn.dataset.userid;
-                const userName = btn.dataset.name;
+                const userId = btn.dataset.userid, userName = btn.dataset.name;
                 await showMemberStatement(userId, userName);
             });
         });
     }
 
     async function showMemberStatement(userId, userName) {
-        // Fetch all transactions for this user from our in-memory list or directly from Firestore
         const userTransactions = allTransactions.filter(t => t.userId === userId);
-        // Also fetch any transactions that might not be in the combined list but are under "transactions" collection
-        const extraTxns = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
-        extraTxns.forEach(doc => {
-            const t = doc.data();
-            if (!userTransactions.some(ut => ut.id === doc.id)) {
-                userTransactions.push({
-                    id: doc.id,
-                    type: t.type,
-                    sender: t.type === 'deposit' ? t.userId : "OmaPosh",
-                    receiver: t.type === 'deposit' ? "OmaPosh" : t.userId,
-                    particulars: t.description || t.type,
-                    amount: t.amount,
-                    date: t.date,
-                    reference: doc.id,
-                    confirmation: "approved",
-                    userId: userId
-                });
-            }
-        });
-        userTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         if (userTransactions.length === 0) {
             showModalMessage("No Transactions", `No transaction history found for ${userName}.`);
             return;
         }
-        let html = `<h4>Transaction History for ${escapeHtml(userName)}</h4>
-                    <table style="width:100%; border-collapse:collapse;">
-                        <thead><tr><th>Date/Time</th><th>Type</th><th>Particulars</th><th>Amount</th><th>Status</th></tr></thead>
-                        <tbody>`;
+        userTransactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+        let html = `<h4>Full Transaction Statement for ${escapeHtml(userName)}</h4>
+                    <table class="statement-table"><thead><tr><th>Date/Time</th><th>Type</th><th>Particulars</th><th>Amount (₦)</th><th>Status</th></tr></thead><tbody>`;
+        let totalCredits = 0, totalDebits = 0;
         userTransactions.forEach(t => {
-            html += `<tr>
-                        <td>${new Date(t.date).toLocaleString()}</td>
-                        <td>${t.type}</td>
-                        <td>${escapeHtml(t.particulars)}</td>
-                        <td>₦${t.amount.toFixed(2)}</td>
-                        <td>${t.confirmation}</td>
-                     </tr>`;
+            const isCredit = (t.type === 'deposit' || t.type === 'contribution' || t.type === 'loan_disbursement' || t.type === 'payout' || t.type === 'admin_deposit');
+            if (isCredit) totalCredits += t.amount;
+            else totalDebits += t.amount;
+            html += `<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type.replace(/_/g, ' ')}</td><td>${escapeHtml(t.particulars)}</td><td>${isCredit ? '+' : '-'}₦${t.amount.toFixed(2)}</td><td>${t.confirmation}</td></tr>`;
         });
-        html += `</tbody></table>`;
+        html += `</tbody></table>
+                <div style="margin-top:20px; padding:12px; background:#f0f0f0; border-radius:12px;">
+                    <strong>Summary:</strong><br>
+                    Total Credits: ₦${totalCredits.toFixed(2)}<br>
+                    Total Debits: ₦${totalDebits.toFixed(2)}<br>
+                    <strong>Net Balance: ₦${(totalCredits - totalDebits).toFixed(2)}</strong>
+                </div>`;
         const modal = document.getElementById('statementModal');
         document.getElementById('statementModalTitle').innerText = `Statement: ${userName}`;
         document.getElementById('statementContent').innerHTML = html;
@@ -447,39 +483,22 @@
         const modal = document.getElementById('userModal');
         const title = document.getElementById('userModalTitle');
         title.innerText = `Edit Privileges: ${email}`;
-        const availablePerms = [
-            "can_approve_deposits", "can_approve_withdrawals", "can_approve_contributions",
-            "can_manage_groups", "can_view_reports", "can_manage_users", "can_issue_payouts"
-        ];
-        const permHtml = availablePerms.map(perm => `
-            <label>
-                <input type="checkbox" value="${perm}" ${currentPerms[perm] ? 'checked' : ''}> ${perm.replace(/_/g, ' ')}
-            </label>
-        `).join('');
+        const availablePerms = ["can_approve_deposits", "can_approve_withdrawals", "can_approve_contributions", "can_manage_groups", "can_view_reports", "can_manage_users", "can_issue_payouts"];
+        const permHtml = availablePerms.map(perm => `<label><input type="checkbox" value="${perm}" ${currentPerms[perm] ? 'checked' : ''}> ${perm.replace(/_/g, ' ')}</label>`).join('');
         const roleOptions = ['admin', 'staff', 'viewer', 'user'];
         const roleSelect = `<select id="userRoleSelect">${roleOptions.map(r => `<option value="${r}" ${currentRole === r ? 'selected' : ''}>${r.toUpperCase()}</option>`).join('')}</select>`;
-        document.getElementById('userModalBody').innerHTML = `
-            <div class="form-group"><label>User Role:</label> ${roleSelect}</div>
-            <div class="form-group"><label>Granular Permissions:</label><div class="permission-group">${permHtml}</div></div>
-        `;
+        document.getElementById('userModalBody').innerHTML = `<div class="form-group"><label>User Role:</label> ${roleSelect}</div><div class="form-group"><label>Granular Permissions:</label><div class="permission-group">${permHtml}</div></div>`;
         modal.classList.remove('hidden');
         const saveBtn = document.getElementById('saveUserPermissionsBtn');
         const closeBtn = document.getElementById('closeUserModalBtn');
         const newSaveHandler = async () => {
             const newRole = document.getElementById('userRoleSelect').value;
             const selectedPerms = {};
-            document.querySelectorAll('#userModalBody input[type="checkbox"]').forEach(cb => {
-                selectedPerms[cb.value] = cb.checked;
-            });
+            document.querySelectorAll('#userModalBody input[type="checkbox"]').forEach(cb => { selectedPerms[cb.value] = cb.checked; });
             try {
-                const userRef = doc(db, "users", userId);
-                await updateDoc(userRef, {
-                    role: newRole,
-                    permissions: selectedPerms,
-                    updatedAt: new Date().toISOString()
-                });
+                await updateDoc(doc(db, "users", userId), { role: newRole, permissions: selectedPerms, updatedAt: new Date().toISOString() });
                 showToast(`Updated user ${email} privileges`, false);
-                loadUsers(); // refresh
+                loadUsers();
                 modal.classList.add('hidden');
             } catch (err) { showToast(err.message, true); }
         };
@@ -500,34 +519,28 @@
         showToast("Data refreshed", false);
     }
 
-    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
-    // Check admin access & setup
     onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-            window.location.href = "index.html";
-            return;
-        }
+        if (!user) { window.location.href = "index.html"; return; }
         const userDoc = await getDoc(doc(db, "users", user.uid));
         const role = userDoc.exists() ? userDoc.data().role : null;
-        if (role !== 'admin') {
-            alert("Access denied. Admin only.");
-            window.location.href = "index.html";
-            return;
-        }
+        if (role !== 'admin') { alert("Access denied. Admin only."); window.location.href = "index.html"; return; }
         currentAdmin = user;
         document.getElementById('adminName').innerText = `Admin: ${userDoc.data().fullName || user.email}`;
         await refreshAll();
-        // Set up filters
         document.getElementById('searchInput').addEventListener('input', loadAndFilterTransactions);
         document.getElementById('typeFilter').addEventListener('change', loadAndFilterTransactions);
         document.getElementById('statusFilter').addEventListener('change', loadAndFilterTransactions);
         document.getElementById('refreshBtn').addEventListener('click', refreshAll);
         document.getElementById('refreshUsersBtn').addEventListener('click', loadUsers);
+        document.getElementById('dataCheckBtn').addEventListener('click', runDataCheckAndCleanup);
     });
 
     document.getElementById('logoutBtn').onclick = () => signOut(auth).then(() => window.location.href = "index.html");
     document.getElementById('backToDashboardBtn').onclick = () => window.location.href = "admin.html";
+    document.getElementById('closeDetailBtn')?.addEventListener('click', () => document.getElementById('detailModal').classList.add('hidden'));
+    document.getElementById('closeStatementBtn')?.addEventListener('click', () => document.getElementById('statementModal').classList.add('hidden'));
 </script>
 </body>
 </html>
