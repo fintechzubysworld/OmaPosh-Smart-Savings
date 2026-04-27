@@ -50,7 +50,6 @@
         .status-approved { color: #27ae60; }
         h4 { margin: 20px 0 12px 0; color: #2c3e50; font-size: 1.2rem; }
         
-        /* Mobile responsive */
         @media (max-width: 768px) {
             body { padding: 12px; }
             .main-content { padding: 20px 16px; }
@@ -104,7 +103,7 @@
                 <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"></div>
                 <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••"></div>
                 <button class="btn btn-primary" id="doLoginBtn">Login</button>
-                <!-- <button class="btn btn-outline" id="createAdminBtn" style="margin-top:10px; background:#eee;">⚠️ Create Admin Account (if missing)</button> -->
+                <button class="btn btn-outline" id="createAdminBtn" style="margin-top:10px; background:#eee;">⚠️ Create Admin Account (if missing)</button>
             </div>
             <div id="registerForm" class="hidden">
                 <div class="form-group"><label>Full Name</label><input type="text" id="regFullName" placeholder="John Doe"></div>
@@ -188,7 +187,6 @@
     let unsubscribeGroups = null;
     let modalResolve = null;
 
-    // Toast helper
     function showToast(message, isError = false) {
         const toast = document.createElement('div');
         toast.innerText = message;
@@ -210,7 +208,13 @@
         setTimeout(() => toast.remove(), 3500);
     }
 
-    function getGreeting() { const h = new Date().getHours(); if (h<12) return "Good morning"; if (h<18) return "Good afternoon"; return "Good evening"; }
+    // ✅ getGreeting is defined right here, before any usage
+    function getGreeting() { 
+        const h = new Date().getHours(); 
+        if (h < 12) return "Good morning"; 
+        if (h < 18) return "Good afternoon"; 
+        return "Good evening"; 
+    }
 
     function showModal(title, bodyHtml, showConfirm = false, confirmText = "Confirm") {
         return new Promise((resolve) => {
@@ -238,7 +242,6 @@
     function showMessage(text, isError = true) { authMsg.innerText = text; authMsg.classList.remove('hidden'); setTimeout(() => authMsg.classList.add('hidden'), 5000); }
     function handleFirestoreError(err) { console.error(err); showMessage(err.message); showToast(err.message, true); }
 
-    // Helper: fetch pending request counts for a plan
     async function getPendingCounts(planId) {
         try {
             const depPending = await getDocs(query(collection(db, "deposit_requests"), where("planId", "==", planId), where("status", "==", "pending")));
@@ -247,7 +250,6 @@
         } catch(e) { return { deposits: 0, withdrawals: 0 }; }
     }
 
-    // Render savings plans
     async function renderUserPlans() {
         if (!currentUser) return;
         try {
@@ -394,7 +396,6 @@
         .then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be >0", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
     });
 
-    // Enhanced Thrift Groups: ALL group actions require admin approval
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
@@ -417,7 +418,6 @@
                     return m;
                 });
                 
-                // Count pending requests for this group by current user
                 let pendingContributionCount = 0;
                 let pendingPayoutCount = 0;
                 try {
@@ -464,7 +464,6 @@
             }
             groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups available yet. Admin will create groups soon. Stay tuned!</p>';
             
-            // Join group handler (no approval needed, stays instant)
             document.querySelectorAll('.join-group-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const groupId = btn.dataset.groupId;
@@ -481,7 +480,6 @@
                 });
             });
             
-            // Request contribution (requires admin approval)
             document.querySelectorAll('.contribute-group-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const groupId = btn.dataset.groupId;
@@ -504,7 +502,6 @@
                 });
             });
             
-            // Request payout (withdrawal from thrift group, requires admin approval)
             document.querySelectorAll('.claim-group-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const groupId = btn.dataset.groupId;
