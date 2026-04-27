@@ -11,13 +11,14 @@
         header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
         .logo h1 { font-size: 1.6rem; }
         .user-info { display: flex; gap: 15px; align-items: center; }
-        .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 0.9rem; }
+        .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; justify-content: center; min-height: 42px; }
         .btn-primary { background: #ffb347; color: #1e2a3e; }
         .btn-primary:hover { background: #ff9f1a; }
         .btn-outline { background: transparent; border: 1px solid white; color: white; }
         .btn-outline:hover { background: rgba(255,255,255,0.1); }
         .btn-danger { background: #dc3545; color: white; }
         .btn-danger:hover { background: #c82333; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; min-height: 34px; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
         .section-title { font-size: 1.5rem; margin-bottom: 20px; color: #1e3c72; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -32,22 +33,28 @@
         .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
         .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 30px; }
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-        .modal > div { background: white; max-width: 600px; width: 100%; border-radius: 24px; padding: 24px; max-height: 80vh; overflow-y: auto; }
+        .modal > div { background: white; max-width: 800px; width: 100%; border-radius: 24px; padding: 24px; max-height: 80vh; overflow-y: auto; }
         .hidden { display: none !important; }
         .info-banner { background: #d1ecf1; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
         .role-badge { background: #6c757d; color: white; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; }
         .permission-group { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
         .permission-group label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
+        .flex-btns { display: flex; gap: 12px; flex-wrap: wrap; margin: 15px 0; }
+        .back-btn { background: #6c757d; color: white; margin-bottom: 20px; }
+        .back-btn:hover { background: #5a6268; }
         @media (max-width: 768px) { th, td { font-size: 0.8rem; padding: 8px; } .filter-bar { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
 <div class="container">
     <header>
-        <div class="logo"><h1>📊 OmaPosh Admin Portal</h1><p>Transactions & User Privileges</p></div>
+        <div class="logo"><h1>📊 OmaPosh Admin Portal</h1><p>Transaction & User Privileges</p></div>
         <div class="user-info"><span id="adminName"></span><button class="btn btn-outline" id="logoutBtn">Logout</button></div>
     </header>
     <div class="main-content">
+        <!-- Back to Dashboard Button -->
+        <button class="btn back-btn" id="backToDashboardBtn">← Back to Dashboard</button>
+
         <div class="section">
             <div class="section-title">
                 <span>📜 All Transactions</span>
@@ -90,6 +97,15 @@
     </div>
 </div>
 
+<!-- User Statement Modal -->
+<div id="statementModal" class="modal hidden">
+    <div>
+        <h3 id="statementModalTitle">User Statement</h3>
+        <div id="statementContent" style="max-height: 60vh; overflow-y: auto;"></div>
+        <button class="btn btn-outline" id="closeStatementBtn">Close</button>
+    </div>
+</div>
+
 <!-- Edit User Permissions Modal -->
 <div id="userModal" class="modal hidden">
     <div>
@@ -120,9 +136,8 @@
     const db = getFirestore(app);
 
     let currentAdmin = null;
-    let allTransactions = []; // store raw transaction objects for filtering
+    let allTransactions = [];
 
-    // Helper: show toast
     function showToast(msg, isError = false) {
         const toast = document.createElement('div');
         toast.innerText = msg;
@@ -143,7 +158,7 @@
     // Fetch all transactions from various collections
     async function fetchAllTransactions() {
         const transactions = [];
-        // 1. Deposit requests (pending & approved) - treat as deposit transactions
+        // 1. Deposit requests
         const depSnap = await getDocs(collection(db, "deposit_requests"));
         depSnap.forEach(doc => {
             const d = doc.data();
@@ -158,7 +173,8 @@
                 reference: d.transactionReference || doc.id,
                 confirmation: d.status || "pending",
                 status: d.status,
-                raw: d
+                raw: d,
+                userId: d.userId
             });
         });
         // 2. Withdrawal requests
@@ -176,10 +192,11 @@
                 reference: doc.id,
                 confirmation: d.status,
                 status: d.status,
-                raw: d
+                raw: d,
+                userId: d.userId
             });
         });
-        // 3. Contribution requests (thrift group contributions pending admin)
+        // 3. Contribution requests
         const contribReqSnap = await getDocs(collection(db, "contribution_requests"));
         contribReqSnap.forEach(doc => {
             const d = doc.data();
@@ -194,10 +211,11 @@
                 reference: d.transactionReference || doc.id,
                 confirmation: d.status,
                 status: d.status,
-                raw: d
+                raw: d,
+                userId: d.userId
             });
         });
-        // 4. Approved contributions (actual contributions after admin approval)
+        // 4. Approved contributions
         const contribSnap = await getDocs(collection(db, "contributions"));
         contribSnap.forEach(doc => {
             const d = doc.data();
@@ -212,7 +230,8 @@
                 reference: doc.id,
                 confirmation: "approved",
                 status: "approved",
-                raw: d
+                raw: d,
+                userId: d.userId
             });
         });
         // 5. Payout transactions
@@ -231,10 +250,10 @@
                     reference: doc.id,
                     confirmation: "approved",
                     status: "approved",
-                    raw: d
+                    raw: d,
+                    userId: d.userId
                 });
             } else if (d.type === 'deposit' || d.type === 'withdrawal') {
-                // also include confirmed transactions if any
                 transactions.push({
                     id: doc.id,
                     type: d.type,
@@ -246,11 +265,11 @@
                     reference: doc.id,
                     confirmation: "approved",
                     status: "approved",
-                    raw: d
+                    raw: d,
+                    userId: d.userId
                 });
             }
         });
-        // sort by date descending
         transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         return transactions;
     }
@@ -263,41 +282,49 @@
         }
         tbody.innerHTML = transactions.map(t => `
             <tr>
-                <td>${new Date(t.date).toLocaleString()}</td>
-                <td>${t.sender}</td>
-                <td>${t.receiver}</td>
-                <td>${t.particulars}</td>
-                <td>₦${t.amount.toFixed(2)}</td>
-                <td>${t.reference.substring(0, 12)}...</td>
-                <td><span class="status-${t.confirmation} status-pending" style="background:${t.confirmation === 'pending' ? '#fff3cd' : (t.confirmation === 'approved' ? '#d4edda' : '#f8d7da')}">${t.confirmation.toUpperCase()}</span></td>
-                <td><button class="btn btn-sm" data-id="${t.id}" data-type="${t.type}" onclick="window.viewTransactionDetail('${t.id}','${t.type}')">View</button></td>
+                <td data-label="Date/Time">${new Date(t.date).toLocaleString()}</td>
+                <td data-label="Sender">${escapeHtml(t.sender)}</td>
+                <td data-label="Receiver">${escapeHtml(t.receiver)}</td>
+                <td data-label="Particulars">${escapeHtml(t.particulars)}</td>
+                <td data-label="Amount">₦${t.amount.toFixed(2)}</td>
+                <td data-label="Reference">${escapeHtml(t.reference.substring(0, 12))}...</td>
+                <td data-label="Confirmation"><span class="status-${t.confirmation}" style="background:${t.confirmation === 'pending' ? '#fff3cd' : (t.confirmation === 'approved' ? '#d4edda' : '#f8d7da')}; padding:4px 8px; border-radius:20px;">${t.confirmation.toUpperCase()}</span></td>
+                <td data-label="Actions"><button class="btn btn-sm btn-primary view-transaction" data-id="${t.id}" data-type="${t.type}">View</button></td>
             </tr>
         `).join('');
-        // attach global function for modal
-        window.viewTransactionDetail = async (id, type) => {
-            const transaction = allTransactions.find(t => t.id === id && t.type === type);
-            if (!transaction) return;
-            const modal = document.getElementById('detailModal');
-            const content = document.getElementById('detailContent');
-            content.innerHTML = `
-                <p><strong>ID:</strong> ${transaction.id}</p>
-                <p><strong>Type:</strong> ${transaction.type}</p>
-                <p><strong>Sender:</strong> ${transaction.sender}</p>
-                <p><strong>Receiver:</strong> ${transaction.receiver}</p>
-                <p><strong>Particulars:</strong> ${transaction.particulars}</p>
-                <p><strong>Amount:</strong> ₦${transaction.amount.toFixed(2)}</p>
-                <p><strong>Date:</strong> ${new Date(transaction.date).toLocaleString()}</p>
-                <p><strong>Time:</strong> ${new Date(transaction.date).toLocaleTimeString()}</p>
-                <p><strong>Reference:</strong> ${transaction.reference}</p>
-                <p><strong>Confirmation Status:</strong> ${transaction.confirmation}</p>
-                <hr>
-                <h4>Raw Data:</h4>
-                <pre style="background:#f4f4f4; padding:10px; border-radius:8px; overflow-x:auto;">${JSON.stringify(transaction.raw, null, 2)}</pre>
-            `;
-            modal.classList.remove('hidden');
-        };
-        document.getElementById('closeDetailBtn').onclick = () => document.getElementById('detailModal').classList.add('hidden');
-        document.getElementById('detailModal').addEventListener('click', (e) => { if(e.target === document.getElementById('detailModal')) document.getElementById('detailModal').classList.add('hidden'); });
+        // Attach view transaction handlers
+        document.querySelectorAll('.view-transaction').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const type = btn.dataset.type;
+                const transaction = allTransactions.find(t => t.id === id && t.type === type);
+                if (transaction) {
+                    showTransactionDetail(transaction);
+                }
+            });
+        });
+    }
+
+    function showTransactionDetail(transaction) {
+        const modal = document.getElementById('detailModal');
+        const content = document.getElementById('detailContent');
+        content.innerHTML = `
+            <p><strong>ID:</strong> ${transaction.id}</p>
+            <p><strong>Type:</strong> ${transaction.type}</p>
+            <p><strong>Sender:</strong> ${escapeHtml(transaction.sender)}</p>
+            <p><strong>Receiver:</strong> ${escapeHtml(transaction.receiver)}</p>
+            <p><strong>Particulars:</strong> ${escapeHtml(transaction.particulars)}</p>
+            <p><strong>Amount:</strong> ₦${transaction.amount.toFixed(2)}</p>
+            <p><strong>Date:</strong> ${new Date(transaction.date).toLocaleString()}</p>
+            <p><strong>Time:</strong> ${new Date(transaction.date).toLocaleTimeString()}</p>
+            <p><strong>Reference:</strong> ${transaction.reference}</p>
+            <p><strong>Confirmation Status:</strong> ${transaction.confirmation}</p>
+            <hr>
+            <h4>Raw Data:</h4>
+            <pre style="background:#f4f4f4; padding:10px; border-radius:8px; overflow-x:auto;">${JSON.stringify(transaction.raw, null, 2)}</pre>
+        `;
+        modal.classList.remove('hidden');
+        document.getElementById('closeDetailBtn').onclick = () => modal.classList.add('hidden');
     }
 
     async function loadAndFilterTransactions() {
@@ -318,7 +345,7 @@
         renderTransactionsTable(filtered);
     }
 
-    // User management with granular permissions
+    // User management with granular permissions AND member statement button
     async function loadUsers() {
         const usersSnap = await getDocs(collection(db, "users"));
         const users = [];
@@ -330,16 +357,19 @@
         if (!users.length) { tbody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>'; return; }
         tbody.innerHTML = users.map(user => `
             <tr>
-                <td>${user.fullName || 'N/A'}</td>
-                <td>${user.email}</td>
-                <td><span class="role-badge">${user.role || 'user'}</span></td>
-                <td>${Object.entries(user.permissions).filter(([k,v])=>v===true).map(([k])=>k).join(', ') || 'No extra permissions'}</td>
-                <td><button class="btn btn-sm btn-primary" data-userid="${user.id}" data-email="${user.email}" data-role="${user.role}" data-perms='${JSON.stringify(user.permissions)}'>Edit Privileges</button></td>
+                <td data-label="Name">${escapeHtml(user.fullName || 'N/A')}</td>
+                <td data-label="Email">${escapeHtml(user.email)}</td>
+                <td data-label="Role"><span class="role-badge">${user.role || 'user'}</span></td>
+                <td data-label="Permissions">${Object.entries(user.permissions).filter(([k,v])=>v===true).map(([k])=>k).join(', ') || 'No extra permissions'}</td>
+                <td data-label="Actions">
+                    <button class="btn btn-sm btn-primary edit-permissions" data-userid="${user.id}" data-email="${user.email}" data-role="${user.role}" data-perms='${JSON.stringify(user.permissions)}'>Edit Privileges</button>
+                    <button class="btn btn-sm btn-outline view-statement" data-userid="${user.id}" data-name="${escapeHtml(user.fullName || user.email)}">Statement</button>
+                </td>
             </tr>
         `).join('');
-        // attach edit handlers
-        document.querySelectorAll('[data-userid]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        // Edit permissions handler
+        document.querySelectorAll('.edit-permissions').forEach(btn => {
+            btn.addEventListener('click', () => {
                 const userId = btn.dataset.userid;
                 const email = btn.dataset.email;
                 const role = btn.dataset.role;
@@ -347,6 +377,70 @@
                 showUserModal(userId, email, role, perms);
             });
         });
+        // Member Statement handler
+        document.querySelectorAll('.view-statement').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const userId = btn.dataset.userid;
+                const userName = btn.dataset.name;
+                await showMemberStatement(userId, userName);
+            });
+        });
+    }
+
+    async function showMemberStatement(userId, userName) {
+        // Fetch all transactions for this user from our in-memory list or directly from Firestore
+        const userTransactions = allTransactions.filter(t => t.userId === userId);
+        // Also fetch any transactions that might not be in the combined list but are under "transactions" collection
+        const extraTxns = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
+        extraTxns.forEach(doc => {
+            const t = doc.data();
+            if (!userTransactions.some(ut => ut.id === doc.id)) {
+                userTransactions.push({
+                    id: doc.id,
+                    type: t.type,
+                    sender: t.type === 'deposit' ? t.userId : "OmaPosh",
+                    receiver: t.type === 'deposit' ? "OmaPosh" : t.userId,
+                    particulars: t.description || t.type,
+                    amount: t.amount,
+                    date: t.date,
+                    reference: doc.id,
+                    confirmation: "approved",
+                    userId: userId
+                });
+            }
+        });
+        userTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        if (userTransactions.length === 0) {
+            showModalMessage("No Transactions", `No transaction history found for ${userName}.`);
+            return;
+        }
+        let html = `<h4>Transaction History for ${escapeHtml(userName)}</h4>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead><tr><th>Date/Time</th><th>Type</th><th>Particulars</th><th>Amount</th><th>Status</th></tr></thead>
+                        <tbody>`;
+        userTransactions.forEach(t => {
+            html += `<tr>
+                        <td>${new Date(t.date).toLocaleString()}</td>
+                        <td>${t.type}</td>
+                        <td>${escapeHtml(t.particulars)}</td>
+                        <td>₦${t.amount.toFixed(2)}</td>
+                        <td>${t.confirmation}</td>
+                     </tr>`;
+        });
+        html += `</tbody></table>`;
+        const modal = document.getElementById('statementModal');
+        document.getElementById('statementModalTitle').innerText = `Statement: ${userName}`;
+        document.getElementById('statementContent').innerHTML = html;
+        modal.classList.remove('hidden');
+        document.getElementById('closeStatementBtn').onclick = () => modal.classList.add('hidden');
+    }
+
+    function showModalMessage(title, content) {
+        const modal = document.getElementById('statementModal');
+        document.getElementById('statementModalTitle').innerText = title;
+        document.getElementById('statementContent').innerHTML = `<p>${content}</p>`;
+        modal.classList.remove('hidden');
+        document.getElementById('closeStatementBtn').onclick = () => modal.classList.add('hidden');
     }
 
     function showUserModal(userId, email, currentRole, currentPerms) {
@@ -389,7 +483,6 @@
                 modal.classList.add('hidden');
             } catch (err) { showToast(err.message, true); }
         };
-        // remove previous listeners to avoid duplication
         saveBtn.removeEventListener('click', saveBtn._listener);
         closeBtn.removeEventListener('click', closeBtn._listener);
         saveBtn._listener = newSaveHandler;
@@ -399,7 +492,6 @@
         modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
     }
 
-    // Refresh all data
     async function refreshAll() {
         showToast("Refreshing data...", false);
         allTransactions = await fetchAllTransactions();
@@ -407,6 +499,8 @@
         await loadUsers();
         showToast("Data refreshed", false);
     }
+
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
 
     // Check admin access & setup
     onAuthStateChanged(auth, async (user) => {
@@ -433,6 +527,7 @@
     });
 
     document.getElementById('logoutBtn').onclick = () => signOut(auth).then(() => window.location.href = "index.html");
+    document.getElementById('backToDashboardBtn').onclick = () => window.location.href = "admin.html";
 </script>
 </body>
 </html>
