@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmaPosh Admin Dashboard - Full Member Management</title>
+    <title>OmaPosh Admin Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; padding: 20px; }
@@ -70,18 +70,7 @@
         </div>
     </header>
     <div class="main-content">
-        <!-- Login Section -->
-        <div id="loginSection" class="auth-box" style="max-width:400px; margin:40px auto;">
-            <h2>Admin Login</h2>
-            <div class="form-group"><label>Email</label><input type="email" id="adminEmail" placeholder="admin@omaposhsmartsavings.com"></div>
-            <div class="form-group"><label>Password</label><input type="password" id="adminPassword" placeholder="admin123"></div>
-            <button class="btn btn-primary" id="adminLoginBtn">Login</button>
-            <button class="btn btn-outline" id="createAdminBtn" style="margin-top:10px; background:#eee;">⚠️ Create Admin Account (if missing)</button>
-            <div id="loginError" class="alert hidden" style="margin-top:15px;"></div>
-        </div>
-
         <div id="loadingSpinner" class="loader hidden">Loading dashboard...</div>
-
         <!-- Admin Dashboard Content -->
         <div id="dashboardContent" class="hidden">
             <div class="stats-row" id="statsCards"></div>
@@ -208,12 +197,10 @@
     const db = getFirestore(app);
 
     // DOM elements
-    const loginSection = document.getElementById('loginSection');
     const dashboardContent = document.getElementById('dashboardContent');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const adminNameSpan = document.getElementById('adminName');
     const logoutBtn = document.getElementById('logoutBtn');
-    const loginError = document.getElementById('loginError');
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
@@ -232,9 +219,8 @@
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
     function showMessage(msg, isError = true) {
-        loginError.innerText = msg;
-        loginError.classList.remove('hidden');
-        setTimeout(() => loginError.classList.add('hidden'), 4000);
+        // Simple alert for now (or you can integrate a toast)
+        alert(msg);
     }
 
     async function logAudit(action, targetUserId = null, details = {}) {
@@ -327,7 +313,7 @@
         document.getElementById('cancelFractionBtn').onclick = closeModal;
     }
 
-    // ======================= GROUP MEMBER DELETION (WORKING) =======================
+    // ======================= GROUP MEMBER DELETION =======================
     async function removeMemberFromGroup(groupId, memberUserId, memberName) {
         if (!confirm(`⚠️ Remove ${memberName} from this group?\nThey will lose access to group contributions.`)) return false;
         try {
@@ -335,7 +321,6 @@
             await updateDoc(groupRef, {
                 members: arrayRemove(memberUserId)
             });
-            // Clean up group_user_stats
             const statsRef = doc(db, "group_user_stats", `${groupId}_${memberUserId}`);
             const statSnap = await getDoc(statsRef);
             if (statSnap.exists()) await deleteDoc(statsRef);
@@ -384,7 +369,6 @@
             
             showModal(`👥 Members of "${escapeHtml(groupName)}"`, membersHtml);
             
-            // Attach remove events after modal renders
             setTimeout(() => {
                 document.querySelectorAll('.remove-member-now').forEach(btn => {
                     btn.onclick = async (e) => {
@@ -406,7 +390,6 @@
         }
     };
 
-    // Rebind group view buttons after table refresh
     function rebindGroupMemberButtons() {
         document.querySelectorAll('.view-members-btn').forEach(btn => {
             const groupId = btn.getAttribute('data-group-id');
@@ -448,7 +431,7 @@
                 <td class="action-group"><button class="btn btn-sm btn-outline" data-uid="${docSnap.id}" data-action="selectUserStatement">Statement</button></td>
             </tr>`;
         }
-        userMgmtHtml += '</tbody></td>';
+        userMgmtHtml += '</tbody></table>';
         document.getElementById('userManagementTable').innerHTML = userMgmtHtml;
         document.querySelectorAll('[data-action="selectUserStatement"]').forEach(btn => btn.onclick = () => showStatement(btn.dataset.uid));
 
@@ -512,7 +495,6 @@
         groupsHtml += '</tbody></table>';
         document.getElementById('allGroupsTable').innerHTML = groupsHtml;
         
-        // Attach delete group handler
         document.querySelectorAll('[data-action="deleteGroup"]').forEach(btn => btn.onclick = async () => {
             if (confirm("Permanently delete this group?")) {
                 await deleteDoc(doc(db, "groups", btn.dataset.group));
@@ -521,7 +503,6 @@
             }
         });
         
-        // Rebind member view buttons
         rebindGroupMemberButtons();
     }
 
@@ -533,7 +514,7 @@
             document.getElementById('withdrawalRequestsTable').innerHTML = '<p>No pending withdrawal requests.</p>';
             return;
         }
-        let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
+        let html = '</tr><thead><tr><th>User</th><th>Plan Type</th><th>Amount (₦)</th><th>Request Date</th><th>Plan ID</th><th>Actions</th></tr></thead><tbody>';
         for (const docSnap of snapshot.docs) {
             const req = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", req.userId));
@@ -591,7 +572,7 @@
         loadWithdrawalRequests();
     }
 
-    // ======================= USER MANAGEMENT FUNCTIONS (simplified but functional) =======================
+    // ======================= USER MANAGEMENT FUNCTIONS =======================
     async function createUserAccount() {
         const email = prompt("Enter user email:"); if(!email) return;
         const password = prompt("Enter temporary password (min 6 chars):"); if(!password || password.length<6) return showMessage("Password min 6 chars");
@@ -730,7 +711,7 @@
     }
     async function loadLoans() {
         const loansSnap = await getDocs(collection(db, "loans"));
-        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Repayment Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+        let html = '</table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Repayment Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
         for(const docSnap of loansSnap.docs){
             const l = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", l.userId));
@@ -762,7 +743,7 @@
         const transactions = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
         let html = `<h4>Statement for ${userName}</h4><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody>`;
         transactions.forEach(doc => { const t = doc.data(); html += `<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type}</td><td>₦${t.amount.toFixed(2)}</td><td>${t.description || ''}</td></tr>`; });
-        html += '</tbody></table>';
+        html += '</tbody></tr>';
         showModal("User Statement", html);
     }
     async function viewAuditTrail() {
@@ -790,17 +771,8 @@
         }
     };
 
-    // Admin creation & login
-    document.getElementById('createAdminBtn').onclick = async () => {
-        try { await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123"); showMessage("Admin account created! Please login.", false); } catch(e) { showMessage(e.message); }
-    };
-    document.getElementById('adminLoginBtn').onclick = async () => {
-        const email = document.getElementById('adminEmail').value, password = document.getElementById('adminPassword').value;
-        try { await signInWithEmailAndPassword(auth, email, password); } catch(e) { showMessage(e.message); }
-    };
-    logoutBtn.onclick = async () => { await signOut(auth); };
-
-    // Auth observer
+    // ======================= AUTH & REDIRECT LOGIC =======================
+    // No login form – redirect to index.html if not authenticated as admin
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             const userRef = doc(db, "users", user.uid);
@@ -813,9 +785,7 @@
             if (role === 'admin') {
                 currentAdmin = user;
                 adminNameSpan.innerText = `👋 ${userSnap.exists() ? userSnap.data().fullName : user.email}`;
-                loginSection.classList.add('hidden');
                 loadingSpinner.classList.remove('hidden');
-                dashboardContent.classList.add('hidden');
                 await initSystemAccounts();
                 await loadSystemAccounts();
                 await loadAdminData();
@@ -823,16 +793,31 @@
                 await loadLoans();
                 loadingSpinner.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
+                // Real-time listeners
                 const unsubUsers = onSnapshot(collection(db, "users"), () => loadAdminData());
                 const unsubPlans = onSnapshot(collection(db, "savings_plans"), () => loadAdminData());
                 const unsubGroups = onSnapshot(collection(db, "groups"), () => loadAdminData());
                 const unsubRequests = onSnapshot(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")), () => loadWithdrawalRequests());
                 window.adminListeners = [unsubUsers, unsubPlans, unsubGroups, unsubRequests];
-            } else { await signOut(auth); loginSection.classList.remove('hidden'); dashboardContent.classList.add('hidden'); loadingSpinner.classList.add('hidden'); showMessage("Access denied: Admin only."); }
-        } else { currentAdmin = null; loginSection.classList.remove('hidden'); dashboardContent.classList.add('hidden'); loadingSpinner.classList.add('hidden'); if(window.adminListeners) window.adminListeners.forEach(fn => fn()); }
+                return;
+            }
+        }
+        // Not logged in or not admin → redirect to main login page
+        window.location.href = 'index.html';
     });
-    
-    // Attach event handlers for buttons
+
+    // Logout & redirect to index.html
+    logoutBtn.onclick = async () => {
+        try {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        } catch (error) {
+            console.error('Logout failed:', error);
+            alert('Logout failed. Please try again.');
+        }
+    };
+
+    // Attach event handlers (excluding login buttons which are removed)
     document.getElementById('configureEsusuModelBtn').onclick = configureEsusuFraction;
     document.getElementById('createUserBtn').onclick = createUserAccount;
     document.getElementById('closeUserBtn').onclick = closeUserAccount;
@@ -848,29 +833,7 @@
         const email = prompt("Enter user email to view statement:");
         if(email){ getDocs(query(collection(db,"users"),where("email","==",email))).then(snap=>{ if(snap.empty) showMessage("User not found"); else showStatement(snap.docs[0].id); }); }
     };
-   document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
-// ==========================================================
-// Auto-redirect to main homepage (index.html) on logout
-// ==========================================================
-(function enhanceLogout() {
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (!logoutBtn) return;
-
-    // Replace or override the existing logout handler
-    logoutBtn.onclick = async (event) => {
-        event.preventDefault();
-        try {
-            // Perform Firebase sign out
-            await signOut(auth);
-            // Redirect to the main homepage
-            window.location.href = 'index.html';
-        } catch (error) {
-            console.error('Logout failed:', error);
-            // Optional: show a user-friendly message
-            alert('Logout failed. Please try again.');
-        }
-    };
-})();
+    document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
 </script>
 </body>
 </html>
