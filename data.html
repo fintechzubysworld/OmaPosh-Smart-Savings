@@ -1,1 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>OmaPosh Admin | Transaction & User Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .logo h1 { font-size: 1.6rem; }
+        .user-info { display: flex; gap: 15px; align-items: center; }
+        .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #ffb347; color: #1e2a3e; }
+        .btn-primary:hover { background: #ff9f1a; }
+        .btn-outline { background: transparent; border: 1px solid white; color: white; }
+        .btn-outline:hover { background: rgba(255,255,255,0.1); }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .main-content { padding: 30px; }
+        .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
+        .section-title { font-size: 1.5rem; margin-bottom: 20px; color: #1e3c72; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 15px; }
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 16px; border: 1px solid #eaeef2; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; overflow-x: auto; display: block; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .status-pending { background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 30px; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+        .modal > div { background: white; max-width: 600px; width: 100%; border-radius: 24px; padding: 24px; max-height: 80vh; overflow-y: auto; }
+        .hidden { display: none !important; }
+        .info-banner { background: #d1ecf1; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
+        .role-badge { background: #6c757d; color: white; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; }
+        .permission-group { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+        .permission-group label { display: flex; align-items: center; gap: 6px; font-weight: normal; }
+        @media (max-width: 768px) { th, td { font-size: 0.8rem; padding: 8px; } .filter-bar { flex-direction: column; align-items: stretch; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="logo"><h1>📊 OmaPosh Admin Portal</h1><p>Transactions & User Privileges</p></div>
+        <div class="user-info"><span id="adminName"></span><button class="btn btn-outline" id="logoutBtn">Logout</button></div>
+    </header>
+    <div class="main-content">
+        <div class="section">
+            <div class="section-title">
+                <span>📜 All Transactions</span>
+                <div class="filter-bar">
+                    <input type="text" id="searchInput" placeholder="Search by ref, sender, receiver...">
+                    <select id="typeFilter"><option value="">All Types</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="contribution">Contribution</option><option value="payout">Payout</option></select>
+                    <select id="statusFilter"><option value="">All Statuses</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+                    <button class="btn btn-primary" id="refreshBtn">Refresh</button>
+                </div>
+            </div>
+            <div id="transactionsTableContainer" style="overflow-x: auto;">
+                <table id="transactionsTable">
+                    <thead><tr><th>Date/Time</th><th>Sender</th><th>Receiver</th><th>Particulars</th><th>Amount</th><th>Reference</th><th>Confirmation</th><th>Actions</th></tr></thead>
+                    <tbody id="transactionsBody"><tr><td colspan="8">Loading transactions...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
 
+        <div class="section">
+            <div class="section-title">
+                <span>👥 User Management & Privileges</span>
+                <button class="btn btn-primary" id="refreshUsersBtn">Refresh Users</button>
+            </div>
+            <div id="usersTableContainer" style="overflow-x: auto;">
+                <table id="usersTable">
+                    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Permissions</th><th>Actions</th></tr></thead>
+                    <tbody id="usersBody"><tr><td colspan="5">Loading users...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Detail Modal -->
+<div id="detailModal" class="modal hidden">
+    <div>
+        <h3>📄 Transaction Details</h3>
+        <div id="detailContent"></div>
+        <button class="btn btn-outline" id="closeDetailBtn" style="margin-top:15px;">Close</button>
+    </div>
+</div>
+
+<!-- Edit User Permissions Modal -->
+<div id="userModal" class="modal hidden">
+    <div>
+        <h3 id="userModalTitle">Edit User Privileges</h3>
+        <div id="userModalBody"></div>
+        <div class="flex-btns" style="margin-top:20px; display: flex; gap:10px;">
+            <button class="btn btn-outline" id="closeUserModalBtn">Cancel</button>
+            <button class="btn btn-primary" id="saveUserPermissionsBtn">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentAdmin = null;
+    let allTransactions = []; // store raw transaction objects for filtering
+
+    // Helper: show toast
+    function showToast(msg, isError = false) {
+        const toast = document.createElement('div');
+        toast.innerText = msg;
+        toast.style.position = 'fixed';
+        toast.style.bottom = '20px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.backgroundColor = isError ? '#dc3545' : '#28a745';
+        toast.style.color = 'white';
+        toast.style.padding = '12px 20px';
+        toast.style.borderRadius = '40px';
+        toast.style.zIndex = '10001';
+        toast.style.fontWeight = 'bold';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Fetch all transactions from various collections
+    async function fetchAllTransactions() {
+        const transactions = [];
+        // 1. Deposit requests (pending & approved) - treat as deposit transactions
+        const depSnap = await getDocs(collection(db, "deposit_requests"));
+        depSnap.forEach(doc => {
+            const d = doc.data();
+            transactions.push({
+                id: doc.id,
+                type: "deposit",
+                sender: d.userName || d.userId || "User",
+                receiver: "OmaPosh Savings",
+                particulars: `Deposit to plan ${d.planId || 'N/A'}`,
+                amount: d.amount,
+                date: d.requestDate || d.createdAt,
+                reference: d.transactionReference || doc.id,
+                confirmation: d.status || "pending",
+                status: d.status,
+                raw: d
+            });
+        });
+        // 2. Withdrawal requests
+        const wdSnap = await getDocs(collection(db, "withdrawal_requests"));
+        wdSnap.forEach(doc => {
+            const d = doc.data();
+            transactions.push({
+                id: doc.id,
+                type: "withdrawal",
+                sender: "OmaPosh Savings",
+                receiver: d.userName || d.userId,
+                particulars: `Withdrawal from ${d.planType || 'savings'} plan`,
+                amount: d.amount,
+                date: d.requestedAt,
+                reference: doc.id,
+                confirmation: d.status,
+                status: d.status,
+                raw: d
+            });
+        });
+        // 3. Contribution requests (thrift group contributions pending admin)
+        const contribReqSnap = await getDocs(collection(db, "contribution_requests"));
+        contribReqSnap.forEach(doc => {
+            const d = doc.data();
+            transactions.push({
+                id: doc.id,
+                type: "contribution",
+                sender: d.userId,
+                receiver: `Thrift Group: ${d.groupName || d.groupId}`,
+                particulars: `Contribution to group ${d.groupName || d.groupId}`,
+                amount: d.amount,
+                date: d.requestedAt,
+                reference: d.transactionReference || doc.id,
+                confirmation: d.status,
+                status: d.status,
+                raw: d
+            });
+        });
+        // 4. Approved contributions (actual contributions after admin approval)
+        const contribSnap = await getDocs(collection(db, "contributions"));
+        contribSnap.forEach(doc => {
+            const d = doc.data();
+            transactions.push({
+                id: doc.id,
+                type: "contribution",
+                sender: d.userId,
+                receiver: `Thrift Group ${d.groupId}`,
+                particulars: "Approved thrift contribution",
+                amount: d.amount,
+                date: d.date,
+                reference: doc.id,
+                confirmation: "approved",
+                status: "approved",
+                raw: d
+            });
+        });
+        // 5. Payout transactions
+        const payoutSnap = await getDocs(collection(db, "transactions"));
+        payoutSnap.forEach(doc => {
+            const d = doc.data();
+            if (d.type === 'payout') {
+                transactions.push({
+                    id: doc.id,
+                    type: "payout",
+                    sender: `Thrift Group ${d.groupId}`,
+                    receiver: d.userId,
+                    particulars: d.description || "Group payout",
+                    amount: d.amount,
+                    date: d.date,
+                    reference: doc.id,
+                    confirmation: "approved",
+                    status: "approved",
+                    raw: d
+                });
+            } else if (d.type === 'deposit' || d.type === 'withdrawal') {
+                // also include confirmed transactions if any
+                transactions.push({
+                    id: doc.id,
+                    type: d.type,
+                    sender: d.type === 'deposit' ? d.userId : "OmaPosh",
+                    receiver: d.type === 'deposit' ? "OmaPosh" : d.userId,
+                    particulars: d.description || `${d.type} transaction`,
+                    amount: d.amount,
+                    date: d.date,
+                    reference: doc.id,
+                    confirmation: "approved",
+                    status: "approved",
+                    raw: d
+                });
+            }
+        });
+        // sort by date descending
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        return transactions;
+    }
+
+    function renderTransactionsTable(transactions) {
+        const tbody = document.getElementById('transactionsBody');
+        if (!transactions.length) {
+            tbody.innerHTML = '<tr><td colspan="8">No transactions found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = transactions.map(t => `
+            <tr>
+                <td>${new Date(t.date).toLocaleString()}</td>
+                <td>${t.sender}</td>
+                <td>${t.receiver}</td>
+                <td>${t.particulars}</td>
+                <td>₦${t.amount.toFixed(2)}</td>
+                <td>${t.reference.substring(0, 12)}...</td>
+                <td><span class="status-${t.confirmation} status-pending" style="background:${t.confirmation === 'pending' ? '#fff3cd' : (t.confirmation === 'approved' ? '#d4edda' : '#f8d7da')}">${t.confirmation.toUpperCase()}</span></td>
+                <td><button class="btn btn-sm" data-id="${t.id}" data-type="${t.type}" onclick="window.viewTransactionDetail('${t.id}','${t.type}')">View</button></td>
+            </tr>
+        `).join('');
+        // attach global function for modal
+        window.viewTransactionDetail = async (id, type) => {
+            const transaction = allTransactions.find(t => t.id === id && t.type === type);
+            if (!transaction) return;
+            const modal = document.getElementById('detailModal');
+            const content = document.getElementById('detailContent');
+            content.innerHTML = `
+                <p><strong>ID:</strong> ${transaction.id}</p>
+                <p><strong>Type:</strong> ${transaction.type}</p>
+                <p><strong>Sender:</strong> ${transaction.sender}</p>
+                <p><strong>Receiver:</strong> ${transaction.receiver}</p>
+                <p><strong>Particulars:</strong> ${transaction.particulars}</p>
+                <p><strong>Amount:</strong> ₦${transaction.amount.toFixed(2)}</p>
+                <p><strong>Date:</strong> ${new Date(transaction.date).toLocaleString()}</p>
+                <p><strong>Time:</strong> ${new Date(transaction.date).toLocaleTimeString()}</p>
+                <p><strong>Reference:</strong> ${transaction.reference}</p>
+                <p><strong>Confirmation Status:</strong> ${transaction.confirmation}</p>
+                <hr>
+                <h4>Raw Data:</h4>
+                <pre style="background:#f4f4f4; padding:10px; border-radius:8px; overflow-x:auto;">${JSON.stringify(transaction.raw, null, 2)}</pre>
+            `;
+            modal.classList.remove('hidden');
+        };
+        document.getElementById('closeDetailBtn').onclick = () => document.getElementById('detailModal').classList.add('hidden');
+        document.getElementById('detailModal').addEventListener('click', (e) => { if(e.target === document.getElementById('detailModal')) document.getElementById('detailModal').classList.add('hidden'); });
+    }
+
+    async function loadAndFilterTransactions() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const type = document.getElementById('typeFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        let filtered = [...allTransactions];
+        if (search) {
+            filtered = filtered.filter(t => 
+                t.sender.toLowerCase().includes(search) || 
+                t.receiver.toLowerCase().includes(search) || 
+                t.reference.toLowerCase().includes(search) ||
+                t.particulars.toLowerCase().includes(search)
+            );
+        }
+        if (type) filtered = filtered.filter(t => t.type === type);
+        if (status) filtered = filtered.filter(t => t.confirmation === status);
+        renderTransactionsTable(filtered);
+    }
+
+    // User management with granular permissions
+    async function loadUsers() {
+        const usersSnap = await getDocs(collection(db, "users"));
+        const users = [];
+        usersSnap.forEach(doc => {
+            const u = doc.data();
+            users.push({ id: doc.id, ...u, permissions: u.permissions || {} });
+        });
+        const tbody = document.getElementById('usersBody');
+        if (!users.length) { tbody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>'; return; }
+        tbody.innerHTML = users.map(user => `
+            <tr>
+                <td>${user.fullName || 'N/A'}</td>
+                <td>${user.email}</td>
+                <td><span class="role-badge">${user.role || 'user'}</span></td>
+                <td>${Object.entries(user.permissions).filter(([k,v])=>v===true).map(([k])=>k).join(', ') || 'No extra permissions'}</td>
+                <td><button class="btn btn-sm btn-primary" data-userid="${user.id}" data-email="${user.email}" data-role="${user.role}" data-perms='${JSON.stringify(user.permissions)}'>Edit Privileges</button></td>
+            </tr>
+        `).join('');
+        // attach edit handlers
+        document.querySelectorAll('[data-userid]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const userId = btn.dataset.userid;
+                const email = btn.dataset.email;
+                const role = btn.dataset.role;
+                const perms = JSON.parse(btn.dataset.perms);
+                showUserModal(userId, email, role, perms);
+            });
+        });
+    }
+
+    function showUserModal(userId, email, currentRole, currentPerms) {
+        const modal = document.getElementById('userModal');
+        const title = document.getElementById('userModalTitle');
+        title.innerText = `Edit Privileges: ${email}`;
+        const availablePerms = [
+            "can_approve_deposits", "can_approve_withdrawals", "can_approve_contributions",
+            "can_manage_groups", "can_view_reports", "can_manage_users", "can_issue_payouts"
+        ];
+        const permHtml = availablePerms.map(perm => `
+            <label>
+                <input type="checkbox" value="${perm}" ${currentPerms[perm] ? 'checked' : ''}> ${perm.replace(/_/g, ' ')}
+            </label>
+        `).join('');
+        const roleOptions = ['admin', 'staff', 'viewer', 'user'];
+        const roleSelect = `<select id="userRoleSelect">${roleOptions.map(r => `<option value="${r}" ${currentRole === r ? 'selected' : ''}>${r.toUpperCase()}</option>`).join('')}</select>`;
+        document.getElementById('userModalBody').innerHTML = `
+            <div class="form-group"><label>User Role:</label> ${roleSelect}</div>
+            <div class="form-group"><label>Granular Permissions:</label><div class="permission-group">${permHtml}</div></div>
+        `;
+        modal.classList.remove('hidden');
+        const saveBtn = document.getElementById('saveUserPermissionsBtn');
+        const closeBtn = document.getElementById('closeUserModalBtn');
+        const newSaveHandler = async () => {
+            const newRole = document.getElementById('userRoleSelect').value;
+            const selectedPerms = {};
+            document.querySelectorAll('#userModalBody input[type="checkbox"]').forEach(cb => {
+                selectedPerms[cb.value] = cb.checked;
+            });
+            try {
+                const userRef = doc(db, "users", userId);
+                await updateDoc(userRef, {
+                    role: newRole,
+                    permissions: selectedPerms,
+                    updatedAt: new Date().toISOString()
+                });
+                showToast(`Updated user ${email} privileges`, false);
+                loadUsers(); // refresh
+                modal.classList.add('hidden');
+            } catch (err) { showToast(err.message, true); }
+        };
+        // remove previous listeners to avoid duplication
+        saveBtn.removeEventListener('click', saveBtn._listener);
+        closeBtn.removeEventListener('click', closeBtn._listener);
+        saveBtn._listener = newSaveHandler;
+        closeBtn._listener = () => modal.classList.add('hidden');
+        saveBtn.addEventListener('click', saveBtn._listener);
+        closeBtn.addEventListener('click', closeBtn._listener);
+        modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
+    }
+
+    // Refresh all data
+    async function refreshAll() {
+        showToast("Refreshing data...", false);
+        allTransactions = await fetchAllTransactions();
+        await loadAndFilterTransactions();
+        await loadUsers();
+        showToast("Data refreshed", false);
+    }
+
+    // Check admin access & setup
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            window.location.href = "index.html";
+            return;
+        }
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const role = userDoc.exists() ? userDoc.data().role : null;
+        if (role !== 'admin') {
+            alert("Access denied. Admin only.");
+            window.location.href = "index.html";
+            return;
+        }
+        currentAdmin = user;
+        document.getElementById('adminName').innerText = `Admin: ${userDoc.data().fullName || user.email}`;
+        await refreshAll();
+        // Set up filters
+        document.getElementById('searchInput').addEventListener('input', loadAndFilterTransactions);
+        document.getElementById('typeFilter').addEventListener('change', loadAndFilterTransactions);
+        document.getElementById('statusFilter').addEventListener('change', loadAndFilterTransactions);
+        document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+        document.getElementById('refreshUsersBtn').addEventListener('click', loadUsers);
+    });
+
+    document.getElementById('logoutBtn').onclick = () => signOut(auth).then(() => window.location.href = "index.html");
+</script>
+</body>
+</html>
