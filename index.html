@@ -50,7 +50,7 @@
         .status-approved { color: #27ae60; }
         h4 { margin: 20px 0 12px 0; color: #2c3e50; font-size: 1.2rem; }
         
-        /* Mobile responsive enhancements */
+        /* Mobile responsive */
         @media (max-width: 768px) {
             body { padding: 12px; }
             .main-content { padding: 20px 16px; }
@@ -130,7 +130,7 @@
             <div class="section">
                 <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
                 <div id="groupsList" class="card-grid">Loading groups...</div>
-                <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse all groups below. Click "Join Group" to become a member instantly. After joining you can contribute and claim payouts when it's your turn.</p>
+                <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse all groups below. Click "Join Group" to become a member instantly. After joining you can deposit contributions and withdraw payouts when it's your turn.</p>
             </div>
         </div>
     </div>
@@ -188,7 +188,7 @@
     let unsubscribeGroups = null;
     let modalResolve = null;
 
-    // Helper: show temporary toast message (mobile friendly)
+    // Toast helper
     function showToast(message, isError = false) {
         const toast = document.createElement('div');
         toast.innerText = message;
@@ -394,7 +394,7 @@
         .then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be >0", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
     });
 
-    // ENHANCED THRIFT GROUPS: non-admin users can join themselves, real-time updates
+    // Enhanced Thrift Groups: spelled-out deposit/withdrawal, join by users
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
@@ -404,96 +404,141 @@
             let anyGroup = false;
             for (const docSnap of snapshot.docs) {
                 anyGroup = true;
-                const g = { id: docSnap.id, ...docSnap.data() };
-                const isMember = g.members?.includes(currentUser.uid) || false;
-                const memberCount = g.members?.length || 0;
-                const maxMembers = g.maxMembers || 10;
+                const group = { id: docSnap.id, ...docSnap.data() };
+                const isMember = group.members?.includes(currentUser.uid) || false;
+                const memberCount = group.members?.length || 0;
+                const maxMembers = group.maxMembers || 10;
                 const isFull = memberCount >= maxMembers;
                 
-                let actionButton = '';
-                if (isMember) {
-                    actionButton = `<button class="btn btn-sm" disabled style="background:#28a745; color:white; opacity:0.7;">✅ Already Joined</button>`;
-                } else if (isFull) {
-                    actionButton = `<button class="btn btn-sm" disabled style="background:#ccc;">❌ Group Full</button>`;
+                const groupName = (group.name || 'Unnamed Group').replace(/[&<>]/g, function(m) {
+                    if (m === '&') return '&amp;';
+                    if (m === '<') return '&lt;';
+                    if (m === '>') return '&gt;';
+                    return m;
+                });
+                
+                let joinButton = '';
+                if (!isMember) {
+                    if (isFull) {
+                        joinButton = `<button class="btn btn-sm" disabled style="background:#ccc;">❌ Group Full - Cannot Join</button>`;
+                    } else {
+                        joinButton = `<button class="btn btn-sm btn-primary join-group-btn" data-group-id="${group.id}">➕ Join This Thrift Group</button>`;
+                    }
                 } else {
-                    actionButton = `<button class="btn btn-sm btn-primary join-group-btn" data-group-id="${g.id}">➕ Join Group</button>`;
+                    joinButton = `<button class="btn btn-sm" disabled style="background:#28a745; color:white;">✅ Already a Member</button>`;
+                }
+                
+                let actionButtons = '';
+                if (isMember) {
+                    actionButtons = `
+                        <div class="flex-btns" style="margin-top:12px;">
+                            <button class="btn btn-sm btn-primary contribute-group-btn" data-group-id="${group.id}">💰 Deposit Contribution (₦${group.contributionAmount})</button>
+                            <button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${group.id}" style="background:#f8f9fa; color:#333; border:1px solid #ccc;">💸 Withdraw Payout (Claim my turn)</button>
+                        </div>
+                    `;
                 }
                 
                 html += `<div class="card">
                             <div class="plan-type">THRIFT GROUP</div>
-                            <h3 style="margin: 8px 0;">${escapeHtml(g.name)}</h3>
-                            <div>💰 Contribution: ₦${g.contributionAmount} every ${g.frequencyDays} days</div>
+                            <h3 style="margin: 8px 0;">${groupName}</h3>
+                            <div>💰 Contribution Amount: ₦${group.contributionAmount} every ${group.frequencyDays} days</div>
                             <div>👥 Members: ${memberCount} / ${maxMembers}</div>
-                            <div>🔄 Next payout index: ${g.currentPayoutIndex || 0}</div>
-                            <div class="flex-btns" style="margin-top:12px;">
-                                ${actionButton}
-                                ${isMember ? `<button class="btn btn-sm btn-outline contribute-group-btn" data-group-id="${g.id}">💸 Contribute</button>
-                                              <button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${g.id}">🎁 Claim Payout</button>` : ''}
-                            </div>
+                            <div>🔄 Next payout index: ${group.currentPayoutIndex || 0}</div>
+                            ${joinButton}
+                            ${actionButtons}
                         </div>`;
             }
-            groupsList.innerHTML = anyGroup ? html : '<p>No groups available yet. Admin will create thrift groups soon. Stay tuned!</p>';
+            groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups available yet. Admin will create groups soon. Stay tuned!</p>';
             
-            // Attach event listeners for join, contribute, claim
-            document.querySelectorAll('.join-group-btn').forEach(btn => btn.addEventListener('click', (e) => joinGroup(btn.dataset.groupId)));
-            document.querySelectorAll('.contribute-group-btn').forEach(btn => btn.addEventListener('click', (e) => contributeToGroup(btn.dataset.groupId)));
-            document.querySelectorAll('.claim-group-btn').forEach(btn => btn.addEventListener('click', (e) => claimPayout(btn.dataset.groupId)));
+            // Join group handler
+            document.querySelectorAll('.join-group-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const groupId = btn.dataset.groupId;
+                    try {
+                        const groupRef = doc(db, "groups", groupId);
+                        const groupSnap = await getDoc(groupRef);
+                        if (!groupSnap.exists()) return showToast("Group not found", true);
+                        const groupData = groupSnap.data();
+                        if (groupData.members?.includes(currentUser.uid)) return showToast("You are already a member", false);
+                        if (groupData.members?.length >= groupData.maxMembers) return showToast("Group is full", true);
+                        await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
+                        showToast(`Successfully joined "${groupData.name}"! You can now deposit and withdraw.`, false);
+                    } catch (err) { showToast(`Join failed: ${err.message}`, true); }
+                });
+            });
+            
+            // Deposit (contribute) handler
+            document.querySelectorAll('.contribute-group-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const groupId = btn.dataset.groupId;
+                    try {
+                        const groupRef = doc(db, "groups", groupId);
+                        const groupSnap = await getDoc(groupRef);
+                        if (!groupSnap.exists()) return showToast("Group not found", true);
+                        const group = groupSnap.data();
+                        if (!group.members?.includes(currentUser.uid)) return showToast("You are not a member. Please join first.", true);
+                        await addDoc(collection(db, "contributions"), {
+                            groupId: groupId,
+                            userId: currentUser.uid,
+                            amount: group.contributionAmount,
+                            date: new Date().toISOString()
+                        });
+                        showToast(`Deposit of ₦${group.contributionAmount} recorded for group "${group.name}".`, false);
+                    } catch (err) { showToast(`Deposit failed: ${err.message}`, true); }
+                });
+            });
+            
+            // Withdraw (claim payout) handler
+            document.querySelectorAll('.claim-group-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const groupId = btn.dataset.groupId;
+                    try {
+                        const groupRef = doc(db, "groups", groupId);
+                        const groupSnap = await getDoc(groupRef);
+                        if (!groupSnap.exists()) return showToast("Group not found", true);
+                        const group = groupSnap.data();
+                        const members = group.members || [];
+                        const idx = group.currentPayoutIndex || 0;
+                        if (members[idx] !== currentUser.uid) return showToast("It is not your turn to withdraw the payout yet.", true);
+                        
+                        const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
+                        const contribSnap = await getDocs(contribQuery);
+                        const counts = {};
+                        contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
+                        for (let m of members) {
+                            if ((counts[m] || 0) <= idx) {
+                                return showToast("Some members haven't completed all contributions for this cycle. Please wait.", true);
+                            }
+                        }
+                        const pot = group.contributionAmount * members.length;
+                        const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+                        const flexSnap = await getDocs(flexQuery);
+                        if (flexSnap.empty) {
+                            await addDoc(collection(db, "savings_plans"), {
+                                userId: currentUser.uid,
+                                type: "flex",
+                                balance: pot,
+                                createdAt: new Date().toISOString()
+                            });
+                        } else {
+                            await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+                        }
+                        await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
+                        await addDoc(collection(db, "transactions"), {
+                            userId: currentUser.uid,
+                            amount: pot,
+                            type: "payout",
+                            groupId: groupId,
+                            date: new Date().toISOString(),
+                            description: `Payout from thrift group ${group.name}`
+                        });
+                        showToast(`Withdrawal successful! ₦${pot.toFixed(2)} credited to your Flexible Savings Plan.`, false);
+                        if (typeof renderUserPlans === 'function') renderUserPlans();
+                    } catch (err) { showToast(`Withdrawal failed: ${err.message}`, true); }
+                });
+            });
         }, err => handleFirestoreError(err));
     }
-
-    async function joinGroup(groupId) {
-        try {
-            const groupRef = doc(db, "groups", groupId);
-            const groupSnap = await getDoc(groupRef);
-            if (!groupSnap.exists()) return showToast("Group not found", true);
-            const group = groupSnap.data();
-            if (group.members?.includes(currentUser.uid)) return showToast("Already a member", false);
-            if (group.members?.length >= group.maxMembers) return showToast("Group is full", true);
-            await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
-            showToast(`🎉 Successfully joined "${group.name}"!`, false);
-        } catch(err) { handleFirestoreError(err); }
-    }
-
-    async function contributeToGroup(groupId) {
-        try {
-            const groupRef = doc(db, "groups", groupId);
-            const groupSnap = await getDoc(groupRef);
-            const group = groupSnap.data();
-            if (!group.members?.includes(currentUser.uid)) return showToast("You are not a member.", true);
-            await addDoc(collection(db, "contributions"), { groupId, userId: currentUser.uid, amount: group.contributionAmount, date: new Date().toISOString() });
-            showToast(`Contributed ₦${group.contributionAmount} to ${group.name}.`, false);
-        } catch(err) { handleFirestoreError(err); }
-    }
-
-    async function claimPayout(groupId) {
-        try {
-            const groupRef = doc(db, "groups", groupId);
-            const groupSnap = await getDoc(groupRef);
-            const group = groupSnap.data();
-            const members = group.members || [];
-            const idx = group.currentPayoutIndex || 0;
-            if (members[idx] !== currentUser.uid) return showToast("Not your turn for payout.", true);
-            const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
-            const contribSnap = await getDocs(contribQuery);
-            const counts = {};
-            contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
-            for (let m of members) if ((counts[m] || 0) <= idx) return showToast("Not all members have contributed for this cycle.", true);
-            const pot = group.contributionAmount * members.length;
-            const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
-            const flexSnap = await getDocs(flexQuery);
-            if (flexSnap.empty) {
-                await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
-            } else {
-                await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
-            }
-            await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
-            await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString(), description: `Payout from group ${group.name}` });
-            showToast(`Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
-            renderUserPlans();
-        } catch(err) { handleFirestoreError(err); }
-    }
-
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
 
     async function createAdminAccountManually() {
         try {
