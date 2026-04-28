@@ -254,7 +254,6 @@
                 <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="you@example.com"></div>
                 <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••"></div>
                 <button class="btn btn-primary" id="doLoginBtn">Login</button>
-                <button class="btn btn-outline" id="createAdminBtn" style="margin-top:10px; background:#eee;">⚠️ Create Admin Account (if missing)</button>
             </div>
             <div id="registerForm" class="hidden">
                 <div class="form-group"><label>Full Name</label><input type="text" id="regFullName" placeholder="John Doe"></div>
@@ -282,7 +281,7 @@
             </div>
         </div>
     </div>
-    <footer>© 2026 OmaPosh Smart Savings — Admin: admin@omaposhsmartsavings.com / admin123</footer>
+    <footer>© 2026 OmaPosh Smart Savings</footer>
 </div>
 
 <!-- Payment Gateway Modal -->
@@ -697,15 +696,6 @@
         });
     }
 
-    async function createAdminAccountManually() {
-        try {
-            const userCred = await createUserWithEmailAndPassword(auth, "admin@omaposhsmartsavings.com", "admin123");
-            await setDoc(doc(db, "users", userCred.user.uid), { fullName: "Super Administrator", email: "admin@omaposhsmartsavings.com", role: "admin", createdAt: new Date().toISOString() });
-            showToast("Admin account created! Please login.", false);
-        } catch(e) { showToast("Error: " + e.message, true); }
-    }
-    const createAdminBtn = safeGetElement('createAdminBtn');
-    if (createAdminBtn) createAdminBtn.onclick = createAdminAccountManually;
     const showLoginBtn = safeGetElement('showLoginBtn');
     const showRegisterBtn = safeGetElement('showRegisterBtn');
     if (showLoginBtn) showLoginBtn.onclick = () => { if (loginForm) loginForm.classList.remove('hidden'); if (registerForm) registerForm.classList.add('hidden'); };
@@ -718,11 +708,6 @@
             if (!email || !pwd) return showToast("Please enter email and password", true);
             await signInWithEmailAndPassword(auth, email, pwd); 
             showToast("Logged in", false);
-            const saveCheckbox = safeGetElement('saveBiometricCheckbox');
-            if (saveCheckbox && saveCheckbox.checked && window.PasswordCredential && navigator.credentials) {
-                const cred = new PasswordCredential({ id: email, password: pwd, name: email });
-                await navigator.credentials.store(cred);
-            }
         } catch(e) { showToast(e.message, true); } 
     };
     const doRegisterBtn = safeGetElement('doRegisterBtn');
@@ -773,6 +758,7 @@
     const progressFill = safeGetElement('loading-progress-bar', false);
     function setProgress(pct) { if (progressFill) progressFill.style.width = pct + '%'; }
 
+    // Biometric login attempt is still present but without the "save device" checkbox
     async function attemptBiometricLogin() {
         if (!window.PasswordCredential || !navigator.credentials) return false;
         try {
@@ -803,10 +789,6 @@
             currentUser = user;
             const userDoc = await getDoc(doc(db, "users", user.uid));
             let role = userDoc.exists() ? userDoc.data().role : null;
-            if (user.email === "admin@omaposhsmartsavings.com" && role !== 'admin') {
-                await setDoc(doc(db, "users", user.uid), { fullName: "Administrator", email: user.email, role: "admin", createdAt: new Date().toISOString() }, { merge: true });
-                role = 'admin';
-            }
             if (role === 'admin') { window.location.href = "admin.html"; return; }
             else {
                 if (authSection) authSection.classList.add('hidden');
@@ -838,20 +820,6 @@
             if (userNameSpan) userNameSpan.innerText = '';
         }
     });
-    
-    // Add "Save biometric" checkbox to login form
-    const loginFormContainer = safeGetElement('loginForm');
-    if (loginFormContainer && !document.getElementById('saveBiometricCheckbox')) {
-        const label = document.createElement('label');
-        label.style.display = 'flex';
-        label.style.alignItems = 'center';
-        label.style.gap = '8px';
-        label.style.marginTop = '10px';
-        label.innerHTML = `<input type="checkbox" id="saveBiometricCheckbox" checked> <span>🔐 Save this device for biometric login (fingerprint / face ID)</span>`;
-        const loginBtnElem = safeGetElement('doLoginBtn');
-        if (loginBtnElem) loginFormContainer.insertBefore(label, loginBtnElem);
-        else loginFormContainer.appendChild(label);
-    }
 
     // Display a console message about file:// usage warning
     if (window.location.protocol === 'file:') {
