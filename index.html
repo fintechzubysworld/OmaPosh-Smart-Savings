@@ -230,7 +230,6 @@
             gap: 8px;
         }
         #ledgerFloatingBtn:hover { transform: scale(1.02); }
-        /* Login prompt screen (shown when not logged in) */
         .login-prompt {
             display: flex;
             flex-direction: column;
@@ -254,7 +253,6 @@
         </div>
     </header>
     <div class="main-content" id="mainContent">
-        <!-- This will be filled by JavaScript depending on auth state -->
         <div id="dashboardContent" class="hidden">
             <div class="info-banner" id="permWarning" style="display:none;">⚠️ Firestore permission error – update rules.</div>
             <div class="section">
@@ -322,7 +320,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, onSnapshot, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, onSnapshot, arrayUnion, increment, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -681,13 +679,57 @@
         document.body.appendChild(btn);
     }
 
+    // ========== CONTRIBUTION REMINDER SYSTEM ==========
+    async function checkContributionReminders() {
+        if (!currentUser) return;
+        const userId = currentUser.uid;
+        const groupsSnap = await getDocs(collection(db, "groups"));
+        const userGroups = [];
+        groupsSnap.forEach(doc => {
+            const group = doc.data();
+            if (group.members && group.members.includes(userId)) {
+                userGroups.push({ id: doc.id, ...group });
+            }
+        });
+        for (const group of userGroups) {
+            const contributionsSnap = await getDocs(query(collection(db, "contributions"), where("groupId", "==", group.id), where("userId", "==", userId), orderBy("date", "desc")));
+            let lastDate = null;
+            if (!contributionsSnap.empty) {
+                const last = contributionsSnap.docs[0].data();
+                lastDate = last.date ? new Date(last.date) : null;
+            }
+            const now = new Date();
+            let daysSince = null;
+            if (lastDate) {
+                const diff = now - lastDate;
+                daysSince = diff / (1000 * 60 * 60 * 24);
+            } else {
+                daysSince = group.frequencyDays + 1; // never contributed
+            }
+            // Check for a reminder in the last 24 hours for this group
+            const remindersSnap = await getDocs(query(collection(db, "messages"), where("userId", "==", userId), where("type", "==", "reminder"), where("createdAt", ">", new Date(Date.now() - 24 * 60 * 60 * 1000))));
+            const alreadyReminded = remindersSnap.docs.some(doc => doc.data().message && doc.data().message.includes(group.name));
+            if (daysSince >= group.frequencyDays && !alreadyReminded) {
+                const frequencyText = group.frequencyDays === 1 ? "daily" : (group.frequencyDays === 7 ? "weekly" : "monthly");
+                await addDoc(collection(db, "messages"), {
+                    userId: userId,
+                    subject: `💰 Contribution Reminder: ${group.name}`,
+                    message: `You have not made your ${frequencyText} contribution of ₦${group.contributionAmount} to the thrift group "${group.name}". Please make your contribution to stay on track.`,
+                    read: false,
+                    createdAt: new Date(),
+                    type: "reminder"
+                });
+                showToast(`Reminder: ${frequencyText} contribution due for ${group.name}`, false);
+            }
+        }
+    }
+
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
             const userDoc = await getDoc(doc(db, "users", user.uid));
             let role = userDoc.exists() ? userDoc.data().role : null;
             if (role === 'admin') { window.location.href = "admin.html"; return; }
-            // Show dashboard, hide login prompt
             dashboardContent.classList.remove('hidden');
             loginPrompt.classList.add('hidden');
             const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
@@ -695,9 +737,9 @@
             logoutBtn.style.display = 'inline-flex';
             await renderUserPlans();
             listenUserGroups();
+            await checkContributionReminders();  // send reminders on login
             addLedgerButton();
         } else {
-            // No user – show login prompt, hide dashboard
             dashboardContent.classList.add('hidden');
             loginPrompt.classList.remove('hidden');
             if (userNameSpan) userNameSpan.innerText = '';
@@ -712,14 +754,8 @@
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
 </script>
-<!-- ========== NOTIFICATION BUTTONS – NO FLASHING ========== -->
+<!-- ========== NOTIFICATION BUTTONS (Floating Inbox & Bell) ========== -->
 <script type="module">
-// ============================================================
-//  Notification Buttons (redirect to notifications.html)
-//  - Floating inbox button appears immediately on login (always visible)
-//  - Bell icon created hidden, only becomes visible when unread > 0
-//  - No flashing because elements are created once and stay.
-// ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -742,41 +778,28 @@ let buttonsAdded = false;
 function addNotificationButtons(user) {
     if (buttonsAdded) return;
     if (!user) return;
-
     const userId = user.uid;
     const messagesRef = collection(db, "messages");
     const q = query(messagesRef, where("userId", "==", userId));
 
-    // --- Floating inbox button (envelope) above "My Ledger" (always visible) ---
+    // Floating inbox button
     let floatingBtn = document.getElementById('floatingInboxBtn');
     if (!floatingBtn) {
         floatingBtn = document.createElement('button');
         floatingBtn.id = 'floatingInboxBtn';
         floatingBtn.innerHTML = '✉️';
         floatingBtn.style.cssText = `
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            z-index: 1000;
-            background: #ffb347;
-            color: #1e2a3e;
-            border: none;
-            border-radius: 50px;
-            width: 48px;
-            height: 48px;
-            font-size: 1.4rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: fixed; bottom: 90px; right: 20px; z-index: 1000;
+            background: #ffb347; color: #1e2a3e; border: none;
+            border-radius: 50px; width: 48px; height: 48px; font-size: 1.4rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer;
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;
         `;
         floatingBtn.onclick = () => window.location.href = 'notifications.html';
         document.body.appendChild(floatingBtn);
     }
 
-    // --- Bell icon in header (initially hidden; shown when unread > 0) ---
+    // Bell icon (initially hidden)
     let bellContainer = document.getElementById('notificationBell');
     if (!bellContainer) {
         const userInfo = document.querySelector('.user-info');
@@ -784,13 +807,8 @@ function addNotificationButtons(user) {
             bellContainer = document.createElement('div');
             bellContainer.id = 'notificationBell';
             bellContainer.style.cssText = `
-                position: relative;
-                cursor: pointer;
-                font-size: 1.4rem;
-                margin-right: 8px;
-                display: flex;
-                align-items: center;
-                display: none;  /* initially hidden */
+                position: relative; cursor: pointer; font-size: 1.4rem;
+                margin-right: 8px; display: flex; align-items: center; display: none;
             `;
             bellContainer.innerHTML = '🔔 <span id="unreadBadge" style="position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;"></span>';
             const logoutBtn = document.getElementById('logoutBtn');
@@ -801,12 +819,9 @@ function addNotificationButtons(user) {
     }
 
     const unreadBadge = document.getElementById('unreadBadge');
-    // Real-time listener for unread count – shows/hides bell and updates badge
     onSnapshot(q, (snapshot) => {
         let unread = 0;
-        snapshot.forEach(doc => {
-            if (!doc.data().read) unread++;
-        });
+        snapshot.forEach(doc => { if (!doc.data().read) unread++; });
         if (unreadBadge && bellContainer) {
             if (unread > 0) {
                 unreadBadge.innerText = unread;
@@ -818,16 +833,12 @@ function addNotificationButtons(user) {
             }
         }
     });
-
     buttonsAdded = true;
 }
 
 onAuthStateChanged(auth, (user) => {
-    if (user) {
-        // Add buttons immediately (no delay) – bell starts hidden, only appears if unread > 0
-        addNotificationButtons(user);
-    } else {
-        // Remove buttons when logged out
+    if (user) { addNotificationButtons(user); } 
+    else {
         const floating = document.getElementById('floatingInboxBtn');
         if (floating) floating.remove();
         const bell = document.getElementById('notificationBell');
