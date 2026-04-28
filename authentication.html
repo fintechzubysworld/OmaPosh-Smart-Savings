@@ -22,7 +22,7 @@
         label { display: block; font-weight: 600; margin-bottom: 8px; color: #1e3c72; }
         input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem; }
         .hidden { display: none !important; }
-        .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; }
+        .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
         .alert-success { background: #d4edda; color: #155724; }
         footer { text-align: center; margin-top: 30px; font-size: 0.7rem; color: #666; }
     </style>
@@ -69,9 +69,23 @@
         messagingSenderId: "469614412839",
         appId: "1:469614412839:web:d51a47b468daad6184fa02"
     };
+
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+
+    // Test Firestore connection on page load
+    (async () => {
+        try {
+            const testDoc = doc(db, "_test_connection", "test");
+            await setDoc(testDoc, { timestamp: new Date().toISOString() }, { merge: true });
+            console.log("✅ Firestore connection successful");
+        } catch (err) {
+            console.error("❌ Firestore connection failed:", err);
+            showMessage("Database connection error: " + err.message, true);
+        }
+    })();
 
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
@@ -82,10 +96,9 @@
         authMsg.classList.remove('hidden');
         authMsg.classList.remove('alert-success');
         if (!isError) authMsg.classList.add('alert-success');
-        setTimeout(() => authMsg.classList.add('hidden'), 5000);
+        setTimeout(() => authMsg.classList.add('hidden'), 8000);
     }
 
-    // Helper: send welcome message
     async function sendWelcomeMessage(userId) {
         try {
             const configRef = doc(db, "admin_config", "messages");
@@ -105,9 +118,9 @@
                 createdAt: new Date(),
                 type: "welcome"
             });
-            console.log("Welcome message sent to", userId);
+            console.log("Welcome message sent");
         } catch (err) {
-            console.warn("Welcome message failed:", err);
+            console.warn("Welcome message not sent:", err);
         }
     }
 
@@ -129,9 +142,9 @@
     };
 
     document.getElementById('doRegisterBtn').onclick = async () => {
-        const email = document.getElementById('regEmail').value;
+        const email = document.getElementById('regEmail').value.trim();
         const pwd = document.getElementById('regPassword').value;
-        const fullName = document.getElementById('regFullName').value;
+        const fullName = document.getElementById('regFullName').value.trim();
         if (!email || !pwd || !fullName) {
             showMessage("All fields are required.");
             return;
@@ -141,20 +154,24 @@
             return;
         }
         
-        // Show loading state
         const registerBtn = document.getElementById('doRegisterBtn');
         const originalText = registerBtn.innerText;
         registerBtn.innerText = "Creating account...";
         registerBtn.disabled = true;
         
         try {
-            // Step 1: Create user in Firebase Authentication
-            console.log("Attempting to create user in Auth...");
+            // Step 1: Check if user already exists in Firestore (by email)
+            console.log("Checking existing users...");
+            const usersRef = collection(db, "users");
+            // Note: query requires index, but we'll just try to write; if duplicate, auth will fail.
+            
+            // Step 2: Create user in Firebase Authentication
+            console.log("Creating Auth user...");
             const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
             const uid = userCred.user.uid;
             console.log("Auth user created with UID:", uid);
             
-            // Step 2: Create user document in Firestore
+            // Step 3: Write user document to Firestore
             const userData = {
                 fullName: fullName,
                 email: email,
@@ -163,30 +180,35 @@
                 disabled: false,
                 permissions: {}
             };
-            console.log("Attempting to write to Firestore:", userData);
+            console.log("Writing to Firestore:", userData);
             await setDoc(doc(db, "users", uid), userData);
-            console.log("Firestore document created successfully for UID:", uid);
+            console.log("Firestore write completed.");
             
-            // Verify the document exists
-            const checkDoc = await getDoc(doc(db, "users", uid));
-            if (checkDoc.exists()) {
-                console.log("✅ Verification: user document exists in Firestore");
+            // Step 4: Verify write
+            const verify = await getDoc(doc(db, "users", uid));
+            if (verify.exists()) {
+                console.log("Verification: document exists!");
             } else {
-                console.error("❌ Verification FAILED: user document does NOT exist after write!");
-                showMessage("Account created but could not verify Firestore write. Please contact support.", true);
+                console.error("Verification FAILED: document missing after write");
+                throw new Error("Document was not saved to database");
             }
             
-            // Step 3: Send welcome message (non-critical)
+            // Step 5: Send welcome message (optional)
             await sendWelcomeMessage(uid);
             
             showMessage("Registration successful! Redirecting...", false);
             setTimeout(() => window.location.href = 'index.html', 1500);
             
         } catch (error) {
-            console.error("Registration error:", error);
+            console.error("Registration error details:", error);
             let errorMsg = error.message;
             if (error.code === 'permission-denied') {
-                errorMsg = "Firestore permission denied. Please check your security rules. Make sure 'users' collection allows write access for authenticated users.";
+                errorMsg = "Permission denied. Please check Firestore security rules. They must allow authenticated users to create documents in 'users' collection.";
+            } else if (error.code === 'auth/email-already-in-use') {
+                errorMsg = "Email already registered. Please login instead.";
+                // Redirect to login form
+                registerForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
             }
             showMessage(errorMsg);
             registerBtn.innerText = originalText;
@@ -194,7 +216,6 @@
         }
     };
 
-    // If already logged in, redirect to dashboard
     onAuthStateChanged(auth, (user) => {
         if (user) window.location.href = 'index.html';
     });
