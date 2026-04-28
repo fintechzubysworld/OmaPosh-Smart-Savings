@@ -712,11 +712,13 @@
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
 </script>
-<!-- ========== NOTIFICATION BUTTONS WITH 2-SECOND DELAY ========== -->
+<!-- ========== NOTIFICATION BUTTONS – NO FLASHING ========== -->
 <script type="module">
 // ============================================================
 //  Notification Buttons (redirect to notifications.html)
-//  DELAYED by 2 seconds after user is logged in.
+//  - Floating inbox button appears immediately on login (always visible)
+//  - Bell icon created hidden, only becomes visible when unread > 0
+//  - No flashing because elements are created once and stay.
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -745,7 +747,7 @@ function addNotificationButtons(user) {
     const messagesRef = collection(db, "messages");
     const q = query(messagesRef, where("userId", "==", userId));
 
-    // --- Floating inbox button (envelope) above "My Ledger" ---
+    // --- Floating inbox button (envelope) above "My Ledger" (always visible) ---
     let floatingBtn = document.getElementById('floatingInboxBtn');
     if (!floatingBtn) {
         floatingBtn = document.createElement('button');
@@ -774,7 +776,7 @@ function addNotificationButtons(user) {
         document.body.appendChild(floatingBtn);
     }
 
-    // --- Bell icon in header (visible only when unread messages exist) ---
+    // --- Bell icon in header (initially hidden; shown when unread > 0) ---
     let bellContainer = document.getElementById('notificationBell');
     if (!bellContainer) {
         const userInfo = document.querySelector('.user-info');
@@ -788,6 +790,7 @@ function addNotificationButtons(user) {
                 margin-right: 8px;
                 display: flex;
                 align-items: center;
+                display: none;  /* initially hidden */
             `;
             bellContainer.innerHTML = '🔔 <span id="unreadBadge" style="position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;"></span>';
             const logoutBtn = document.getElementById('logoutBtn');
@@ -798,20 +801,20 @@ function addNotificationButtons(user) {
     }
 
     const unreadBadge = document.getElementById('unreadBadge');
-    // Real-time listener for unread count
+    // Real-time listener for unread count – shows/hides bell and updates badge
     onSnapshot(q, (snapshot) => {
         let unread = 0;
         snapshot.forEach(doc => {
             if (!doc.data().read) unread++;
         });
-        if (unreadBadge) {
+        if (unreadBadge && bellContainer) {
             if (unread > 0) {
                 unreadBadge.innerText = unread;
                 unreadBadge.style.display = 'inline-flex';
-                if (bellContainer) bellContainer.style.display = 'flex';
+                bellContainer.style.display = 'flex';
             } else {
                 unreadBadge.style.display = 'none';
-                if (bellContainer) bellContainer.style.display = 'none';
+                bellContainer.style.display = 'none';
             }
         }
     });
@@ -821,12 +824,10 @@ function addNotificationButtons(user) {
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // Delay the appearance of notification buttons by 2 seconds
-        setTimeout(() => {
-            addNotificationButtons(user);
-        }, 2000);
+        // Add buttons immediately (no delay) – bell starts hidden, only appears if unread > 0
+        addNotificationButtons(user);
     } else {
-        // Remove buttons immediately when logged out
+        // Remove buttons when logged out
         const floating = document.getElementById('floatingInboxBtn');
         if (floating) floating.remove();
         const bell = document.getElementById('notificationBell');
