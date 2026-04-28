@@ -4,6 +4,140 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
+    <!-- ========== CUSTOM DIALOG OVERRIDE (MUST BE FIRST) ========== -->
+    <script>
+    (function() {
+        if (window.__customDialogsInstalled) return;
+        window.__customDialogsInstalled = true;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'custom-dialog-overlay';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+            z-index: 100000; visibility: hidden; backdrop-filter: blur(3px);
+        `;
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: white; border-radius: 28px; padding: 24px; max-width: 400px;
+            width: 90%; box-shadow: 0 20px 30px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif;
+        `;
+        card.innerHTML = `
+            <div id="custom-dialog-header" style="font-weight: 700; margin-bottom: 12px; color: #1e3c72; font-size: 1.1rem;"></div>
+            <div id="custom-dialog-message" style="font-size: 1rem; margin-bottom: 20px; color: #2d3748; line-height: 1.5;"></div>
+            <div id="custom-dialog-input-group" style="margin-bottom: 20px; display: none;">
+                <input type="text" id="custom-dialog-input" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem;">
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="custom-dialog-cancel" style="padding: 8px 18px; background: #e9ecef; border: none; border-radius: 40px; cursor: pointer; font-weight: 600;">Cancel</button>
+                <button id="custom-dialog-ok" style="padding: 8px 18px; background: #ffb347; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; color: #1e2a3e;">OK</button>
+            </div>
+        `;
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        let resolveFn = null;
+        let isPromptMode = false;
+
+        const header = document.getElementById('custom-dialog-header');
+        const msg = document.getElementById('custom-dialog-message');
+        const inputGroup = document.getElementById('custom-dialog-input-group');
+        const inputField = document.getElementById('custom-dialog-input');
+        const ok = document.getElementById('custom-dialog-ok');
+        const cancel = document.getElementById('custom-dialog-cancel');
+
+        function hide() {
+            overlay.style.visibility = 'hidden';
+            if (resolveFn) {
+                if (isPromptMode) resolveFn(null);
+                else resolveFn(false);
+                resolveFn = null;
+            }
+            isPromptMode = false;
+        }
+
+        ok.onclick = () => {
+            overlay.style.visibility = 'hidden';
+            if (resolveFn) {
+                if (isPromptMode) resolveFn(inputField.value);
+                else resolveFn(true);
+                resolveFn = null;
+            }
+            isPromptMode = false;
+        };
+        cancel.onclick = hide;
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
+
+        let userName = 'OmaPosh';
+        function updateUserName() {
+            if (typeof auth !== 'undefined' && auth.currentUser) {
+                if (auth.currentUser.email) userName = auth.currentUser.email.split('@')[0];
+                if (typeof db !== 'undefined' && auth.currentUser.uid) {
+                    import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(({ getDoc, doc }) => {
+                        getDoc(doc(db, "users", auth.currentUser.uid)).then(docSnap => {
+                            if (docSnap.exists() && docSnap.data().fullName) userName = docSnap.data().fullName;
+                        }).catch(() => {});
+                    }).catch(() => {});
+                }
+            }
+        }
+        updateUserName();
+        const interval = setInterval(() => {
+            if (typeof auth !== 'undefined' && auth.currentUser) {
+                updateUserName();
+                clearInterval(interval);
+            }
+        }, 200);
+        if (typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
+            onAuthStateChanged(auth, () => updateUserName());
+        }
+
+        function showDialog(prefix, message, showInput, defaultValue) {
+            header.innerText = `${userName} ${prefix}`;
+            msg.innerText = String(message);
+            if (showInput) {
+                inputField.value = defaultValue;
+                inputGroup.style.display = 'block';
+            } else {
+                inputGroup.style.display = 'none';
+            }
+            overlay.style.visibility = 'visible';
+        }
+
+        window.alert = function(m) {
+            cancel.style.display = 'none';
+            ok.innerText = 'OK';
+            showDialog('says:', m, false);
+            return new Promise((resolve) => {
+                ok.onclick = () => { overlay.style.visibility = 'hidden'; resolve(); };
+                cancel.style.display = 'none';
+            });
+        };
+        window.confirm = function(m) {
+            cancel.style.display = 'inline-flex';
+            ok.innerText = 'OK';
+            showDialog('asks:', m, false);
+            return new Promise((resolve) => {
+                const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
+                const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
+                ok.onclick = onOk;
+                cancel.onclick = onCancel;
+            });
+        };
+        window.prompt = function(m, d) {
+            cancel.style.display = 'inline-flex';
+            ok.innerText = 'OK';
+            showDialog('requests:', m, true, d || '');
+            isPromptMode = true;
+            return new Promise((resolve) => {
+                const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField.value); };
+                const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(null); };
+                ok.onclick = onOk;
+                cancel.onclick = onCancel;
+            });
+        };
+    })();
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; padding: 20px; }
@@ -56,7 +190,6 @@
         .status-pending { color: #e67e22; font-weight: bold; }
         .status-approved { color: #27ae60; }
         h4 { margin: 20px 0 12px 0; color: #2c3e50; font-size: 1.2rem; }
-        
         @media (max-width: 768px) {
             body { padding: 12px; }
             .main-content { padding: 20px 16px; }
@@ -70,159 +203,27 @@
             input, select { font-size: 16px; }
         }
         button, .btn, [onclick] { cursor: pointer; touch-action: manipulation; }
-    </style>
-    <script>
-(function() {
-  // Create modal elements once
-  const overlay = document.createElement('div');
-  overlay.id = 'custom-dialog-overlay';
-  overlay.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
-    z-index: 100000; visibility: hidden; backdrop-filter: blur(3px);
-  `;
-  const card = document.createElement('div');
-  card.style.cssText = `
-    background: white; border-radius: 28px; padding: 24px; max-width: 400px;
-    width: 90%; box-shadow: 0 20px 30px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif;
-  `;
-  card.innerHTML = `
-    <div id="custom-dialog-header" style="font-weight: 700; margin-bottom: 12px; color: #1e3c72; font-size: 1.1rem;"></div>
-    <div id="custom-dialog-message" style="font-size: 1rem; margin-bottom: 20px; color: #2d3748; line-height: 1.5;"></div>
-    <div id="custom-dialog-input-group" style="margin-bottom: 20px; display: none;">
-      <input type="text" id="custom-dialog-input" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem;">
-    </div>
-    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-      <button id="custom-dialog-cancel" style="padding: 8px 18px; background: #e9ecef; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s;">Cancel</button>
-      <button id="custom-dialog-ok" style="padding: 8px 18px; background: #ffb347; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; color: #1e2a3e; transition: 0.2s;">OK</button>
-    </div>
-  `;
-  overlay.appendChild(card);
-  document.body.appendChild(overlay);
-
-  let resolveFn = null;
-  let isPromptMode = false;
-
-  const headerEl = document.getElementById('custom-dialog-header');
-  const msgEl = document.getElementById('custom-dialog-message');
-  const inputGroup = document.getElementById('custom-dialog-input-group');
-  const inputField = document.getElementById('custom-dialog-input');
-  const okBtn = document.getElementById('custom-dialog-ok');
-  const cancelBtn = document.getElementById('custom-dialog-cancel');
-
-  function hide() {
-    overlay.style.visibility = 'hidden';
-    if (resolveFn) {
-      if (isPromptMode) resolveFn(null);
-      else resolveFn(false);
-      resolveFn = null;
-    }
-    isPromptMode = false;
-  }
-
-  okBtn.onclick = () => {
-    overlay.style.visibility = 'hidden';
-    if (resolveFn) {
-      if (isPromptMode) resolveFn(inputField.value);
-      else resolveFn(true);
-      resolveFn = null;
-    }
-    isPromptMode = false;
-  };
-
-  cancelBtn.onclick = hide;
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
-
-  // Helper to get logged‑in user name (synchronous – returns cached or placeholder)
-  let cachedUserName = null;
-  let userNamePromise = null;
-  function getUserName() {
-    if (cachedUserName) return cachedUserName;
-    // Try to get from Firebase synchronously if available
-    if (typeof auth !== 'undefined' && auth.currentUser && auth.currentUser.email) {
-      const email = auth.currentUser.email;
-      cachedUserName = email.split('@')[0];
-      return cachedUserName;
-    }
-    return 'OmaPosh';
-  }
-
-  // Function to show the modal
-  function showDialog(headerPrefix, message, showInput, defaultValue) {
-    const name = getUserName();
-    headerEl.innerText = `${name} ${headerPrefix}`;
-    msgEl.innerText = String(message);
-    if (showInput) {
-      inputField.value = defaultValue;
-      inputGroup.style.display = 'block';
-    } else {
-      inputGroup.style.display = 'none';
-    }
-    overlay.style.visibility = 'visible';
-  }
-
-  // Override alert
-  window.alert = function(message) {
-    cancelBtn.style.display = 'none';
-    okBtn.innerText = 'OK';
-    showDialog('says:', message, false);
-    return new Promise((resolve) => {
-      okBtn.onclick = () => {
-        overlay.style.visibility = 'hidden';
-        resolve();
-      };
-      // ensure cancel is hidden
-      cancelBtn.style.display = 'none';
-    });
-  };
-
-  // Override confirm
-  window.confirm = function(message) {
-    cancelBtn.style.display = 'inline-flex';
-    okBtn.innerText = 'OK';
-    showDialog('asks:', message, false);
-    return new Promise((resolve) => {
-      const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
-      const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
-      okBtn.onclick = onOk;
-      cancelBtn.onclick = onCancel;
-    });
-  };
-
-  // Override prompt
-  window.prompt = function(message, defaultValue = '') {
-    cancelBtn.style.display = 'inline-flex';
-    okBtn.innerText = 'OK';
-    showDialog('requests:', message, true, defaultValue);
-    isPromptMode = true;
-    return new Promise((resolve) => {
-      const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField.value); };
-      const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(null); };
-      okBtn.onclick = onOk;
-      cancelBtn.onclick = onCancel;
-    });
-  };
-
-  // Refresh user name when auth state changes (if Firebase is loaded)
-  if (typeof window !== 'undefined' && typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
-    onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        cachedUserName = user.email.split('@')[0];
-        // Optionally fetch full name from Firestore
-        if (typeof db !== 'undefined') {
-          getDoc(doc(db, "users", user.uid)).then(docSnap => {
-            if (docSnap.exists() && docSnap.data().fullName) {
-              cachedUserName = docSnap.data().fullName;
-            }
-          }).catch(() => {});
+        #ledgerFloatingBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: #ffb347;
+            color: #1e2a3e;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-      } else {
-        cachedUserName = 'OmaPosh';
-      }
-    });
-  }
-})();
-</script>
+        #ledgerFloatingBtn:hover { transform: scale(1.02); }
+    </style>
 </head>
 <body>
 <div class="container">
@@ -350,7 +351,7 @@
     let currentUser = null;
     let unsubscribeGroups = null;
     let modalResolve = null;
-    let pendingPaymentCallback = null; // function to call after payment confirmation
+    let pendingPaymentCallback = null;
 
     function showToast(message, isError = false) {
         const toast = document.createElement('div');
@@ -391,7 +392,6 @@
     document.getElementById('closeModalBtn').onclick = closeModal;
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
-    // Payment Gateway function - shows Moniepoint details, on confirm creates pending approval request
     function showPaymentGateway(amount, purpose, onCreateRequest) {
         return new Promise((resolve) => {
             paymentAmountDisplay.innerText = `₦${amount.toFixed(2)}`;
@@ -466,7 +466,6 @@
         } catch(err) { handleFirestoreError(err); }
     }
 
-    // Savings deposit: after payment, create pending deposit request (admin must approve)
     async function initiateSavingsDeposit(planId) {
         const amount = parseFloat(prompt("Enter deposit amount (₦):"));
         if (isNaN(amount) || amount <= 0) return showToast("Invalid amount", true);
@@ -583,7 +582,6 @@
         .then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be >0", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
     });
 
-    // Thrift Groups: contributions require payment gateway and admin approval via contribution_requests
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
@@ -682,7 +680,23 @@
     document.getElementById('createAdminBtn').onclick = createAdminAccountManually;
     document.getElementById('showLoginBtn').onclick = () => { loginForm.classList.remove('hidden'); registerForm.classList.add('hidden'); };
     document.getElementById('showRegisterBtn').onclick = () => { registerForm.classList.remove('hidden'); loginForm.classList.add('hidden'); };
-    document.getElementById('doLoginBtn').onclick = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('loginEmail').value, document.getElementById('loginPassword').value); showToast("Logged in", false); } catch(e) { showToast(e.message, true); } };
+    
+    // Modified login to store credential for biometric
+    const originalLoginHandler = document.getElementById('doLoginBtn').onclick;
+    document.getElementById('doLoginBtn').onclick = async () => {
+        const email = document.getElementById('loginEmail').value;
+        const pwd = document.getElementById('loginPassword').value;
+        try {
+            await signInWithEmailAndPassword(auth, email, pwd);
+            showToast("Logged in", false);
+            // Store credential for biometric if checkbox is checked
+            const saveCheckbox = document.getElementById('saveBiometricCheckbox');
+            if (saveCheckbox && saveCheckbox.checked && window.PasswordCredential && navigator.credentials) {
+                const cred = new PasswordCredential({ id: email, password: pwd, name: email });
+                await navigator.credentials.store(cred);
+            }
+        } catch(e) { showToast(e.message, true); }
+    };
     document.getElementById('doRegisterBtn').onclick = async () => {
         try {
             const cred = await createUserWithEmailAndPassword(auth, document.getElementById('regEmail').value, document.getElementById('regPassword').value);
@@ -692,15 +706,68 @@
     };
     logoutBtn.onclick = () => signOut(auth);
     
-    // Profile link: redirect to profile.html when user clicks on display name
-    userNameSpan.addEventListener('click', () => {
-        if (currentUser) {
-            window.location.href = 'profile.html';
-        }
-    });
-    
+    userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
+
+    // Floating Ledger Button (create on demand)
+    function addLedgerButton() {
+        if (document.getElementById('ledgerFloatingBtn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'ledgerFloatingBtn';
+        btn.innerHTML = '📒 My Ledger';
+        btn.onclick = () => window.location.href = 'ledger.html';
+        document.body.appendChild(btn);
+    }
+
+    // Biometric login attempt on page load (handled by loading overlay)
+    // Blue loading overlay + biometric prompt
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'biometric-loading-overlay';
+    loadingOverlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: #1e3c72; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; z-index: 1000000;
+        color: white; transition: opacity 0.5s;
+    `;
+    loadingOverlay.innerHTML = `
+        <div style="text-align: center;">
+            <div style="width: 200px; height: 6px; background: rgba(255,255,255,0.3); border-radius: 10px; overflow: hidden; margin: 20px auto;">
+                <div id="loading-progress-bar" style="width: 0%; height: 100%; background: #ffb347; transition: width 0.3s;"></div>
+            </div>
+            <p style="margin-top: 20px; font-size: 1rem;">Loading...</p>
+        </div>
+    `;
+    document.body.appendChild(loadingOverlay);
+    const progressFill = document.getElementById('loading-progress-bar');
+    function setProgress(pct) { if (progressFill) progressFill.style.width = pct + '%'; }
+
+    async function attemptBiometricLogin() {
+        if (!window.PasswordCredential || !navigator.credentials) return false;
+        try {
+            setProgress(40);
+            const cred = await navigator.credentials.get({ password: true, mediation: 'optional' });
+            if (cred && cred.type === 'password' && cred.id && cred.password) {
+                setProgress(70);
+                const emailInput = document.getElementById('loginEmail');
+                const pwdInput = document.getElementById('loginPassword');
+                if (emailInput && pwdInput) {
+                    emailInput.value = cred.id;
+                    pwdInput.value = cred.password;
+                }
+                // Auto login
+                await signInWithEmailAndPassword(auth, cred.id, cred.password);
+                return true;
+            }
+        } catch(e) { console.warn("Biometric failed", e); }
+        return false;
+    }
+
     onAuthStateChanged(auth, async (user) => {
         if (user) {
+            setProgress(100);
+            setTimeout(() => {
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => loadingOverlay.remove(), 500);
+            }, 300);
             currentUser = user;
             const userDoc = await getDoc(doc(db, "users", user.uid));
             let role = userDoc.exists() ? userDoc.data().role : null;
@@ -717,221 +784,42 @@
                 logoutBtn.style.display = 'inline-flex';
                 await renderUserPlans();
                 listenUserGroups();
+                addLedgerButton();
             }
         } else {
-            currentUser = null;
-            authSection.classList.remove('hidden');
-            dashboardSection.classList.add('hidden');
-            if (unsubscribeGroups) unsubscribeGroups();
+            setProgress(10);
+            const success = await attemptBiometricLogin();
+            if (!success) {
+                setProgress(100);
+                setTimeout(() => {
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(() => loadingOverlay.remove(), 500);
+                }, 500);
+                authSection.classList.remove('hidden');
+                dashboardSection.classList.add('hidden');
+            } else {
+                setProgress(90);
+                // auth state will trigger again with user
+            }
+            if (document.getElementById('ledgerFloatingBtn')) document.getElementById('ledgerFloatingBtn').remove();
             logoutBtn.style.display = 'none';
-            userNameSpan.innerText = ''; // clear name when logged out
-            modal.classList.add('hidden');
-            paymentModal.classList.add('hidden');
+            userNameSpan.innerText = '';
         }
     });
-    // ============================================================
-// Floating "My Ledger" Button for index.html
-// Appears only when a non-admin user is logged in.
-// Clicking navigates to ledger.html
-// ============================================================
 
-(function addLedgerFloatingButton() {
-  // Wait for Firebase to be ready (assumes Firebase already initialised)
-  const waitForAuth = setInterval(() => {
-    if (typeof auth !== 'undefined' && auth.currentUser) {
-      clearInterval(waitForAuth);
-      initButton();
-    } else if (typeof auth !== 'undefined' && auth.currentUser === null) {
-      // Not logged in – remove button if exists
-      const existing = document.getElementById('ledgerFloatingBtn');
-      if (existing) existing.remove();
+    // Add "Save biometric" checkbox to login form
+    const loginFormContainer = document.getElementById('loginForm');
+    if (loginFormContainer && !document.getElementById('saveBiometricCheckbox')) {
+        const label = document.createElement('label');
+        label.style.display = 'flex';
+        label.style.alignItems = 'center';
+        label.style.gap = '8px';
+        label.style.marginTop = '10px';
+        label.innerHTML = `<input type="checkbox" id="saveBiometricCheckbox" checked> <span>🔐 Save this device for biometric login (fingerprint / face ID)</span>`;
+        const loginBtnElem = document.getElementById('doLoginBtn');
+        if (loginBtnElem) loginFormContainer.insertBefore(label, loginBtnElem);
+        else loginFormContainer.appendChild(label);
     }
-  }, 500);
-
-  function initButton() {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    // Check if user is admin (redirects to admin.html, so we show only for non-admin)
-    // We'll also check role from Firestore if available
-    getDoc(doc(db, "users", user.uid)).then(userDoc => {
-      const role = userDoc.exists() ? userDoc.data().role : null;
-      if (role === 'admin') return; // Do not show for admins
-
-      // Create floating button if not already present
-      if (document.getElementById('ledgerFloatingBtn')) return;
-
-      const btn = document.createElement('button');
-      btn.id = 'ledgerFloatingBtn';
-      btn.innerHTML = '📒 My Ledger';
-      btn.style.position = 'fixed';
-      btn.style.bottom = '20px';
-      btn.style.right = '20px';
-      btn.style.zIndex = '1000';
-      btn.style.backgroundColor = '#ffb347';
-      btn.style.color = '#1e2a3e';
-      btn.style.border = 'none';
-      btn.style.borderRadius = '50px';
-      btn.style.padding = '12px 20px';
-      btn.style.fontSize = '1rem';
-      btn.style.fontWeight = 'bold';
-      btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-      btn.style.cursor = 'pointer';
-      btn.style.transition = 'all 0.2s ease';
-      btn.style.display = 'flex';
-      btn.style.alignItems = 'center';
-      btn.style.gap = '8px';
-      btn.onmouseenter = () => btn.style.transform = 'scale(1.02)';
-      btn.onmouseleave = () => btn.style.transform = 'scale(1)';
-      btn.onclick = () => window.location.href = 'ledger.html';
-      document.body.appendChild(btn);
-    }).catch(err => console.warn("Could not check user role:", err));
-  }
-
-  // Listen for auth state changes to add/remove button
-  if (typeof onAuthStateChanged === 'function') {
-    onAuthStateChanged(auth, (user) => {
-      const existing = document.getElementById('ledgerFloatingBtn');
-      if (user && user.email !== 'admin@omaposhsmartsavings.com') {
-        if (!existing) initButton();
-      } else if (existing) {
-        existing.remove();
-      }
-    });
-  }
-})();
-// ============================================================
-// Biometric Login + Blue Loading Screen (with "Loading..." text)
-// ============================================================
-(function() {
-  if (window.__biometricFlowInitialised) return;
-  window.__biometricFlowInitialised = true;
-
-  const authSection = document.getElementById('authSection');
-  const dashboardSection = document.getElementById('dashboardSection');
-  const loginFormDiv = document.getElementById('loginForm');
-  const emailInput = document.getElementById('loginEmail');
-  const passwordInput = document.getElementById('loginPassword');
-  const loginBtn = document.getElementById('doLoginBtn');
-
-  // Create blue loading overlay
-  const overlay = document.createElement('div');
-  overlay.id = 'biometric-loading-overlay';
-  overlay.style.position = 'fixed';
-  overlay.style.top = '0';
-  overlay.style.left = '0';
-  overlay.style.width = '100%';
-  overlay.style.height = '100%';
-  overlay.style.backgroundColor = '#1e3c72';
-  overlay.style.display = 'flex';
-  overlay.style.flexDirection = 'column';
-  overlay.style.alignItems = 'center';
-  overlay.style.justifyContent = 'center';
-  overlay.style.zIndex = '9999';
-  overlay.style.color = 'white';
-  overlay.innerHTML = `
-    <div style="text-align: center;">
-      <div class="loader-meter" style="width: 200px; height: 6px; background: rgba(255,255,255,0.3); border-radius: 10px; overflow: hidden; margin: 20px auto;">
-        <div style="width: 0%; height: 100%; background: #ffb347; border-radius: 10px; transition: width 0.3s;" id="loading-progress"></div>
-      </div>
-      <p style="margin-top: 20px; font-size: 1rem;">Loading...</p>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  const progressBar = overlay.querySelector('#loading-progress');
-
-  function setProgress(percent) {
-    if (progressBar) progressBar.style.width = percent + '%';
-  }
-
-  async function storeCredential(email, password, shouldSave) {
-    if (!shouldSave) return;
-    if (window.PasswordCredential && navigator.credentials) {
-      const cred = new PasswordCredential({ id: email, password: password, name: email });
-      await navigator.credentials.store(cred);
-    }
-  }
-
-  async function attemptBiometricLogin() {
-    if (!window.PasswordCredential || !navigator.credentials) return false;
-    try {
-      const cred = await navigator.credentials.get({ password: true, mediation: 'optional' });
-      if (cred && cred.type === 'password' && cred.id && cred.password) {
-        setProgress(70);
-        if (emailInput && passwordInput) {
-          emailInput.value = cred.id;
-          passwordInput.value = cred.password;
-        }
-        if (loginBtn) loginBtn.click();
-        return true;
-      }
-    } catch (err) {}
-    return false;
-  }
-
-  // Override login button to store credentials when "Save this device" is checked
-  const originalLoginHandler = loginBtn.onclick;
-  loginBtn.onclick = async function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const email = emailInput.value;
-    const password = passwordInput.value;
-    const saveCheckbox = document.getElementById('saveBiometricCheckbox');
-    const shouldSave = saveCheckbox ? saveCheckbox.checked : false;
-    try {
-      const { signInWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
-      await signInWithEmailAndPassword(auth, email, password);
-      await storeCredential(email, password, shouldSave);
-    } catch (err) {
-      const authMsg = document.getElementById('authMessage');
-      if (authMsg) {
-        authMsg.innerText = err.message;
-        authMsg.classList.remove('hidden');
-        setTimeout(() => authMsg.classList.add('hidden'), 5000);
-      }
-    }
-  };
-
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      setProgress(100);
-      setTimeout(() => {
-        overlay.style.display = 'none';
-        if (authSection) authSection.classList.add('hidden');
-        if (dashboardSection) dashboardSection.classList.remove('hidden');
-      }, 300);
-    } else {
-      setProgress(30);
-      const success = await attemptBiometricLogin();
-      if (!success) {
-        setProgress(100);
-        setTimeout(() => {
-          overlay.style.display = 'none';
-          if (authSection) authSection.classList.remove('hidden');
-          if (dashboardSection) dashboardSection.classList.add('hidden');
-        }, 500);
-      } else {
-        setProgress(90);
-      }
-    }
-  });
-
-  // Add "Save this device" checkbox to login form
-  const loginFormContainer = document.getElementById('loginForm');
-  if (loginFormContainer && !document.getElementById('saveBiometricCheckbox')) {
-    const checkboxGroup = document.createElement('div');
-    checkboxGroup.className = 'form-group';
-    checkboxGroup.innerHTML = `
-      <label style="display: flex; align-items: center; gap: 8px;">
-        <input type="checkbox" id="saveBiometricCheckbox" checked>
-        <span>🔐 Save this device for biometric login (fingerprint / face ID)</span>
-      </label>
-    `;
-    const loginButton = loginFormContainer.querySelector('#doLoginBtn');
-    if (loginButton) loginFormContainer.insertBefore(checkboxGroup, loginButton);
-    else loginFormContainer.appendChild(checkboxGroup);
-  }
-})();
 </script>
 </body>
 </html>
