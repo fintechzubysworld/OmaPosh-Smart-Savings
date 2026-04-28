@@ -712,10 +712,11 @@
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
 </script>
+<!-- ========== NOTIFICATION BUTTONS WITH 2-SECOND DELAY ========== -->
 <script type="module">
 // ============================================================
 //  Notification Buttons (redirect to notifications.html)
-//  Corrected: imports Firebase directly – no global auth/db needed.
+//  DELAYED by 2 seconds after user is logged in.
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -730,17 +731,14 @@ const firebaseConfig = {
     appId: "1:469614412839:web:d51a47b468daad6184fa02"
 };
 
-// Initialize Firebase (will reuse existing instance if already initialised)
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
-}
+let buttonsAdded = false;
 
-async function initNotificationButtons(user) {
+function addNotificationButtons(user) {
+    if (buttonsAdded) return;
     if (!user) return;
 
     const userId = user.uid;
@@ -817,17 +815,23 @@ async function initNotificationButtons(user) {
             }
         }
     });
+
+    buttonsAdded = true;
 }
 
-// Wait for auth state and DOM to be ready
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // Ensure DOM elements exist before adding buttons
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => initNotificationButtons(user));
-        } else {
-            initNotificationButtons(user);
-        }
+        // Delay the appearance of notification buttons by 2 seconds
+        setTimeout(() => {
+            addNotificationButtons(user);
+        }, 2000);
+    } else {
+        // Remove buttons immediately when logged out
+        const floating = document.getElementById('floatingInboxBtn');
+        if (floating) floating.remove();
+        const bell = document.getElementById('notificationBell');
+        if (bell) bell.remove();
+        buttonsAdded = false;
     }
 });
 </script>
