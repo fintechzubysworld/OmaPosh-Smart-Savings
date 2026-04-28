@@ -4,138 +4,147 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
-    <!-- ========== CUSTOM DIALOG OVERRIDE (MUST BE FIRST) ========== -->
+    <!-- ========== CUSTOM DIALOG OVERRIDE (FIRST SCRIPT - CRITICAL) ========== -->
     <script>
     (function() {
-        if (window.__customDialogsInstalled) return;
-        window.__customDialogsInstalled = true;
-
-        const overlay = document.createElement('div');
-        overlay.id = 'custom-dialog-overlay';
-        overlay.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
-            z-index: 100000; visibility: hidden; backdrop-filter: blur(3px);
-        `;
-        const card = document.createElement('div');
-        card.style.cssText = `
-            background: white; border-radius: 28px; padding: 24px; max-width: 400px;
-            width: 90%; box-shadow: 0 20px 30px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif;
-        `;
-        card.innerHTML = `
-            <div id="custom-dialog-header" style="font-weight: 700; margin-bottom: 12px; color: #1e3c72; font-size: 1.1rem;"></div>
-            <div id="custom-dialog-message" style="font-size: 1rem; margin-bottom: 20px; color: #2d3748; line-height: 1.5;"></div>
-            <div id="custom-dialog-input-group" style="margin-bottom: 20px; display: none;">
-                <input type="text" id="custom-dialog-input" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem;">
-            </div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button id="custom-dialog-cancel" style="padding: 8px 18px; background: #e9ecef; border: none; border-radius: 40px; cursor: pointer; font-weight: 600;">Cancel</button>
-                <button id="custom-dialog-ok" style="padding: 8px 18px; background: #ffb347; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; color: #1e2a3e;">OK</button>
-            </div>
-        `;
-        overlay.appendChild(card);
-        document.body.appendChild(overlay);
-
-        let resolveFn = null;
-        let isPromptMode = false;
-
-        const header = document.getElementById('custom-dialog-header');
-        const msg = document.getElementById('custom-dialog-message');
-        const inputGroup = document.getElementById('custom-dialog-input-group');
-        const inputField = document.getElementById('custom-dialog-input');
-        const ok = document.getElementById('custom-dialog-ok');
-        const cancel = document.getElementById('custom-dialog-cancel');
-
-        function hide() {
-            overlay.style.visibility = 'hidden';
-            if (resolveFn) {
-                if (isPromptMode) resolveFn(null);
-                else resolveFn(false);
-                resolveFn = null;
-            }
-            isPromptMode = false;
+        // Wait for DOM to be fully ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
         }
+        function init() {
+            if (window.__customDialogsInstalled) return;
+            window.__customDialogsInstalled = true;
 
-        ok.onclick = () => {
-            overlay.style.visibility = 'hidden';
-            if (resolveFn) {
-                if (isPromptMode) resolveFn(inputField.value);
-                else resolveFn(true);
-                resolveFn = null;
+            const overlay = document.createElement('div');
+            overlay.id = 'custom-dialog-overlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+                z-index: 100000; visibility: hidden; backdrop-filter: blur(3px);
+            `;
+            const card = document.createElement('div');
+            card.style.cssText = `
+                background: white; border-radius: 28px; padding: 24px; max-width: 400px;
+                width: 90%; box-shadow: 0 20px 30px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif;
+            `;
+            card.innerHTML = `
+                <div id="custom-dialog-header" style="font-weight: 700; margin-bottom: 12px; color: #1e3c72; font-size: 1.1rem;"></div>
+                <div id="custom-dialog-message" style="font-size: 1rem; margin-bottom: 20px; color: #2d3748; line-height: 1.5;"></div>
+                <div id="custom-dialog-input-group" style="margin-bottom: 20px; display: none;">
+                    <input type="text" id="custom-dialog-input" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem;">
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button id="custom-dialog-cancel" style="padding: 8px 18px; background: #e9ecef; border: none; border-radius: 40px; cursor: pointer; font-weight: 600;">Cancel</button>
+                    <button id="custom-dialog-ok" style="padding: 8px 18px; background: #ffb347; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; color: #1e2a3e;">OK</button>
+                </div>
+            `;
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+
+            let resolveFn = null;
+            let isPromptMode = false;
+
+            const header = document.getElementById('custom-dialog-header');
+            const msg = document.getElementById('custom-dialog-message');
+            const inputGroup = document.getElementById('custom-dialog-input-group');
+            const inputField = document.getElementById('custom-dialog-input');
+            const ok = document.getElementById('custom-dialog-ok');
+            const cancel = document.getElementById('custom-dialog-cancel');
+
+            function hide() {
+                overlay.style.visibility = 'hidden';
+                if (resolveFn) {
+                    if (isPromptMode) resolveFn(null);
+                    else resolveFn(false);
+                    resolveFn = null;
+                }
+                isPromptMode = false;
             }
-            isPromptMode = false;
-        };
-        cancel.onclick = hide;
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
 
-        let userName = 'OmaPosh';
-        function updateUserName() {
-            if (typeof auth !== 'undefined' && auth.currentUser) {
-                if (auth.currentUser.email) userName = auth.currentUser.email.split('@')[0];
-                if (typeof db !== 'undefined' && auth.currentUser.uid) {
-                    import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(({ getDoc, doc }) => {
-                        getDoc(doc(db, "users", auth.currentUser.uid)).then(docSnap => {
-                            if (docSnap.exists() && docSnap.data().fullName) userName = docSnap.data().fullName;
+            ok.onclick = () => {
+                overlay.style.visibility = 'hidden';
+                if (resolveFn) {
+                    if (isPromptMode) resolveFn(inputField.value);
+                    else resolveFn(true);
+                    resolveFn = null;
+                }
+                isPromptMode = false;
+            };
+            cancel.onclick = hide;
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
+
+            let userName = 'OmaPosh';
+            function updateUserName() {
+                if (typeof auth !== 'undefined' && auth.currentUser) {
+                    if (auth.currentUser.email) userName = auth.currentUser.email.split('@')[0];
+                    if (typeof db !== 'undefined' && auth.currentUser.uid) {
+                        import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(({ getDoc, doc }) => {
+                            getDoc(doc(db, "users", auth.currentUser.uid)).then(docSnap => {
+                                if (docSnap.exists() && docSnap.data().fullName) userName = docSnap.data().fullName;
+                            }).catch(() => {});
                         }).catch(() => {});
-                    }).catch(() => {});
+                    }
                 }
             }
-        }
-        updateUserName();
-        const interval = setInterval(() => {
-            if (typeof auth !== 'undefined' && auth.currentUser) {
-                updateUserName();
-                clearInterval(interval);
+            updateUserName();
+            const interval = setInterval(() => {
+                if (typeof auth !== 'undefined' && auth.currentUser) {
+                    updateUserName();
+                    clearInterval(interval);
+                }
+            }, 200);
+            if (typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
+                onAuthStateChanged(auth, () => updateUserName());
             }
-        }, 200);
-        if (typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
-            onAuthStateChanged(auth, () => updateUserName());
-        }
 
-        function showDialog(prefix, message, showInput, defaultValue) {
-            header.innerText = `${userName} ${prefix}`;
-            msg.innerText = String(message);
-            if (showInput) {
-                inputField.value = defaultValue;
-                inputGroup.style.display = 'block';
-            } else {
-                inputGroup.style.display = 'none';
+            function showDialog(prefix, message, showInput, defaultValue) {
+                if (header) header.innerText = `${userName} ${prefix}`;
+                if (msg) msg.innerText = String(message);
+                if (showInput && inputGroup && inputField) {
+                    inputField.value = defaultValue;
+                    inputGroup.style.display = 'block';
+                } else if (inputGroup) {
+                    inputGroup.style.display = 'none';
+                }
+                overlay.style.visibility = 'visible';
             }
-            overlay.style.visibility = 'visible';
-        }
 
-        window.alert = function(m) {
-            cancel.style.display = 'none';
-            ok.innerText = 'OK';
-            showDialog('says:', m, false);
-            return new Promise((resolve) => {
-                ok.onclick = () => { overlay.style.visibility = 'hidden'; resolve(); };
-                cancel.style.display = 'none';
-            });
-        };
-        window.confirm = function(m) {
-            cancel.style.display = 'inline-flex';
-            ok.innerText = 'OK';
-            showDialog('asks:', m, false);
-            return new Promise((resolve) => {
-                const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
-                const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
-                ok.onclick = onOk;
-                cancel.onclick = onCancel;
-            });
-        };
-        window.prompt = function(m, d) {
-            cancel.style.display = 'inline-flex';
-            ok.innerText = 'OK';
-            showDialog('requests:', m, true, d || '');
-            isPromptMode = true;
-            return new Promise((resolve) => {
-                const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField.value); };
-                const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(null); };
-                ok.onclick = onOk;
-                cancel.onclick = onCancel;
-            });
-        };
+            window.alert = function(m) {
+                if (cancel) cancel.style.display = 'none';
+                if (ok) ok.innerText = 'OK';
+                showDialog('says:', m, false);
+                return new Promise((resolve) => {
+                    const handler = () => { overlay.style.visibility = 'hidden'; resolve(); };
+                    if (ok) ok.onclick = handler;
+                    if (cancel) cancel.style.display = 'none';
+                });
+            };
+            window.confirm = function(m) {
+                if (cancel) cancel.style.display = 'inline-flex';
+                if (ok) ok.innerText = 'OK';
+                showDialog('asks:', m, false);
+                return new Promise((resolve) => {
+                    const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
+                    const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
+                    if (ok) ok.onclick = onOk;
+                    if (cancel) cancel.onclick = onCancel;
+                });
+            };
+            window.prompt = function(m, d) {
+                if (cancel) cancel.style.display = 'inline-flex';
+                if (ok) ok.innerText = 'OK';
+                showDialog('requests:', m, true, d || '');
+                isPromptMode = true;
+                return new Promise((resolve) => {
+                    const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField ? inputField.value : null); };
+                    const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(null); };
+                    if (ok) ok.onclick = onOk;
+                    if (cancel) cancel.onclick = onCancel;
+                });
+            };
+        }
     })();
     </script>
     <style>
@@ -331,22 +340,29 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // DOM elements
-    const authSection = document.getElementById('authSection');
-    const dashboardSection = document.getElementById('dashboardSection');
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-    const authMsg = document.getElementById('authMessage');
-    const userNameSpan = document.getElementById('userName');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const plansList = document.getElementById('plansList');
-    const groupsList = document.getElementById('groupsList');
-    const modal = document.getElementById('modal');
-    const paymentModal = document.getElementById('paymentModal');
-    const paymentAmountDisplay = document.getElementById('paymentAmountDisplay');
-    const transactionRefInput = document.getElementById('transactionRef');
-    const closePaymentModalBtn = document.getElementById('closePaymentModalBtn');
-    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    // Helper function to safely get element
+    function safeGetElement(id, logMissing = true) {
+        const el = document.getElementById(id);
+        if (!el && logMissing) console.warn(`Element with id "${id}" not found.`);
+        return el;
+    }
+
+    // DOM elements with null checks
+    const authSection = safeGetElement('authSection');
+    const dashboardSection = safeGetElement('dashboardSection');
+    const loginForm = safeGetElement('loginForm');
+    const registerForm = safeGetElement('registerForm');
+    const authMsg = safeGetElement('authMessage');
+    const userNameSpan = safeGetElement('userName');
+    const logoutBtn = safeGetElement('logoutBtn');
+    const plansList = safeGetElement('plansList');
+    const groupsList = safeGetElement('groupsList');
+    const modal = safeGetElement('modal');
+    const paymentModal = safeGetElement('paymentModal');
+    const paymentAmountDisplay = safeGetElement('paymentAmountDisplay');
+    const transactionRefInput = safeGetElement('transactionRef');
+    const closePaymentModalBtn = safeGetElement('closePaymentModalBtn');
+    const confirmPaymentBtn = safeGetElement('confirmPaymentBtn');
 
     let currentUser = null;
     let unsubscribeGroups = null;
@@ -376,50 +392,57 @@
 
     function showModal(title, bodyHtml, showConfirm = false, confirmText = "Confirm") {
         return new Promise((resolve) => {
-            document.getElementById('modalTitle').innerText = title;
-            document.getElementById('modalBody').innerHTML = bodyHtml;
-            const confirmBtn = document.getElementById('modalConfirmBtn');
-            if (showConfirm) {
-                confirmBtn.style.display = 'inline-flex';
-                confirmBtn.innerText = confirmText;
-            } else { confirmBtn.style.display = 'none'; }
-            modal.classList.remove('hidden');
+            const modalTitle = safeGetElement('modalTitle');
+            const modalBody = safeGetElement('modalBody');
+            const confirmBtn = safeGetElement('modalConfirmBtn');
+            if (modalTitle) modalTitle.innerText = title;
+            if (modalBody) modalBody.innerHTML = bodyHtml;
+            if (confirmBtn) {
+                if (showConfirm) {
+                    confirmBtn.style.display = 'inline-flex';
+                    confirmBtn.innerText = confirmText;
+                } else { confirmBtn.style.display = 'none'; }
+            }
+            if (modal) modal.classList.remove('hidden');
             modalResolve = resolve;
         });
     }
-    function closeModal() { modal.classList.add('hidden'); if(modalResolve) { modalResolve(false); modalResolve = null; } }
-    document.getElementById('modalConfirmBtn').onclick = () => { if(modalResolve) { modalResolve(true); modalResolve = null; } closeModal(); };
-    document.getElementById('closeModalBtn').onclick = closeModal;
-    modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+    function closeModal() { if (modal) modal.classList.add('hidden'); if(modalResolve) { modalResolve(false); modalResolve = null; } }
+    const modalConfirmBtn = safeGetElement('modalConfirmBtn');
+    const closeModalBtn = safeGetElement('closeModalBtn');
+    if (modalConfirmBtn) modalConfirmBtn.onclick = () => { if(modalResolve) { modalResolve(true); modalResolve = null; } closeModal(); };
+    if (closeModalBtn) closeModalBtn.onclick = closeModal;
+    if (modal) modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
     function showPaymentGateway(amount, purpose, onCreateRequest) {
         return new Promise((resolve) => {
-            paymentAmountDisplay.innerText = `₦${amount.toFixed(2)}`;
-            document.getElementById('paymentModalTitle').innerText = purpose;
-            transactionRefInput.value = '';
-            paymentModal.classList.remove('hidden');
+            if (paymentAmountDisplay) paymentAmountDisplay.innerText = `₦${amount.toFixed(2)}`;
+            const paymentModalTitle = safeGetElement('paymentModalTitle');
+            if (paymentModalTitle) paymentModalTitle.innerText = purpose;
+            if (transactionRefInput) transactionRefInput.value = '';
+            if (paymentModal) paymentModal.classList.remove('hidden');
             pendingPaymentCallback = async () => {
-                const ref = transactionRefInput.value.trim() || "N/A";
+                const ref = (transactionRefInput ? transactionRefInput.value.trim() : "") || "N/A";
                 await onCreateRequest(ref);
                 showToast(`Payment request of ₦${amount.toFixed(2)} recorded. Waiting for admin approval.`, false);
-                paymentModal.classList.add('hidden');
+                if (paymentModal) paymentModal.classList.add('hidden');
                 resolve(true);
             };
         });
     }
-    closePaymentModalBtn.onclick = () => {
-        paymentModal.classList.add('hidden');
+    if (closePaymentModalBtn) closePaymentModalBtn.onclick = () => {
+        if (paymentModal) paymentModal.classList.add('hidden');
         pendingPaymentCallback = null;
     };
-    confirmPaymentBtn.onclick = async () => {
+    if (confirmPaymentBtn) confirmPaymentBtn.onclick = async () => {
         if (pendingPaymentCallback) {
             await pendingPaymentCallback();
             pendingPaymentCallback = null;
         } else {
-            paymentModal.classList.add('hidden');
+            if (paymentModal) paymentModal.classList.add('hidden');
         }
     };
-    paymentModal.addEventListener('click', (e) => { if(e.target === paymentModal) paymentModal.classList.add('hidden'); });
+    if (paymentModal) paymentModal.addEventListener('click', (e) => { if(e.target === paymentModal) paymentModal.classList.add('hidden'); });
 
     function handleFirestoreError(err) { console.error(err); showToast(err.message, true); }
     
@@ -432,7 +455,7 @@
     }
 
     async function renderUserPlans() {
-        if (!currentUser) return;
+        if (!currentUser || !plansList) return;
         try {
             const q = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid));
             const snap = await getDocs(q);
@@ -467,7 +490,7 @@
     }
 
     async function initiateSavingsDeposit(planId) {
-        const amount = parseFloat(prompt("Enter deposit amount (₦):"));
+        const amount = parseFloat(await prompt("Enter deposit amount (₦):"));
         if (isNaN(amount) || amount <= 0) return showToast("Invalid amount", true);
         try {
             const planRef = doc(db, "savings_plans", planId);
@@ -496,12 +519,12 @@
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showToast("Not your plan", true);
             const plan = planSnap.data();
-            const amount = parseFloat(prompt(`Enter withdrawal request amount (₦): Maximum ₦${plan.balance.toFixed(2)}`));
+            const amount = parseFloat(await prompt(`Enter withdrawal request amount (₦): Maximum ₦${plan.balance.toFixed(2)}`));
             if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showToast("Invalid amount or exceeds balance.", true);
             if (plan.type === 'locked') {
                 const lockDate = new Date(plan.lockUntil);
-                if (new Date() < lockDate && !confirm(`Plan locked until ${lockDate.toLocaleDateString()}. Request withdrawal anyway?`)) return;
-            } else if (plan.type === 'target' && !confirm(`Target plan withdrawal requires admin approval. Continue?`)) return;
+                if (new Date() < lockDate && !(await confirm(`Plan locked until ${lockDate.toLocaleDateString()}. Request withdrawal anyway?`))) return;
+            } else if (plan.type === 'target' && !(await confirm(`Target plan withdrawal requires admin approval. Continue?`))) return;
             await addDoc(collection(db, "withdrawal_requests"), {
                 userId: currentUser.uid,
                 planId: planId,
@@ -569,24 +592,28 @@
         } catch(err) { handleFirestoreError(err); }
     }
 
-    document.getElementById('createFlexBtn')?.addEventListener('click', () => {
+    const createFlexBtn = safeGetElement('createFlexBtn');
+    const createLockedBtn = safeGetElement('createLockedBtn');
+    const createTargetBtn = safeGetElement('createTargetBtn');
+    if (createFlexBtn) createFlexBtn.addEventListener('click', () => {
         showModal("Create Flexible Plan", `<div class="form-group"><label>Initial deposit (₦) - payment via Moniepoint</label><input type="number" id="flexDeposit" value="0" step="100"></div>`, true, "Create Plan")
-        .then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('flexDeposit')?.value) || 0; if (amt < 0) amt = 0; await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "flex" }, amt); } closeModal(); });
+        .then(async ok => { if(ok && currentUser) { let amt = parseFloat(safeGetElement('flexDeposit')?.value) || 0; if (amt < 0) amt = 0; await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "flex" }, amt); } closeModal(); });
     });
-    document.getElementById('createLockedBtn')?.addEventListener('click', () => {
+    if (createLockedBtn) createLockedBtn.addEventListener('click', () => {
         showModal("Create Locked Plan", `<div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, true, "Create")
-        .then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('lockAmount')?.value) || 0; let until = document.getElementById('lockUntil')?.value; if(!until) { showToast("Lock until date required", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "locked", lockUntil: until }, amt); } closeModal(); });
+        .then(async ok => { if(ok && currentUser) { let amt = parseFloat(safeGetElement('lockAmount')?.value) || 0; let until = safeGetElement('lockUntil')?.value; if(!until) { showToast("Lock until date required", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "locked", lockUntil: until }, amt); } closeModal(); });
     });
-    document.getElementById('createTargetBtn')?.addEventListener('click', () => {
+    if (createTargetBtn) createTargetBtn.addEventListener('click', () => {
         showModal("Create Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="targetDeposit" value="0"></div>`, true, "Create")
-        .then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be >0", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
+        .then(async ok => { if(ok && currentUser) { let target = parseFloat(safeGetElement('targetAmount')?.value); let date = safeGetElement('targetDate')?.value; let deposit = parseFloat(safeGetElement('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be >0", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
     });
 
+    // Thrift Groups: contributions require payment gateway and admin approval via contribution_requests
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
         unsubscribeGroups = onSnapshot(q, async (snapshot) => {
-            if (!currentUser) return;
+            if (!currentUser || !groupsList) return;
             let html = '';
             let anyGroup = false;
             for (const docSnap of snapshot.docs) {
@@ -677,38 +704,45 @@
             showToast("Admin account created! Please login.", false);
         } catch(e) { showToast("Error: " + e.message, true); }
     }
-    document.getElementById('createAdminBtn').onclick = createAdminAccountManually;
-    document.getElementById('showLoginBtn').onclick = () => { loginForm.classList.remove('hidden'); registerForm.classList.add('hidden'); };
-    document.getElementById('showRegisterBtn').onclick = () => { registerForm.classList.remove('hidden'); loginForm.classList.add('hidden'); };
-    
-    // Modified login to store credential for biometric
-    const originalLoginHandler = document.getElementById('doLoginBtn').onclick;
-    document.getElementById('doLoginBtn').onclick = async () => {
-        const email = document.getElementById('loginEmail').value;
-        const pwd = document.getElementById('loginPassword').value;
-        try {
-            await signInWithEmailAndPassword(auth, email, pwd);
+    const createAdminBtn = safeGetElement('createAdminBtn');
+    if (createAdminBtn) createAdminBtn.onclick = createAdminAccountManually;
+    const showLoginBtn = safeGetElement('showLoginBtn');
+    const showRegisterBtn = safeGetElement('showRegisterBtn');
+    if (showLoginBtn) showLoginBtn.onclick = () => { if (loginForm) loginForm.classList.remove('hidden'); if (registerForm) registerForm.classList.add('hidden'); };
+    if (showRegisterBtn) showRegisterBtn.onclick = () => { if (registerForm) registerForm.classList.remove('hidden'); if (loginForm) loginForm.classList.add('hidden'); };
+    const doLoginBtn = safeGetElement('doLoginBtn');
+    if (doLoginBtn) doLoginBtn.onclick = async () => { 
+        try { 
+            const email = safeGetElement('loginEmail')?.value;
+            const pwd = safeGetElement('loginPassword')?.value;
+            if (!email || !pwd) return showToast("Please enter email and password", true);
+            await signInWithEmailAndPassword(auth, email, pwd); 
             showToast("Logged in", false);
-            // Store credential for biometric if checkbox is checked
-            const saveCheckbox = document.getElementById('saveBiometricCheckbox');
+            const saveCheckbox = safeGetElement('saveBiometricCheckbox');
             if (saveCheckbox && saveCheckbox.checked && window.PasswordCredential && navigator.credentials) {
                 const cred = new PasswordCredential({ id: email, password: pwd, name: email });
                 await navigator.credentials.store(cred);
             }
-        } catch(e) { showToast(e.message, true); }
+        } catch(e) { showToast(e.message, true); } 
     };
-    document.getElementById('doRegisterBtn').onclick = async () => {
+    const doRegisterBtn = safeGetElement('doRegisterBtn');
+    if (doRegisterBtn) doRegisterBtn.onclick = async () => {
         try {
-            const cred = await createUserWithEmailAndPassword(auth, document.getElementById('regEmail').value, document.getElementById('regPassword').value);
-            await setDoc(doc(db, "users", cred.user.uid), { fullName: document.getElementById('regFullName').value, email: cred.user.email, role: "user", createdAt: new Date().toISOString() });
+            const email = safeGetElement('regEmail')?.value;
+            const pwd = safeGetElement('regPassword')?.value;
+            const fullName = safeGetElement('regFullName')?.value;
+            if (!email || !pwd || !fullName) return showToast("All fields required", true);
+            const cred = await createUserWithEmailAndPassword(auth, email, pwd);
+            await setDoc(doc(db, "users", cred.user.uid), { fullName: fullName, email: cred.user.email, role: "user", createdAt: new Date().toISOString() });
             showToast("Registration successful! Please login.", false);
         } catch(e) { showToast(e.message, true); }
     };
-    logoutBtn.onclick = () => signOut(auth);
+    if (logoutBtn) logoutBtn.onclick = () => signOut(auth);
     
-    userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
-
-    // Floating Ledger Button (create on demand)
+    if (userNameSpan) userNameSpan.addEventListener('click', () => {
+        if (currentUser) window.location.href = 'profile.html';
+    });
+    
     function addLedgerButton() {
         if (document.getElementById('ledgerFloatingBtn')) return;
         const btn = document.createElement('button');
@@ -717,9 +751,8 @@
         btn.onclick = () => window.location.href = 'ledger.html';
         document.body.appendChild(btn);
     }
-
-    // Biometric login attempt on page load (handled by loading overlay)
-    // Blue loading overlay + biometric prompt
+    
+    // Loading overlay and biometric attempt
     const loadingOverlay = document.createElement('div');
     loadingOverlay.id = 'biometric-loading-overlay';
     loadingOverlay.style.cssText = `
@@ -737,7 +770,7 @@
         </div>
     `;
     document.body.appendChild(loadingOverlay);
-    const progressFill = document.getElementById('loading-progress-bar');
+    const progressFill = safeGetElement('loading-progress-bar', false);
     function setProgress(pct) { if (progressFill) progressFill.style.width = pct + '%'; }
 
     async function attemptBiometricLogin() {
@@ -747,13 +780,12 @@
             const cred = await navigator.credentials.get({ password: true, mediation: 'optional' });
             if (cred && cred.type === 'password' && cred.id && cred.password) {
                 setProgress(70);
-                const emailInput = document.getElementById('loginEmail');
-                const pwdInput = document.getElementById('loginPassword');
+                const emailInput = safeGetElement('loginEmail', false);
+                const pwdInput = safeGetElement('loginPassword', false);
                 if (emailInput && pwdInput) {
                     emailInput.value = cred.id;
                     pwdInput.value = cred.password;
                 }
-                // Auto login
                 await signInWithEmailAndPassword(auth, cred.id, cred.password);
                 return true;
             }
@@ -777,11 +809,11 @@
             }
             if (role === 'admin') { window.location.href = "admin.html"; return; }
             else {
-                authSection.classList.add('hidden');
-                dashboardSection.classList.remove('hidden');
+                if (authSection) authSection.classList.add('hidden');
+                if (dashboardSection) dashboardSection.classList.remove('hidden');
                 const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
-                userNameSpan.innerText = `${getGreeting()}, ${fullName}`;
-                logoutBtn.style.display = 'inline-flex';
+                if (userNameSpan) userNameSpan.innerText = `${getGreeting()}, ${fullName}`;
+                if (logoutBtn) logoutBtn.style.display = 'inline-flex';
                 await renderUserPlans();
                 listenUserGroups();
                 addLedgerButton();
@@ -795,20 +827,20 @@
                     loadingOverlay.style.opacity = '0';
                     setTimeout(() => loadingOverlay.remove(), 500);
                 }, 500);
-                authSection.classList.remove('hidden');
-                dashboardSection.classList.add('hidden');
+                if (authSection) authSection.classList.remove('hidden');
+                if (dashboardSection) dashboardSection.classList.add('hidden');
             } else {
                 setProgress(90);
-                // auth state will trigger again with user
             }
-            if (document.getElementById('ledgerFloatingBtn')) document.getElementById('ledgerFloatingBtn').remove();
-            logoutBtn.style.display = 'none';
-            userNameSpan.innerText = '';
+            const existingLedger = document.getElementById('ledgerFloatingBtn');
+            if (existingLedger) existingLedger.remove();
+            if (logoutBtn) logoutBtn.style.display = 'none';
+            if (userNameSpan) userNameSpan.innerText = '';
         }
     });
-
+    
     // Add "Save biometric" checkbox to login form
-    const loginFormContainer = document.getElementById('loginForm');
+    const loginFormContainer = safeGetElement('loginForm');
     if (loginFormContainer && !document.getElementById('saveBiometricCheckbox')) {
         const label = document.createElement('label');
         label.style.display = 'flex';
@@ -816,9 +848,14 @@
         label.style.gap = '8px';
         label.style.marginTop = '10px';
         label.innerHTML = `<input type="checkbox" id="saveBiometricCheckbox" checked> <span>🔐 Save this device for biometric login (fingerprint / face ID)</span>`;
-        const loginBtnElem = document.getElementById('doLoginBtn');
+        const loginBtnElem = safeGetElement('doLoginBtn');
         if (loginBtnElem) loginFormContainer.insertBefore(label, loginBtnElem);
         else loginFormContainer.appendChild(label);
+    }
+
+    // Display a console message about file:// usage warning
+    if (window.location.protocol === 'file:') {
+        console.warn('⚠️ You are opening this page directly from the file system (file://). For full functionality, please use a local web server (e.g., VS Code Live Server, "python -m http.server").');
     }
 </script>
 </body>
