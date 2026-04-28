@@ -2,8 +2,147 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh | Login or Register</title>
+    <!-- ========== CUSTOM DIALOG OVERRIDE (NO "THIS PAGE SAYS") ========== -->
+    <script>
+    (function() {
+        if (window.__customDialogsInstalled) return;
+        window.__customDialogsInstalled = true;
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        function init() {
+            const overlay = document.createElement('div');
+            overlay.id = 'custom-dialog-overlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+                z-index: 100000; visibility: hidden; backdrop-filter: blur(3px);
+            `;
+            const card = document.createElement('div');
+            card.style.cssText = `
+                background: white; border-radius: 28px; padding: 24px; max-width: 400px;
+                width: 90%; box-shadow: 0 20px 30px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif;
+            `;
+            card.innerHTML = `
+                <div id="custom-dialog-header" style="font-weight: 700; margin-bottom: 12px; color: #1e3c72; font-size: 1.1rem;"></div>
+                <div id="custom-dialog-message" style="font-size: 1rem; margin-bottom: 20px; color: #2d3748; line-height: 1.5;"></div>
+                <div id="custom-dialog-input-group" style="margin-bottom: 20px; display: none;">
+                    <input type="text" id="custom-dialog-input" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem;">
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button id="custom-dialog-cancel" style="padding: 8px 18px; background: #e9ecef; border: none; border-radius: 40px; cursor: pointer; font-weight: 600;">Cancel</button>
+                    <button id="custom-dialog-ok" style="padding: 8px 18px; background: #ffb347; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; color: #1e2a3e;">OK</button>
+                </div>
+            `;
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+
+            let resolveFn = null;
+            let isPromptMode = false;
+            const header = document.getElementById('custom-dialog-header');
+            const msg = document.getElementById('custom-dialog-message');
+            const inputGroup = document.getElementById('custom-dialog-input-group');
+            const inputField = document.getElementById('custom-dialog-input');
+            const ok = document.getElementById('custom-dialog-ok');
+            const cancel = document.getElementById('custom-dialog-cancel');
+
+            function hide() {
+                overlay.style.visibility = 'hidden';
+                if (resolveFn) {
+                    if (isPromptMode) resolveFn(null);
+                    else resolveFn(false);
+                    resolveFn = null;
+                }
+                isPromptMode = false;
+            }
+            ok.onclick = () => {
+                overlay.style.visibility = 'hidden';
+                if (resolveFn) {
+                    if (isPromptMode) resolveFn(inputField.value);
+                    else resolveFn(true);
+                    resolveFn = null;
+                }
+                isPromptMode = false;
+            };
+            cancel.onclick = hide;
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
+
+            let userName = 'OmaPosh';
+            function updateUserName() {
+                if (typeof auth !== 'undefined' && auth.currentUser) {
+                    if (auth.currentUser.email) userName = auth.currentUser.email.split('@')[0];
+                    if (typeof db !== 'undefined' && auth.currentUser.uid) {
+                        import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(({ getDoc, doc }) => {
+                            getDoc(doc(db, "users", auth.currentUser.uid)).then(docSnap => {
+                                if (docSnap.exists() && docSnap.data().fullName) userName = docSnap.data().fullName;
+                            }).catch(() => {});
+                        }).catch(() => {});
+                    }
+                }
+            }
+            updateUserName();
+            const interval = setInterval(() => {
+                if (typeof auth !== 'undefined' && auth.currentUser) {
+                    updateUserName();
+                    clearInterval(interval);
+                }
+            }, 200);
+            if (typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
+                onAuthStateChanged(auth, () => updateUserName());
+            }
+
+            function showDialog(prefix, message, showInput, defaultValue) {
+                if (header) header.innerText = `${userName} ${prefix}`;
+                if (msg) msg.innerText = String(message);
+                if (showInput && inputGroup && inputField) {
+                    inputField.value = defaultValue;
+                    inputGroup.style.display = 'block';
+                } else if (inputGroup) {
+                    inputGroup.style.display = 'none';
+                }
+                overlay.style.visibility = 'visible';
+            }
+
+            window.alert = function(m) {
+                if (cancel) cancel.style.display = 'none';
+                if (ok) ok.innerText = 'OK';
+                showDialog('says:', m, false);
+                return new Promise((resolve) => {
+                    const handler = () => { overlay.style.visibility = 'hidden'; resolve(); };
+                    if (ok) ok.onclick = handler;
+                    if (cancel) cancel.style.display = 'none';
+                });
+            };
+            window.confirm = function(m) {
+                if (cancel) cancel.style.display = 'inline-flex';
+                if (ok) ok.innerText = 'OK';
+                showDialog('asks:', m, false);
+                return new Promise((resolve) => {
+                    const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
+                    const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
+                    if (ok) ok.onclick = onOk;
+                    if (cancel) cancel.onclick = onCancel;
+                });
+            };
+            window.prompt = function(m, d) {
+                if (cancel) cancel.style.display = 'inline-flex';
+                if (ok) ok.innerText = 'OK';
+                showDialog('requests:', m, true, d || '');
+                isPromptMode = true;
+                return new Promise((resolve) => {
+                    const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField ? inputField.value : null); };
+                    const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(null); };
+                    if (ok) ok.onclick = onOk;
+                    if (cancel) cancel.onclick = onCancel;
+                });
+            };
+        }
+    })();
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -59,7 +198,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, addDoc, collection, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -86,6 +225,7 @@
         setTimeout(() => authMsg.classList.add('hidden'), 8000);
     }
 
+    // Send welcome message to a new user (reads from admin_config/messages)
     async function sendWelcomeMessage(userId) {
         try {
             const configRef = doc(db, "admin_config", "messages");
@@ -105,12 +245,13 @@
                 createdAt: new Date(),
                 type: "welcome"
             });
-            console.log("Welcome message sent");
+            console.log("✅ Welcome message sent to user", userId);
         } catch (err) {
-            console.warn("Welcome message not sent:", err);
+            console.warn("⚠️ Welcome message could not be sent:", err);
         }
     }
 
+    // Toggle between login and register forms
     document.getElementById('showRegisterBtn').onclick = () => {
         loginForm.classList.add('hidden');
         registerForm.classList.remove('hidden');
@@ -119,19 +260,29 @@
         registerForm.classList.add('hidden');
         loginForm.classList.remove('hidden');
     };
+
+    // LOGIN handler
     document.getElementById('doLoginBtn').onclick = async () => {
-        const email = document.getElementById('loginEmail').value;
+        const email = document.getElementById('loginEmail').value.trim();
         const pwd = document.getElementById('loginPassword').value;
+        if (!email || !pwd) {
+            showMessage("Please enter both email and password.");
+            return;
+        }
         try {
             await signInWithEmailAndPassword(auth, email, pwd);
             window.location.href = 'index.html';
-        } catch(e) { showMessage(e.message); }
+        } catch(e) {
+            showMessage(e.message);
+        }
     };
 
+    // REGISTER handler – creates Auth user and then Firestore document
     document.getElementById('doRegisterBtn').onclick = async () => {
         const email = document.getElementById('regEmail').value.trim();
         const pwd = document.getElementById('regPassword').value;
         const fullName = document.getElementById('regFullName').value.trim();
+
         if (!email || !pwd || !fullName) {
             showMessage("All fields are required.");
             return;
@@ -140,20 +291,20 @@
             showMessage("Password must be at least 6 characters.");
             return;
         }
-        
+
         const registerBtn = document.getElementById('doRegisterBtn');
         const originalText = registerBtn.innerText;
         registerBtn.innerText = "Creating account...";
         registerBtn.disabled = true;
-        
+
         try {
-            // Create user in Firebase Authentication
-            console.log("Creating Auth user...");
+            // Step 1: Create user in Firebase Authentication
+            console.log("🔐 Creating Auth user...");
             const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
             const uid = userCred.user.uid;
-            console.log("Auth user created with UID:", uid);
-            
-            // Write user document to Firestore
+            console.log("✅ Auth user created. UID:", uid);
+
+            // Step 2: Create user document in Firestore
             const userData = {
                 fullName: fullName,
                 email: email,
@@ -162,21 +313,21 @@
                 disabled: false,
                 permissions: {}
             };
-            console.log("Writing to Firestore:", userData);
+            console.log("📝 Writing to Firestore:", userData);
             await setDoc(doc(db, "users", uid), userData);
-            console.log("Firestore write completed.");
-            
-            // Send welcome message (optional)
+            console.log("✅ Firestore document created for UID:", uid);
+
+            // Step 3: Send welcome message (non‑critical)
             await sendWelcomeMessage(uid);
-            
+
             showMessage("Registration successful! Redirecting...", false);
             setTimeout(() => window.location.href = 'index.html', 1500);
-            
+
         } catch (error) {
-            console.error("Registration error:", error);
+            console.error("❌ Registration error:", error);
             let errorMsg = error.message;
             if (error.code === 'permission-denied') {
-                errorMsg = "Permission denied. Firestore security rules must allow users to write to 'users/{userId}'.";
+                errorMsg = "Permission denied. Firestore security rules must allow writing to 'users/{userId}' for authenticated users.";
             } else if (error.code === 'auth/email-already-in-use') {
                 errorMsg = "Email already registered. Please login instead.";
                 registerForm.classList.add('hidden');
@@ -188,6 +339,7 @@
         }
     };
 
+    // If already logged in, go directly to dashboard
     onAuthStateChanged(auth, (user) => {
         if (user) window.location.href = 'index.html';
     });
