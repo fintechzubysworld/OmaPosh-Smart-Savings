@@ -712,5 +712,124 @@
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
 </script>
+<script type="module">
+// ============================================================
+//  Notification Buttons (redirect to notifications.html)
+//  Corrected: imports Firebase directly – no global auth/db needed.
+// ============================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+    authDomain: "omaposh-smart-savings.firebaseapp.com",
+    projectId: "omaposh-smart-savings",
+    storageBucket: "omaposh-smart-savings.firebasestorage.app",
+    messagingSenderId: "469614412839",
+    appId: "1:469614412839:web:d51a47b468daad6184fa02"
+};
+
+// Initialize Firebase (will reuse existing instance if already initialised)
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
+}
+
+async function initNotificationButtons(user) {
+    if (!user) return;
+
+    const userId = user.uid;
+    const messagesRef = collection(db, "messages");
+    const q = query(messagesRef, where("userId", "==", userId));
+
+    // --- Floating inbox button (envelope) above "My Ledger" ---
+    let floatingBtn = document.getElementById('floatingInboxBtn');
+    if (!floatingBtn) {
+        floatingBtn = document.createElement('button');
+        floatingBtn.id = 'floatingInboxBtn';
+        floatingBtn.innerHTML = '✉️';
+        floatingBtn.style.cssText = `
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            z-index: 1000;
+            background: #ffb347;
+            color: #1e2a3e;
+            border: none;
+            border-radius: 50px;
+            width: 48px;
+            height: 48px;
+            font-size: 1.4rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        floatingBtn.onclick = () => window.location.href = 'notifications.html';
+        document.body.appendChild(floatingBtn);
+    }
+
+    // --- Bell icon in header (visible only when unread messages exist) ---
+    let bellContainer = document.getElementById('notificationBell');
+    if (!bellContainer) {
+        const userInfo = document.querySelector('.user-info');
+        if (userInfo && !document.getElementById('notificationBell')) {
+            bellContainer = document.createElement('div');
+            bellContainer.id = 'notificationBell';
+            bellContainer.style.cssText = `
+                position: relative;
+                cursor: pointer;
+                font-size: 1.4rem;
+                margin-right: 8px;
+                display: flex;
+                align-items: center;
+            `;
+            bellContainer.innerHTML = '🔔 <span id="unreadBadge" style="position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;"></span>';
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) userInfo.insertBefore(bellContainer, logoutBtn);
+            else userInfo.appendChild(bellContainer);
+            bellContainer.onclick = () => window.location.href = 'notifications.html';
+        }
+    }
+
+    const unreadBadge = document.getElementById('unreadBadge');
+    // Real-time listener for unread count
+    onSnapshot(q, (snapshot) => {
+        let unread = 0;
+        snapshot.forEach(doc => {
+            if (!doc.data().read) unread++;
+        });
+        if (unreadBadge) {
+            if (unread > 0) {
+                unreadBadge.innerText = unread;
+                unreadBadge.style.display = 'inline-flex';
+                if (bellContainer) bellContainer.style.display = 'flex';
+            } else {
+                unreadBadge.style.display = 'none';
+                if (bellContainer) bellContainer.style.display = 'none';
+            }
+        }
+    });
+}
+
+// Wait for auth state and DOM to be ready
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        // Ensure DOM elements exist before adding buttons
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => initNotificationButtons(user));
+        } else {
+            initNotificationButtons(user);
+        }
+    }
+});
+</script>
 </body>
 </html>
