@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh | Login or Register</title>
-    <!-- ========== CUSTOM DIALOG OVERRIDE (NO "THIS PAGE SAYS") ========== -->
+    <!-- ========== CUSTOM DIALOG OVERRIDE ========== -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
@@ -221,7 +221,7 @@
         setTimeout(() => authMsg.classList.add('hidden'), 5000);
     }
 
-    // Helper: send welcome message to a new user
+    // Helper: send welcome message to a new user (reads from admin_config)
     async function sendWelcomeMessage(userId) {
         const configRef = doc(db, "admin_config", "messages");
         const configSnap = await getDoc(configRef);
@@ -262,14 +262,36 @@
         const email = document.getElementById('regEmail').value;
         const pwd = document.getElementById('regPassword').value;
         const fullName = document.getElementById('regFullName').value;
+        if (!email || !pwd || !fullName) {
+            showMessage("All fields are required.");
+            return;
+        }
         try {
-            const cred = await createUserWithEmailAndPassword(auth, email, pwd);
-            await setDoc(doc(db, "users", cred.user.uid), { fullName, email, role: "user", createdAt: new Date().toISOString() });
-            // Send the welcome message (admin-defined)
-            await sendWelcomeMessage(cred.user.uid);
+            // 1. Create user in Firebase Authentication
+            const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
+            const uid = userCred.user.uid;
+
+            // 2. Create user document in Firestore (critical step)
+            await setDoc(doc(db, "users", uid), {
+                fullName: fullName,
+                email: email,
+                role: "user",
+                createdAt: new Date().toISOString(),
+                disabled: false,
+                permissions: {}
+            });
+
+            // 3. Send welcome message (optional but good to have)
+            await sendWelcomeMessage(uid);
+
             showMessage("Registration successful! Redirecting...", false);
             setTimeout(() => window.location.href = 'index.html', 1500);
-        } catch(e) { showMessage(e.message); }
+        } catch(e) {
+            console.error("Registration error:", e);
+            showMessage(e.message);
+            // If Firestore write failed but auth user was created, you may want to delete the auth user?
+            // (Optional cleanup not implemented for simplicity)
+        }
     };
 
     // If already logged in, redirect to dashboard
