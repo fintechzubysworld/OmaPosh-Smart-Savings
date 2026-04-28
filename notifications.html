@@ -1,1 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>OmaPosh | Notifications & Messages</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; border-radius: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .logo h1 { font-size: 1.5rem; }
+        .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #ffb347; color: #1e2a3e; }
+        .btn-outline { background: transparent; border: 1px solid white; color: white; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+        .main-content { padding: 30px; }
+        .message-item { border-bottom: 1px solid #eee; padding: 16px; transition: background 0.2s; }
+        .message-unread { background: #fef3c7; }
+        .message-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+        .message-subject { font-weight: 700; color: #1e3c72; font-size: 1.1rem; }
+        .message-date { font-size: 0.75rem; color: #666; }
+        .message-body { margin: 10px 0; line-height: 1.5; }
+        .message-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .empty-state { text-align: center; padding: 50px; color: #666; }
+        footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
+        @media (max-width: 768px) {
+            .message-header { flex-direction: column; align-items: flex-start; }
+            .message-actions { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="logo"><h1>📬 Notifications & Messages</h1><p>Your personal inbox</p></div>
+        <button class="btn btn-outline" id="backToDashboardBtn">← Back to Dashboard</button>
+    </header>
+    <div class="main-content">
+        <div id="messagesContainer">
+            <div class="empty-state">Loading messages...</div>
+        </div>
+    </div>
+    <footer>© 2026 OmaPosh Smart Savings</footer>
+</div>
 
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, query, where, orderBy, onSnapshot, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const messagesContainer = document.getElementById('messagesContainer');
+    let currentUserId = null;
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
+    }
+
+    function renderMessages(messages) {
+        if (!messages.length) {
+            messagesContainer.innerHTML = '<div class="empty-state">📭 No messages yet.</div>';
+            return;
+        }
+        messagesContainer.innerHTML = messages.map(msg => `
+            <div class="message-item ${!msg.read ? 'message-unread' : ''}" data-id="${msg.id}">
+                <div class="message-header">
+                    <span class="message-subject">${escapeHtml(msg.subject || 'Message')}</span>
+                    <span class="message-date">${new Date(msg.createdAt?.toDate?.() || msg.createdAt).toLocaleString()}</span>
+                </div>
+                <div class="message-body">${escapeHtml(msg.message)}</div>
+                <div class="message-actions">
+                    ${!msg.read ? `<button class="btn btn-sm btn-primary mark-read-btn" data-id="${msg.id}">✓ Mark as read</button>` : ''}
+                    <button class="btn btn-sm btn-outline delete-btn" data-id="${msg.id}" style="background:#e9ecef; color:#333;">🗑 Delete</button>
+                </div>
+            </div>
+        `).join('');
+
+        // Attach event handlers
+        document.querySelectorAll('.mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const msgId = btn.dataset.id;
+                await updateDoc(doc(db, "messages", msgId), { read: true });
+            });
+        });
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Delete this message permanently?')) {
+                    await deleteDoc(doc(db, "messages", btn.dataset.id));
+                }
+            });
+        });
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+        currentUserId = user.uid;
+        const messagesRef = collection(db, "messages");
+        const q = query(messagesRef, where("userId", "==", currentUserId), orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const messages = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                messages.push({
+                    id: doc.id,
+                    subject: data.subject,
+                    message: data.message,
+                    createdAt: data.createdAt,
+                    read: data.read || false
+                });
+            });
+            renderMessages(messages);
+        });
+    });
+
+    document.getElementById('backToDashboardBtn').onclick = () => {
+        window.location.href = 'index.html';
+    };
+</script>
+</body>
+</html>
