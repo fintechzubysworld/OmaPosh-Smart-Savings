@@ -38,12 +38,12 @@
         th { background: #f5f5f5; }
         .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 20px; }
         .hidden { display: none !important; }
-        #modal, #reviewModal, #statementModal {
+        #modal, #reviewModal {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000;
             backdrop-filter: blur(2px); padding: 16px;
         }
-        #modal > div, #reviewModal > div, #statementModal > div {
+        #modal > div, #reviewModal > div {
             background: white; max-width: 700px; width: 100%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 30px rgba(0,0,0,0.2);
         }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
@@ -57,7 +57,8 @@
         .statement-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         .statement-table th, .statement-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         .statement-table th { background: #f2f2f2; }
-        
+        .message-preview { background: #f8f9fa; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+        .message-preview p { margin: 5px 0; }
         @media (max-width: 768px) {
             body { padding: 12px; }
             .main-content { padding: 20px 16px; }
@@ -74,158 +75,6 @@
             .member-item button { width: 100%; margin-top: 8px; }
         }
     </style>
-    <script>
-(function() {
-  // Create modal elements once
-  const overlay = document.createElement('div');
-  overlay.id = 'custom-dialog-overlay';
-  overlay.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
-    z-index: 100000; visibility: hidden; backdrop-filter: blur(3px);
-  `;
-  const card = document.createElement('div');
-  card.style.cssText = `
-    background: white; border-radius: 28px; padding: 24px; max-width: 400px;
-    width: 90%; box-shadow: 0 20px 30px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif;
-  `;
-  card.innerHTML = `
-    <div id="custom-dialog-header" style="font-weight: 700; margin-bottom: 12px; color: #1e3c72; font-size: 1.1rem;"></div>
-    <div id="custom-dialog-message" style="font-size: 1rem; margin-bottom: 20px; color: #2d3748; line-height: 1.5;"></div>
-    <div id="custom-dialog-input-group" style="margin-bottom: 20px; display: none;">
-      <input type="text" id="custom-dialog-input" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem;">
-    </div>
-    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-      <button id="custom-dialog-cancel" style="padding: 8px 18px; background: #e9ecef; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s;">Cancel</button>
-      <button id="custom-dialog-ok" style="padding: 8px 18px; background: #ffb347; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; color: #1e2a3e; transition: 0.2s;">OK</button>
-    </div>
-  `;
-  overlay.appendChild(card);
-  document.body.appendChild(overlay);
-
-  let resolveFn = null;
-  let isPromptMode = false;
-
-  const headerEl = document.getElementById('custom-dialog-header');
-  const msgEl = document.getElementById('custom-dialog-message');
-  const inputGroup = document.getElementById('custom-dialog-input-group');
-  const inputField = document.getElementById('custom-dialog-input');
-  const okBtn = document.getElementById('custom-dialog-ok');
-  const cancelBtn = document.getElementById('custom-dialog-cancel');
-
-  function hide() {
-    overlay.style.visibility = 'hidden';
-    if (resolveFn) {
-      if (isPromptMode) resolveFn(null);
-      else resolveFn(false);
-      resolveFn = null;
-    }
-    isPromptMode = false;
-  }
-
-  okBtn.onclick = () => {
-    overlay.style.visibility = 'hidden';
-    if (resolveFn) {
-      if (isPromptMode) resolveFn(inputField.value);
-      else resolveFn(true);
-      resolveFn = null;
-    }
-    isPromptMode = false;
-  };
-
-  cancelBtn.onclick = hide;
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
-
-  // Helper to get logged‑in user name (synchronous – returns cached or placeholder)
-  let cachedUserName = null;
-  let userNamePromise = null;
-  function getUserName() {
-    if (cachedUserName) return cachedUserName;
-    // Try to get from Firebase synchronously if available
-    if (typeof auth !== 'undefined' && auth.currentUser && auth.currentUser.email) {
-      const email = auth.currentUser.email;
-      cachedUserName = email.split('@')[0];
-      return cachedUserName;
-    }
-    return 'OmaPosh';
-  }
-
-  // Function to show the modal
-  function showDialog(headerPrefix, message, showInput, defaultValue) {
-    const name = getUserName();
-    headerEl.innerText = `${name} ${headerPrefix}`;
-    msgEl.innerText = String(message);
-    if (showInput) {
-      inputField.value = defaultValue;
-      inputGroup.style.display = 'block';
-    } else {
-      inputGroup.style.display = 'none';
-    }
-    overlay.style.visibility = 'visible';
-  }
-
-  // Override alert
-  window.alert = function(message) {
-    cancelBtn.style.display = 'none';
-    okBtn.innerText = 'OK';
-    showDialog('says:', message, false);
-    return new Promise((resolve) => {
-      okBtn.onclick = () => {
-        overlay.style.visibility = 'hidden';
-        resolve();
-      };
-      // ensure cancel is hidden
-      cancelBtn.style.display = 'none';
-    });
-  };
-
-  // Override confirm
-  window.confirm = function(message) {
-    cancelBtn.style.display = 'inline-flex';
-    okBtn.innerText = 'OK';
-    showDialog('asks:', message, false);
-    return new Promise((resolve) => {
-      const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
-      const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
-      okBtn.onclick = onOk;
-      cancelBtn.onclick = onCancel;
-    });
-  };
-
-  // Override prompt
-  window.prompt = function(message, defaultValue = '') {
-    cancelBtn.style.display = 'inline-flex';
-    okBtn.innerText = 'OK';
-    showDialog('requests:', message, true, defaultValue);
-    isPromptMode = true;
-    return new Promise((resolve) => {
-      const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField.value); };
-      const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(null); };
-      okBtn.onclick = onOk;
-      cancelBtn.onclick = onCancel;
-    });
-  };
-
-  // Refresh user name when auth state changes (if Firebase is loaded)
-  if (typeof window !== 'undefined' && typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
-    onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        cachedUserName = user.email.split('@')[0];
-        // Optionally fetch full name from Firestore
-        if (typeof db !== 'undefined') {
-          getDoc(doc(db, "users", user.uid)).then(docSnap => {
-            if (docSnap.exists() && docSnap.data().fullName) {
-              cachedUserName = docSnap.data().fullName;
-            }
-          }).catch(() => {});
-        }
-      } else {
-        cachedUserName = 'OmaPosh';
-      }
-    });
-  }
-})();
-</script>
 </head>
 <body>
 <div class="container">
@@ -241,6 +90,17 @@
             <!-- System Accounts -->
             <div class="section"><div class="section-title">🏦 System Accounts</div><div id="systemAccountsView"></div><div class="flex-btns"><button class="btn btn-primary" id="configureEsusuModelBtn">⚙️ Configure Esusu Fraction</button></div></div>
 
+            <!-- Message Center -->
+            <div class="section">
+                <div class="section-title">📨 Message Center</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="configureWelcomeMsgBtn">✏️ Set Welcome Message (for new users)</button>
+                    <button class="btn btn-primary" id="sendBulkMsgBtn">📢 Send Message to All Users</button>
+                    <button class="btn btn-primary" id="sendSingleMsgBtn">👤 Send Message to Specific User</button>
+                </div>
+                <div id="currentWelcomeMsg" class="message-preview" style="margin-top:15px;"></div>
+            </div>
+
             <!-- Pending Deposit Requests -->
             <div class="section"><div class="section-title">💰 Pending Deposit Requests</div><div id="pendingDepositsTable"></div></div>
 
@@ -253,9 +113,9 @@
             <!-- Pending Thrift Payout Requests -->
             <div class="section"><div class="section-title">💎 Pending Thrift Payout Requests</div><div id="pendingPayoutsTable"></div></div>
 
-            <!-- User Management (with Member Statement button) -->
+            <!-- User Management & Privileges -->
             <div class="section">
-                <div class="section-title">👥 User Management</div>
+                <div class="section-title">👥 User Management & Privileges</div>
                 <div class="flex-btns">
                     <button class="btn btn-primary" id="createUserBtn">➕ Create User</button>
                     <button class="btn btn-danger" id="closeUserBtn">🔒 Close Account</button>
@@ -275,25 +135,20 @@
             <!-- Direct Withdrawals -->
             <div class="section"><div class="section-title">💸 Direct Withdrawal (Flexible Plans)</div><button class="btn btn-primary" id="directWithdrawBtn">Withdraw from User's Flexible Plan</button></div>
 
-            <!-- Statements & Audit -->
-            <div class="section"><div class="section-title">📜 Statements & Audit Trail</div><div class="flex-btns"><button class="btn btn-outline" id="viewStatementBtn">View User Statement</button><button class="btn btn-outline" id="viewAuditTrailBtn">View Audit Trail</button></div></div>
+            <!-- Statements & Audit Trail -->
+            <div class="section">
+                <div class="section-title">📜 Statements & Audit Trail</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="viewStatementBtn">👤 View User Statement</button>
+                    <button class="btn btn-primary" id="viewAuditTrailBtn">📋 View Audit Trail</button>
+                </div>
+            </div>
 
-            <!-- Staff Management (with extra redirect buttons) -->
+            <!-- Staff Management -->
             <div class="section">
                 <div class="section-title">👥 Staff Management</div>
-                <div class="flex-btns">
-                    <button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button>
-                    <button class="btn btn-primary" id="userManagementRedirectBtn">👥 User Management & Privileges</button>
-                    <button class="btn btn-primary" id="statementAuditRedirectBtn">📜 Statement & Audit Trail</button>
-                </div>
-                <div style="overflow-x:auto; margin-top:20px;">
-                    <table id="staffTable">
-                        <thead>
-                            <tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+                <button class="btn btn-primary" id="createStaffBtn">+ Create Staff (Collector/Supervisor)</button>
+                <div style="overflow-x:auto; margin-top:20px;"><table id="staffTable"><thead>运转<th>Name</th><th>Email</th><th>Role</th><th>Actions</th> </thead><tbody></tbody></table></div>
             </div>
 
             <!-- All Users, Plans, Groups -->
@@ -308,7 +163,7 @@
 <!-- Generic Modal -->
 <div id="modal" class="hidden"><div><h3 id="modalTitle"></h3><div id="modalBody"></div><div class="flex-btns"><button class="btn btn-outline" id="closeModalBtn">Close</button></div></div></div>
 
-<!-- Transaction Review Modal (for approval confirmation) -->
+<!-- Review Modal (for approval confirmation) -->
 <div id="reviewModal" class="hidden">
     <div>
         <h3 id="reviewModalTitle">Confirm Approval</h3>
@@ -317,15 +172,6 @@
             <button class="btn btn-outline" id="cancelReviewBtn">Cancel</button>
             <button class="btn btn-success" id="confirmReviewBtn">✅ Confirm Approval</button>
         </div>
-    </div>
-</div>
-
-<!-- Member Statement Modal -->
-<div id="statementModal" class="hidden">
-    <div>
-        <h3 id="statementModalTitle">Member Statement</h3>
-        <div id="statementContent" style="max-height: 65vh; overflow-y: auto;"></div>
-        <button class="btn btn-outline" id="closeStatementBtn">Close</button>
     </div>
 </div>
 
@@ -347,7 +193,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // DOM elements
     const dashboardContent = document.getElementById('dashboardContent');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const adminNameSpan = document.getElementById('adminName');
@@ -361,10 +206,6 @@
     const reviewModalContent = document.getElementById('reviewModalContent');
     const cancelReviewBtn = document.getElementById('cancelReviewBtn');
     const confirmReviewBtn = document.getElementById('confirmReviewBtn');
-    const statementModalEl = document.getElementById('statementModal');
-    const statementModalTitle = document.getElementById('statementModalTitle');
-    const statementContent = document.getElementById('statementContent');
-    const closeStatementBtn = document.getElementById('closeStatementBtn');
 
     let currentAdmin = null;
     let esusuFraction = 0.01;
@@ -392,10 +233,7 @@
     reviewModal.addEventListener('click', (e) => { if(e.target === reviewModal) reviewModal.classList.add('hidden'); });
 
     function showMessage(msg, isError = true) { alert(msg); }
-    async function logAudit(action, targetUserId = null, details = {}) {
-        if (!currentAdmin) return;
-        await addDoc(collection(db, "audit_logs"), { adminId: currentAdmin.uid, adminEmail: currentAdmin.email, action, targetUserId, details, timestamp: new Date().toISOString() });
-    }
+    async function logAudit(action, targetUserId = null, details = {}) { if (!currentAdmin) return; await addDoc(collection(db, "audit_logs"), { adminId: currentAdmin.uid, adminEmail: currentAdmin.email, action, targetUserId, details, timestamp: new Date().toISOString() }); }
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
 
     // ======================= SYSTEM ACCOUNTS =======================
@@ -434,107 +272,115 @@
         document.getElementById('cancelFractionBtn').onclick = closeModal;
     }
 
-    // ======================= FETCH ALL TRANSACTIONS FOR STATEMENT =======================
-    async function fetchAllTransactionsForUser(userId) {
-        const transactions = [];
-        // Deposit requests
-        const depSnap = await getDocs(query(collection(db, "deposit_requests"), where("userId", "==", userId)));
-        depSnap.forEach(doc => {
-            const d = doc.data();
-            transactions.push({ type: "deposit", amount: d.amount, date: d.requestDate, status: d.status, particulars: `Deposit to plan ${d.planId}`, reference: doc.id });
-        });
-        // Withdrawal requests
-        const wdSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("userId", "==", userId)));
-        wdSnap.forEach(doc => {
-            const d = doc.data();
-            transactions.push({ type: "withdrawal", amount: d.amount, date: d.requestedAt, status: d.status, particulars: `Withdrawal from ${d.planType} plan`, reference: doc.id });
-        });
-        // Contribution requests & approved contributions
-        const contribReq = await getDocs(query(collection(db, "contribution_requests"), where("userId", "==", userId)));
-        contribReq.forEach(doc => {
-            const d = doc.data();
-            transactions.push({ type: "contribution", amount: d.amount, date: d.requestedAt, status: d.status, particulars: `Contribution to group ${d.groupName}`, reference: doc.id });
-        });
-        const contribApproved = await getDocs(query(collection(db, "contributions"), where("userId", "==", userId)));
-        contribApproved.forEach(doc => {
-            const d = doc.data();
-            transactions.push({ type: "contribution", amount: d.amount, date: d.date, status: "approved", particulars: `Approved contribution to group`, reference: doc.id });
-        });
-        // Payout transactions
-        const payouts = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId), where("type", "==", "payout")));
-        payouts.forEach(doc => {
-            const d = doc.data();
-            transactions.push({ type: "payout", amount: d.amount, date: d.date, status: "approved", particulars: d.description, reference: doc.id });
-        });
-        // Loan disbursements and recoveries
-        const loans = await getDocs(query(collection(db, "loans"), where("userId", "==", userId)));
-        loans.forEach(doc => {
-            const l = doc.data();
-            if (l.disbursedAt) transactions.push({ type: "loan_disbursement", amount: l.amount, date: l.disbursedAt, status: "approved", particulars: "Loan disbursement", reference: doc.id });
-            if (l.recoveredAt && l.recoveredAmount) transactions.push({ type: "loan_recovery", amount: l.recoveredAmount, date: l.recoveredAt, status: "approved", particulars: "Loan recovery", reference: doc.id });
-        });
-        // Manual deposits/withdrawals from admin
-        const adminTx = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId), where("type", "in", ["admin_deposit", "admin_withdrawal"])));
-        adminTx.forEach(doc => {
-            const d = doc.data();
-            transactions.push({ type: d.type, amount: d.amount, date: d.date, status: "approved", particulars: d.description, reference: doc.id });
-        });
-        transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-        return transactions;
-    }
-
-    async function showMemberStatement(userId, userName) {
-        const transactions = await fetchAllTransactionsForUser(userId);
-        if (transactions.length === 0) {
-            statementModalTitle.innerText = `Statement: ${userName}`;
-            statementContent.innerHTML = `<p>No transaction history found for ${escapeHtml(userName)}.</p>`;
-            statementModalEl.classList.remove('hidden');
-            return;
+    // ======================= MESSAGE CENTER =======================
+    async function loadWelcomeMessage() {
+        const configRef = doc(db, "admin_config", "messages");
+        const configSnap = await getDoc(configRef);
+        if (configSnap.exists()) {
+            const data = configSnap.data();
+            document.getElementById('currentWelcomeMsg').innerHTML = `
+                <p><strong>Current welcome message:</strong></p>
+                <p><strong>Subject:</strong> ${escapeHtml(data.welcomeSubject || 'Welcome to OmaPosh')}</p>
+                <p><strong>Message:</strong> ${escapeHtml(data.welcomeBody || 'Thank you for joining us!')}</p>
+                <p><em>This message will be sent to every new user upon registration.</em></p>
+            `;
+        } else {
+            document.getElementById('currentWelcomeMsg').innerHTML = '<p>No welcome message set. Use the button above to set one.</p>';
         }
-        let html = `<h4>Full Transaction Statement for ${escapeHtml(userName)}</h4>
-                    <table class="statement-table">
-                        <thead><tr><th>Date/Time</th><th>Type</th><th>Particulars</th><th>Amount (₦)</th><th>Status</th></tr></thead>
-                        <tbody>`;
-        let totalCredits = 0, totalDebits = 0;
-        transactions.forEach(t => {
-            const isCredit = (t.type === 'deposit' || t.type === 'contribution' || t.type === 'loan_disbursement' || t.type === 'payout' || t.type === 'admin_deposit');
-            if (isCredit) totalCredits += t.amount;
-            else totalDebits += t.amount;
-            const amountDisplay = `${isCredit ? '+' : '-'}₦${t.amount.toFixed(2)}`;
-            html += `<tr>
-                        <tr>${new Date(t.date).toLocaleString()}</td>
-                        <td>${t.type.replace(/_/g, ' ')}</td>
-                        <td>${escapeHtml(t.particulars)}</td>
-                        <td>${amountDisplay}</td>
-                        <td>${t.status}</td>
-                     </tr>`;
-        });
-        html += `</tbody></table>
-                <div style="margin-top:20px; padding:12px; background:#f0f0f0; border-radius:12px;">
-                    <strong>Summary:</strong><br>
-                    Total Credits: ₦${totalCredits.toFixed(2)}<br>
-                    Total Debits: ₦${totalDebits.toFixed(2)}<br>
-                    <strong>Net Balance: ₦${(totalCredits - totalDebits).toFixed(2)}</strong>
-                </div>`;
-        statementModalTitle.innerText = `Statement: ${userName}`;
-        statementContent.innerHTML = html;
-        statementModalEl.classList.remove('hidden');
     }
-    closeStatementBtn.onclick = () => statementModalEl.classList.add('hidden');
-    statementModalEl.addEventListener('click', (e) => { if(e.target === statementModalEl) statementModalEl.classList.add('hidden'); });
+    async function configureWelcomeMessage() {
+        const configRef = doc(db, "admin_config", "messages");
+        const configSnap = await getDoc(configRef);
+        const current = configSnap.exists() ? configSnap.data() : {};
+        const html = `
+            <div class="form-group"><label>Subject</label><input type="text" id="welcomeSubject" value="${escapeHtml(current.welcomeSubject || 'Welcome to OmaPosh')}"></div>
+            <div class="form-group"><label>Message Body</label><textarea id="welcomeBody" rows="4">${escapeHtml(current.welcomeBody || 'Thank you for joining OmaPosh Smart Savings! Start saving and joining thrift groups today.')}</textarea></div>
+            <div class="flex-btns"><button class="btn btn-primary" id="saveWelcomeBtn">Save</button><button class="btn btn-outline" id="cancelWelcomeBtn">Cancel</button></div>
+        `;
+        showModal("Set Welcome Message for New Users", html);
+        document.getElementById('saveWelcomeBtn').onclick = async () => {
+            const subject = document.getElementById('welcomeSubject').value.trim();
+            const body = document.getElementById('welcomeBody').value.trim();
+            if (!subject || !body) return showMessage("Both subject and body required.");
+            await setDoc(configRef, { welcomeSubject: subject, welcomeBody: body, updatedAt: new Date().toISOString() }, { merge: true });
+            showMessage("Welcome message saved successfully.", false);
+            closeModal();
+            loadWelcomeMessage();
+        };
+        document.getElementById('cancelWelcomeBtn').onclick = closeModal;
+    }
+    async function sendBulkMessage() {
+        const html = `
+            <div class="form-group"><label>Subject</label><input type="text" id="bulkSubject" placeholder="Message subject"></div>
+            <div class="form-group"><label>Message</label><textarea id="bulkMessage" rows="4" placeholder="Your message to all users..."></textarea></div>
+            <div class="flex-btns"><button class="btn btn-primary" id="sendBulkConfirmBtn">Send to All Users</button><button class="btn btn-outline" id="cancelBulkBtn">Cancel</button></div>
+        `;
+        showModal("Send Message to All Users", html);
+        document.getElementById('sendBulkConfirmBtn').onclick = async () => {
+            const subject = document.getElementById('bulkSubject').value.trim();
+            const message = document.getElementById('bulkMessage').value.trim();
+            if (!subject || !message) return showMessage("Please fill both fields.");
+            const usersSnap = await getDocs(collection(db, "users"));
+            let successCount = 0;
+            for (const userDoc of usersSnap.docs) {
+                const uid = userDoc.id;
+                await addDoc(collection(db, "messages"), {
+                    userId: uid,
+                    subject: subject,
+                    message: message,
+                    read: false,
+                    createdAt: new Date(),
+                    type: "admin_bulk"
+                });
+                successCount++;
+            }
+            showMessage(`Message sent to ${successCount} users.`, false);
+            closeModal();
+        };
+        document.getElementById('cancelBulkBtn').onclick = closeModal;
+    }
+    async function sendSingleMessage() {
+        const html = `
+            <div class="form-group"><label>User Email</label><input type="email" id="singleEmail" placeholder="user@example.com"></div>
+            <div class="form-group"><label>Subject</label><input type="text" id="singleSubject" placeholder="Message subject"></div>
+            <div class="form-group"><label>Message</label><textarea id="singleMessage" rows="4" placeholder="Your message..."></textarea></div>
+            <div class="flex-btns"><button class="btn btn-primary" id="sendSingleConfirmBtn">Send</button><button class="btn btn-outline" id="cancelSingleBtn">Cancel</button></div>
+        `;
+        showModal("Send Message to Specific User", html);
+        document.getElementById('sendSingleConfirmBtn').onclick = async () => {
+            const email = document.getElementById('singleEmail').value.trim();
+            const subject = document.getElementById('singleSubject').value.trim();
+            const message = document.getElementById('singleMessage').value.trim();
+            if (!email || !subject || !message) return showMessage("All fields required.");
+            const userSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+            if (userSnap.empty) return showMessage("User not found.");
+            const uid = userSnap.docs[0].id;
+            await addDoc(collection(db, "messages"), {
+                userId: uid,
+                subject: subject,
+                message: message,
+                read: false,
+                createdAt: new Date(),
+                type: "admin_single"
+            });
+            showMessage(`Message sent to ${email}.`, false);
+            closeModal();
+        };
+        document.getElementById('cancelSingleBtn').onclick = closeModal;
+    }
 
-    // ======================= PENDING REQUESTS WITH REVIEW CONFIRMATION =======================
+    // ======================= PENDING REQUESTS (with review modals) =======================
     async function loadPendingDeposits() {
         const q = query(collection(db, "deposit_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingDepositsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending deposit requests.</p>'; return; }
-            let html = '</td><thead><tr><th>User</th><th>Plan ID</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
+            let html = '<table><thead>运转<th>User</th><th>Plan ID</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan ID">${req.planId}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestDate).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-deposit" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-deposit" data-id="${docSnap.id}">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan ID">${req.planId}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestDate).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-deposit" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-deposit" data-id="${docSnap.id}">Reject</button></td>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
@@ -578,24 +424,25 @@
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('withdrawalRequestsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending withdrawal requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Plan Type</th><th>Amount</th><th>Request Date</th><th>Plan ID</th><th>Actions</th> </thead><tbody>';
+            let html = '</table><thead>运转<th>User</th><th>Plan Type</th><th>Amount</th><th>Request Date</th><th>Plan ID</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan Type">${req.planType}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Plan ID">${req.planId || 'MISSING'}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-withdrawal" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-withdrawal" data-id="${docSnap.id}">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Plan Type">${req.planType}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Plan ID">${req.planId || 'MISSING'}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-withdrawal" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-withdrawal" data-id="${docSnap.id}">Reject</button></td>`;
             }
-            html += '</tbody></table>';
+            html += '</tbody><tr>';
             container.innerHTML = html;
             document.querySelectorAll('.approve-withdrawal').forEach(btn => btn.onclick = () => {
                 const req = JSON.parse(btn.dataset.req);
+                const requestId = btn.dataset.id;
                 showReviewModal("Approve Withdrawal Request", `
                     <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
                     <p><strong>Plan Type:</strong> ${req.planType}</p>
                     <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
                     <p><strong>Request Date:</strong> ${new Date(req.requestedAt).toLocaleString()}</p>
                     <p>⚠️ This will deduct from the user's savings plan.</p>
-                `, () => approveWithdrawal(btn.dataset.id));
+                `, () => approveWithdrawal(requestId));
             });
             document.querySelectorAll('.reject-withdrawal').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.id));
         });
@@ -630,26 +477,27 @@
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingContributionsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending contribution requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
+            let html = '<table><thead>运转<th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const groupDoc = await getDoc(doc(db, "groups", req.groupId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
                 const groupName = groupDoc.exists() ? groupDoc.data().name : "Unknown";
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-contribution" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-contribution" data-id="${docSnap.id}">Reject</button></td></tr>`;
+                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-contribution" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-contribution" data-id="${docSnap.id}">Reject</button></td>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
             document.querySelectorAll('.approve-contribution').forEach(btn => btn.onclick = () => {
                 const req = JSON.parse(btn.dataset.req);
+                const requestId = btn.dataset.id;
                 showReviewModal("Approve Thrift Contribution", `
                     <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
                     <p><strong>Group:</strong> ${req.groupName || req.groupId}</p>
                     <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
                     <p><strong>Request Date:</strong> ${new Date(req.requestedAt).toLocaleString()}</p>
                     <p>⚠️ This will add the contribution to the group's cycle after deductions (Esusu/Profit).</p>
-                `, () => approveContribution(btn.dataset.id));
+                `, () => approveContribution(requestId));
             });
             document.querySelectorAll('.reject-contribution').forEach(btn => btn.onclick = () => rejectContribution(btn.dataset.id));
         });
@@ -694,26 +542,27 @@
         onSnapshot(q, async (snapshot) => {
             const container = document.getElementById('pendingPayoutsTable');
             if (snapshot.empty) { container.innerHTML = '<p>✅ No pending payout requests.</p>'; return; }
-            let html = '<table><thead><tr><th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Expected Index</th><th>Actions</th> </thead><tbody>';
+            let html = '<td><thead>运转<th>User</th><th>Group</th><th>Amount</th><th>Request Date</th><th>Expected Index</th><th>Actions</th> </thead><tbody>';
             for (const docSnap of snapshot.docs) {
                 const req = docSnap.data();
                 const userDoc = await getDoc(doc(db, "users", req.userId));
                 const groupDoc = await getDoc(doc(db, "groups", req.groupId));
                 const userName = userDoc.exists() ? userDoc.data().fullName : req.userId;
                 const groupName = groupDoc.exists() ? groupDoc.data().name : "Unknown";
-                html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Expected Index">${req.expectedPayoutIndex}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-payout" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-payout" data-id="${docSnap.id}">Reject</button></td></tr>`;
+                html += `</td><td data-label="User">${escapeHtml(userName)}</td><td data-label="Group">${escapeHtml(groupName)}</td><td data-label="Amount">₦${req.amount.toFixed(2)}</td><td data-label="Request Date">${new Date(req.requestedAt).toLocaleString()}</td><td data-label="Expected Index">${req.expectedPayoutIndex}</td><td data-label="Actions"><button class="btn btn-sm btn-success approve-payout" data-id="${docSnap.id}" data-req='${JSON.stringify(req)}'>Approve</button> <button class="btn btn-sm btn-danger reject-payout" data-id="${docSnap.id}">Reject</button></td>`;
             }
             html += '</tbody></table>';
             container.innerHTML = html;
             document.querySelectorAll('.approve-payout').forEach(btn => btn.onclick = () => {
                 const req = JSON.parse(btn.dataset.req);
+                const requestId = btn.dataset.id;
                 showReviewModal("Approve Thrift Payout", `
                     <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
                     <p><strong>Group:</strong> ${req.groupName || req.groupId}</p>
                     <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
                     <p><strong>Expected Payout Index:</strong> ${req.expectedPayoutIndex}</p>
                     <p>⚠️ This will credit the user's flexible plan with the full pot.</p>
-                `, () => approvePayout(btn.dataset.id));
+                `, () => approvePayout(requestId));
             });
             document.querySelectorAll('.reject-payout').forEach(btn => btn.onclick = () => rejectPayout(btn.dataset.id));
         });
@@ -758,37 +607,81 @@
         showMessage("Payout request rejected", false);
     }
 
-    // ======================= OTHER ADMIN FUNCTIONS =======================
+    // ======================= USER MANAGEMENT & PRIVILEGES =======================
+    async function loadUserManagement() {
+        const usersSnap = await getDocs(collection(db, "users"));
+        let html = '<table><thead>运转<th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Permissions</th><th>Actions</th> </thead><tbody>';
+        for (const docSnap of usersSnap.docs) {
+            const u = docSnap.data();
+            const status = u.disabled ? "Disabled" : "Active";
+            const perms = u.permissions || {};
+            const permList = Object.entries(perms).filter(([,v]) => v===true).map(([k]) => k).join(', ') || 'None';
+            html += `<tr><td data-label="Name">${escapeHtml(u.fullName || 'N/A')}</td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Status">${status}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Permissions">${permList}</td><td data-label="Actions"><button class="btn btn-sm btn-primary edit-privileges" data-uid="${docSnap.id}" data-email="${escapeHtml(u.email)}" data-role="${u.role || 'user'}" data-perms='${JSON.stringify(perms)}'>Edit Privileges</button> <button class="btn btn-sm btn-outline view-statement" data-uid="${docSnap.id}" data-name="${escapeHtml(u.fullName || u.email)}">Statement</button></td>`;
+        }
+        html += '</tbody></table>';
+        document.getElementById('userManagementTable').innerHTML = html;
+        document.querySelectorAll('.edit-privileges').forEach(btn => btn.onclick = () => {
+            const uid = btn.dataset.uid;
+            const email = btn.dataset.email;
+            const role = btn.dataset.role;
+            const perms = JSON.parse(btn.dataset.perms);
+            showPrivilegeModal(uid, email, role, perms);
+        });
+        document.querySelectorAll('.view-statement').forEach(btn => btn.onclick = () => showStatement(btn.dataset.uid, btn.dataset.name));
+    }
+
+    function showPrivilegeModal(userId, email, currentRole, currentPerms) {
+        const availablePerms = ["can_approve_deposits", "can_approve_withdrawals", "can_approve_contributions", "can_manage_groups", "can_view_reports", "can_manage_users", "can_issue_payouts"];
+        const permHtml = availablePerms.map(perm => `
+            <label style="display: flex; align-items: center; gap: 8px; margin-right: 16px;">
+                <input type="checkbox" value="${perm}" ${currentPerms[perm] ? 'checked' : ''}> ${perm.replace(/_/g, ' ')}
+            </label>
+        `).join('');
+        const roleOptions = ['admin', 'staff', 'viewer', 'user'];
+        const roleSelect = `<select id="privRoleSelect">${roleOptions.map(r => `<option value="${r}" ${currentRole === r ? 'selected' : ''}>${r.toUpperCase()}</option>`).join('')}</select>`;
+        const modalHtml = `
+            <div class="form-group"><label>Role</label> ${roleSelect}</div>
+            <div class="form-group"><label>Granular Permissions</label><div style="display: flex; flex-wrap: wrap; gap: 12px;">${permHtml}</div></div>
+            <div class="flex-btns"><button class="btn btn-primary" id="savePrivilegesBtn">Save Changes</button><button class="btn btn-outline" id="cancelPrivilegesBtn">Cancel</button></div>
+        `;
+        showModal(`Edit Privileges: ${email}`, modalHtml);
+        document.getElementById('savePrivilegesBtn').onclick = async () => {
+            const newRole = document.getElementById('privRoleSelect').value;
+            const selectedPerms = {};
+            document.querySelectorAll('#modalBody input[type="checkbox"]').forEach(cb => { selectedPerms[cb.value] = cb.checked; });
+            try {
+                await updateDoc(doc(db, "users", userId), { role: newRole, permissions: selectedPerms, updatedAt: new Date().toISOString() });
+                await logAudit("edit_user_privileges", userId, { newRole, permissions: selectedPerms });
+                showMessage("Privileges updated.", false);
+                closeModal();
+                loadUserManagement();
+            } catch(err) { showMessage(err.message); }
+        };
+        document.getElementById('cancelPrivilegesBtn').onclick = closeModal;
+    }
+
+    // ======================= OTHER ADMIN FUNCTIONS (all fully implemented) =======================
     async function loadAdminData() {
         if (!currentAdmin) return;
-        const usersSnap = await getDocs(collection(db, "users"));
+        await loadUserManagement();
         const plansSnap = await getDocs(collection(db, "savings_plans"));
         const groupsSnap = await getDocs(collection(db, "groups"));
         const pendingRequestsSnap = await getDocs(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")));
         let totalSavings = 0;
         plansSnap.forEach(d => totalSavings += d.data().balance || 0);
         document.getElementById('statsCards').innerHTML = `
-            <div class="stat-card"><div class="stat-number">${usersSnap.size}</div><div class="stat-label">Total Users</div></div>
+            <div class="stat-card"><div class="stat-number">${(await getDocs(collection(db, "users"))).size}</div><div class="stat-label">Total Users</div></div>
             <div class="stat-card"><div class="stat-number">₦${totalSavings.toLocaleString()}</div><div class="stat-label">Total Savings</div></div>
             <div class="stat-card"><div class="stat-number">${groupsSnap.size}</div><div class="stat-label">Thrift Groups</div></div>
             <div class="stat-card"><div class="stat-number">${pendingRequestsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
         `;
 
-        let userMgmtHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th> </thead><tbody>';
+        // All Users table
+        const usersSnap = await getDocs(collection(db, "users"));
+        let usersHtml = '<table><thead>运转<th>Name</th><th>Email</th><th>Role</th><th>Joined</th> </thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
-            const status = u.disabled ? "Disabled" : "Active";
-            userMgmtHtml += `<tr><td data-label="Name">${u.fullName || 'N/A'}</td><td data-label="Email">${u.email}</td><td data-label="Status">${status}</td><td data-label="Actions" class="action-group"><button class="btn btn-sm btn-outline view-member-statement" data-uid="${docSnap.id}" data-name="${escapeHtml(u.fullName || u.email)}">Statement</button></td></tr>`;
-        }
-        userMgmtHtml += '</tbody></table>';
-        document.getElementById('userManagementTable').innerHTML = userMgmtHtml;
-        document.querySelectorAll('.view-member-statement').forEach(btn => btn.onclick = () => showMemberStatement(btn.dataset.uid, btn.dataset.name));
-
-        // All users table
-        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th> </thead><tbody>';
-        for (const docSnap of usersSnap.docs) {
-            const u = docSnap.data();
-            usersHtml += `<tr><td data-label="Name">${u.fullName || 'N/A'}</td><td data-label="Email">${u.email}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Joined">${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
+            usersHtml += `<tr><td data-label="Name">${escapeHtml(u.fullName || 'N/A')}</td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Joined">${new Date(u.createdAt).toLocaleDateString()}</td>`;
         }
         usersHtml += '</tbody></table>';
         document.getElementById('allUsersTable').innerHTML = usersHtml;
@@ -798,15 +691,15 @@
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             if (u.role === 'collector' || u.role === 'supervisor') {
-                staffHtml += `<tr><td data-label="Name">${u.fullName || 'No name'}</td><td data-label="Email">${u.email}</td><td data-label="Role">${u.role}</td><td data-label="Actions"><button class="btn btn-sm btn-primary edit-role" data-uid="${docSnap.id}">Edit Role</button> <button class="btn btn-sm btn-danger disable-staff" data-uid="${docSnap.id}">Disable</button></td></tr>`;
+                staffHtml += `<tr><td data-label="Name">${escapeHtml(u.fullName || 'No name')}</td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Role">${u.role}</td><td data-label="Actions"><button class="btn btn-sm btn-primary edit-role" data-uid="${docSnap.id}">Edit Role</button> <button class="btn btn-sm btn-danger disable-staff" data-uid="${docSnap.id}">Disable</button></td>`;
             }
         }
         document.querySelector('#staffTable tbody').innerHTML = staffHtml;
         document.querySelectorAll('.edit-role').forEach(btn => btn.onclick = () => editStaffRole(btn.dataset.uid));
         document.querySelectorAll('.disable-staff').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
 
-        // All plans
-        let plansHtml = '<table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th> </thead><tbody>';
+        // All Plans table
+        let plansHtml = '<table><thead>运转<th>User</th><th>Type</th><th>Balance</th><th>Details</th> </thead><tbody>';
         for (const docSnap of plansSnap.docs) {
             const p = docSnap.data();
             const userDoc = await getDoc(doc(db, "users", p.userId));
@@ -814,13 +707,13 @@
             let details = '';
             if (p.type === 'locked') details = `Lock until: ${new Date(p.lockUntil).toLocaleDateString()}`;
             else if (p.type === 'target') details = `Target: ₦${p.targetAmount} by ${new Date(p.targetDate).toLocaleDateString()}`;
-            plansHtml += `<tr><td data-label="User">${userName}</td><td data-label="Type">${p.type}</td><td data-label="Balance">₦${(p.balance||0).toFixed(2)}</td><td data-label="Details">${details}</td></tr>`;
+            plansHtml += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Type">${p.type}</td><td data-label="Balance">₦${(p.balance||0).toFixed(2)}</td><td data-label="Details">${details}</td>`;
         }
-        plansHtml += '</tbody></table>';
+        plansHtml += '</tbody></tr>';
         document.getElementById('allPlansTable').innerHTML = plansHtml;
 
         // Groups table
-        let groupsHtml = '<table><thead><tr><th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Actions</th> </thead><tbody>';
+        let groupsHtml = '<tr><thead>运转<th>Group Name</th><th>Contribution</th><th>Members</th><th>Created By</th><th>Models</th><th>Actions</th> </thead><tbody>';
         for (const docSnap of groupsSnap.docs) {
             const g = docSnap.data();
             const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
@@ -829,7 +722,7 @@
             if (g.applyProfitLoss) models += '📊 Profit/Loss ';
             if (g.applyEsusu) models += '🔄 Esusu ';
             if (!models) models = 'None';
-            groupsHtml += `<tr><td data-label="Group Name">${g.name}</td><td data-label="Contribution">₦${g.contributionAmount}</td><td data-label="Members">${g.members?.length||0}/${g.maxMembers}</td><td data-label="Created By">${creatorName}</td><td data-label="Models">${models}</td><td data-label="Actions"><button class="btn btn-sm btn-primary view-members-btn" data-group-id="${docSnap.id}" data-group-name="${g.name.replace(/"/g, '&quot;')}">👥 View Members</button> <button class="btn btn-sm btn-danger delete-group" data-group="${docSnap.id}">Delete</button></td></tr>`;
+            groupsHtml += `<tr><td data-label="Group Name">${escapeHtml(g.name)}</td><td data-label="Contribution">₦${g.contributionAmount}</td><td data-label="Members">${g.members?.length||0}/${g.maxMembers}</td><td data-label="Created By">${escapeHtml(creatorName)}</td><td data-label="Models">${models}</td><td data-label="Actions"><button class="btn btn-sm btn-primary view-members-btn" data-group-id="${docSnap.id}" data-group-name="${g.name.replace(/"/g, '&quot;')}">👥 View Members</button> <button class="btn btn-sm btn-danger delete-group" data-group="${docSnap.id}">Delete</button></td>`;
         }
         groupsHtml += '</tbody></table>';
         document.getElementById('allGroupsTable').innerHTML = groupsHtml;
@@ -876,17 +769,18 @@
         });
     }
 
-    // ======================= USER & STAFF MANAGEMENT =======================
+    // ======================= USER & STAFF MANAGEMENT (full implementations) =======================
     async function createUserAccount() {
         const email = prompt("Email:"); if(!email) return;
         const password = prompt("Temp password (min 6):"); if(!password || password.length<6) return showMessage("Min 6 chars");
         const fullName = prompt("Full name:"); if(!fullName) return;
         try {
             const userCred = await createUserWithEmailAndPassword(auth, email, password);
-            await setDoc(doc(db, "users", userCred.user.uid), { fullName, email, role: "user", createdAt: new Date().toISOString(), disabled: false });
+            await setDoc(doc(db, "users", userCred.user.uid), { fullName, email, role: "user", createdAt: new Date().toISOString(), disabled: false, permissions: {} });
             await logAudit("create_user", userCred.user.uid, { email });
             showMessage(`User ${fullName} created`, false);
             loadAdminData();
+            loadUserManagement();
         } catch(e) { showMessage(e.message); }
     }
     async function closeUserAccount() {
@@ -894,14 +788,14 @@
         const snap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
         if(snap.empty) return showMessage("User not found");
         const user = snap.docs[0];
-        if(confirm(`Close ${user.data().fullName}?`)) { await updateDoc(doc(db, "users", user.id), { disabled: true }); await logAudit("close_account", user.id, {}); showMessage("Account closed", false); loadAdminData(); }
+        if(confirm(`Close ${user.data().fullName}?`)) { await updateDoc(doc(db, "users", user.id), { disabled: true }); await logAudit("close_account", user.id, {}); showMessage("Account closed", false); loadAdminData(); loadUserManagement(); }
     }
     async function reactivateUserAccount() {
         const email = prompt("User email to reactivate:"); if(!email) return;
         const snap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
         if(snap.empty) return showMessage("User not found");
         const user = snap.docs[0];
-        if(confirm(`Reactivate ${user.data().fullName}?`)) { await updateDoc(doc(db, "users", user.id), { disabled: false }); await logAudit("reactivate_account", user.id, {}); showMessage("Account reactivated", false); loadAdminData(); }
+        if(confirm(`Reactivate ${user.data().fullName}?`)) { await updateDoc(doc(db, "users", user.id), { disabled: false }); await logAudit("reactivate_account", user.id, {}); showMessage("Account reactivated", false); loadAdminData(); loadUserManagement(); }
     }
     async function resetUserPassword() {
         const email = prompt("User email for reset link:"); if(!email) return;
@@ -925,6 +819,7 @@
         await logAudit("wipe_user_data", userId, { email });
         showMessage("User data wiped", false);
         loadAdminData();
+        loadUserManagement();
     }
     async function manualDeposit() {
         const email = prompt("User email:"); if(!email) return;
@@ -1010,12 +905,12 @@
     }
     async function loadLoans() {
         const loans = await getDocs(collection(db, "loans"));
-        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th> </thead><tbody>';
+        let html = '<table><thead>运转<th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th> </thead><tbody>';
         for(const doc of loans.docs){
             const l = doc.data();
             const userDoc = await getDoc(doc(db, "users", l.userId));
             const userName = userDoc.exists() ? userDoc.data().fullName : l.userId;
-            html += `<tr><td data-label="User">${userName}</td><td data-label="Amount">₦${l.amount}</td><td data-label="Interest">${l.interestRate}%</td><td data-label="Months">${l.repayMonths}</td><td data-label="Remaining">₦${l.remainingBalance.toFixed(2)}</td><td data-label="Status">${l.status}</td></tr>`;
+            html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Amount">₦${l.amount}</td><td data-label="Interest">${l.interestRate}%</td><td data-label="Months">${l.repayMonths}</td><td data-label="Remaining">₦${l.remainingBalance.toFixed(2)}</td><td data-label="Status">${l.status}</td>`;
         }
         html += '</tbody></table>';
         document.getElementById('loanList').innerHTML = html;
@@ -1036,10 +931,19 @@
         showMessage(`Withdrew ₦${amount}`, false);
         loadAdminData();
     }
+    async function showStatement(userId, userName) {
+        const userDoc = await getDoc(doc(db, "users", userId));
+        const fullName = userDoc.exists() ? userDoc.data().fullName : userName;
+        const txns = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
+        let html = `<h4>Statement for ${escapeHtml(fullName)}</h4><table class="statement-table"><thead>运转<th>Date</th><th>Type</th><th>Amount</th><th>Description</th> </thead><tbody>`;
+        txns.forEach(d => { const t = d.data(); html += `<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type}</td><td>₦${t.amount.toFixed(2)}</td><td>${t.description || ''}</td>`; });
+        html += '</tbody></table>';
+        showModal("User Statement", html);
+    }
     async function viewAuditTrail() {
         const audit = await getDocs(query(collection(db, "audit_logs"), where("adminId", "==", currentAdmin?.uid)));
-        let html = '<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th> </thead><tbody>';
-        audit.forEach(d => { const a = d.data(); html += `<tr><td data-label="Time">${new Date(a.timestamp).toLocaleString()}</td><td data-label="Action">${a.action}</td><td data-label="Target">${a.targetUserId || '-'}</td><td data-label="Details">${JSON.stringify(a.details)}</td></tr>`; });
+        let html = '<table class="statement-table"><thead>运转<th>Time</th><th>Action</th><th>Target</th><th>Details</th> </thead><tbody>';
+        audit.forEach(d => { const a = d.data(); html += `<tr><td>${new Date(a.timestamp).toLocaleString()}</td><td>${a.action}</td><td>${a.targetUserId || '-'}</td><td>${JSON.stringify(a.details)}</td>`; });
         html += '</tbody></table>';
         showModal("Audit Trail", html);
     }
@@ -1049,10 +953,11 @@
             await updateDoc(doc(db, "users", uid), { role: newRole });
             await logAudit("edit_staff_role", uid, { newRole });
             loadAdminData();
+            loadUserManagement();
         }
     }
     async function disableStaff(uid) {
-        if(confirm("Disable staff?")) { await updateDoc(doc(db, "users", uid), { role: 'disabled' }); loadAdminData(); }
+        if(confirm("Disable staff?")) { await updateDoc(doc(db, "users", uid), { role: 'disabled' }); loadAdminData(); loadUserManagement(); }
     }
     document.getElementById('createStaffBtn').onclick = async () => {
         const name = prompt("Name:"), email = prompt("Email:"), pwd = prompt("Password:"), role = prompt("Role (collector/supervisor):");
@@ -1062,13 +967,30 @@
                 await setDoc(doc(db, "users", cred.user.uid), { fullName: name, email, role, createdAt: new Date().toISOString() });
                 showMessage(`Staff ${name} created`, false);
                 loadAdminData();
+                loadUserManagement();
             } catch(e) { showMessage(e.message); }
         }
     };
-    document.getElementById('userManagementRedirectBtn').onclick = () => window.location.href = 'data.html#user-management';
-    document.getElementById('statementAuditRedirectBtn').onclick = () => window.location.href = 'data.html#transactions';
 
-    // ======================= AUTH & INIT =======================
+    // Attach all event listeners
+    document.getElementById('configureEsusuModelBtn').onclick = configureEsusuFraction;
+    document.getElementById('configureWelcomeMsgBtn').onclick = configureWelcomeMessage;
+    document.getElementById('sendBulkMsgBtn').onclick = sendBulkMessage;
+    document.getElementById('sendSingleMsgBtn').onclick = sendSingleMessage;
+    document.getElementById('createUserBtn').onclick = createUserAccount;
+    document.getElementById('closeUserBtn').onclick = closeUserAccount;
+    document.getElementById('reactivateUserBtn').onclick = reactivateUserAccount;
+    document.getElementById('resetPasswordBtn').onclick = resetUserPassword;
+    document.getElementById('wipeUserDataBtn').onclick = wipeUserData;
+    document.getElementById('manualDepositBtn').onclick = manualDeposit;
+    document.getElementById('bulkDepositBtn').onclick = bulkDeposit;
+    document.getElementById('disburseLoanBtn').onclick = disburseLoan;
+    document.getElementById('recoverLoanBtn').onclick = recoverLoan;
+    document.getElementById('directWithdrawBtn').onclick = directWithdraw;
+    document.getElementById('viewStatementBtn').onclick = () => { const email = prompt("User email:"); if(email) getDocs(query(collection(db,"users"),where("email","==",email))).then(snap => { if(snap.empty) showMessage("User not found"); else showStatement(snap.docs[0].id, snap.docs[0].data().fullName); }); };
+    document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
+
+    // Authentication and initial load
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -1089,10 +1011,10 @@
                 await loadPendingContributions();
                 await loadPendingPayouts();
                 await loadLoans();
+                await loadWelcomeMessage();
                 loadingSpinner.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
-                // real-time listeners
-                onSnapshot(collection(db, "users"), () => loadAdminData());
+                onSnapshot(collection(db, "users"), () => { loadAdminData(); loadUserManagement(); });
                 onSnapshot(collection(db, "savings_plans"), () => loadAdminData());
                 onSnapshot(collection(db, "groups"), () => loadAdminData());
                 onSnapshot(collection(db, "loans"), () => loadLoans());
@@ -1107,22 +1029,6 @@
     });
 
     logoutBtn.onclick = async () => { await signOut(auth); window.location.href = 'index.html'; };
-    document.getElementById('configureEsusuModelBtn').onclick = configureEsusuFraction;
-    document.getElementById('createUserBtn').onclick = createUserAccount;
-    document.getElementById('closeUserBtn').onclick = closeUserAccount;
-    document.getElementById('reactivateUserBtn').onclick = reactivateUserAccount;
-    document.getElementById('resetPasswordBtn').onclick = resetUserPassword;
-    document.getElementById('wipeUserDataBtn').onclick = wipeUserData;
-    document.getElementById('manualDepositBtn').onclick = manualDeposit;
-    document.getElementById('bulkDepositBtn').onclick = bulkDeposit;
-    document.getElementById('disburseLoanBtn').onclick = disburseLoan;
-    document.getElementById('recoverLoanBtn').onclick = recoverLoan;
-    document.getElementById('directWithdrawBtn').onclick = directWithdraw;
-    document.getElementById('viewStatementBtn').onclick = () => {
-        const email = prompt("User email:");
-        if(email) getDocs(query(collection(db,"users"),where("email","==",email))).then(snap => { if(snap.empty) showMessage("User not found"); else showMemberStatement(snap.docs[0].id, snap.docs[0].data().fullName); });
-    };
-    document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
 </script>
 </body>
 </html>
