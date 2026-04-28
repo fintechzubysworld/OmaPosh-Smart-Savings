@@ -23,6 +23,7 @@
         .message-body { margin: 10px 0; line-height: 1.5; }
         .message-actions { display: flex; gap: 10px; margin-top: 10px; }
         .empty-state { text-align: center; padding: 50px; color: #666; }
+        .error-state { text-align: center; padding: 50px; color: #721c24; background: #f8d7da; border-radius: 12px; }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
         @media (max-width: 768px) {
             .message-header { flex-direction: column; align-items: flex-start; }
@@ -37,6 +38,9 @@
         <button class="btn btn-outline" id="backToDashboardBtn">← Back to Dashboard</button>
     </header>
     <div class="main-content">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+            <button id="markAllReadBtn" class="btn btn-sm btn-primary" style="background: #28a745;">✓ Mark all as read</button>
+        </div>
         <div id="messagesContainer">
             <div class="empty-state">Loading messages...</div>
         </div>
@@ -47,7 +51,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, query, where, orderBy, onSnapshot, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, orderBy, onSnapshot, updateDoc, deleteDoc, doc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -62,7 +66,9 @@
     const db = getFirestore(app);
 
     const messagesContainer = document.getElementById('messagesContainer');
+    const markAllReadBtn = document.getElementById('markAllReadBtn');
     let currentUserId = null;
+    let unsubscribe = null;
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -72,8 +78,10 @@
     function renderMessages(messages) {
         if (!messages.length) {
             messagesContainer.innerHTML = '<div class="empty-state">📭 No messages yet.</div>';
+            markAllReadBtn.style.display = 'none';
             return;
         }
+        markAllReadBtn.style.display = 'inline-flex';
         messagesContainer.innerHTML = messages.map(msg => `
             <div class="message-item ${!msg.read ? 'message-unread' : ''}" data-id="${msg.id}">
                 <div class="message-header">
@@ -106,33 +114,52 @@
         });
     }
 
-    onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-            window.location.href = 'index.html';
-            return;
-        }
-        currentUserId = user.uid;
-        const messagesRef = collection(db, "messages");
-        const q = query(messagesRef, where("userId", "==", currentUserId), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            const messages = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                messages.push({
-                    id: doc.id,
-                    subject: data.subject,
-                    message: data.message,
-                    createdAt: data.createdAt,
-                    read: data.read || false
-                });
-            });
-            renderMessages(messages);
+    async function markAllAsRead() {
+        if (!currentUserId) return;
+        const q = query(collection(db, "messages"), where("userId", "==", currentUserId), where("read", "==", false));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return;
+        const batch = writeBatch(db);
+        snapshot.forEach(doc => {
+            batch.update(doc.ref, { read: true });
         });
+        await batch.commit();
+        // No need to re-render – snapshot listener will update
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUserId = user.uid;
+            const messagesRef = collection(db, "messages");
+            const q = query(messagesRef, where("userId", "==", currentUserId), orderBy("createdAt", "desc"));
+            if (unsubscribe) unsubscribe();
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                const messages = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    messages.push({
+                        id: doc.id,
+                        subject: data.subject,
+                        message: data.message,
+                        createdAt: data.createdAt,
+                        read: data.read || false
+                    });
+                });
+                renderMessages(messages);
+            }, (error) => {
+                console.error("Snapshot error:", error);
+                messagesContainer.innerHTML = `<div class="error-state">❌ Error loading messages: ${error.message}. Please check your connection.</div>`;
+            });
+        } else {
+            // Not logged in – redirect to index
+            window.location.href = 'index.html';
+        }
     });
 
     document.getElementById('backToDashboardBtn').onclick = () => {
         window.location.href = 'index.html';
     };
+    markAllReadBtn.onclick = markAllAsRead;
 </script>
 </body>
 </html>
