@@ -1030,5 +1030,94 @@
 
     logoutBtn.onclick = async () => { await signOut(auth); window.location.href = 'index.html'; };
 </script>
+    <!-- ========== THRIFT GROUP CREATION MODAL & BUTTON ========== -->
+<div id="createGroupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(2px);">
+    <div style="background: white; max-width: 500px; width: 90%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto;">
+        <h3 style="color: #1e3c72; margin-bottom: 20px;">➕ Create New Thrift Group</h3>
+        <div class="form-group"><label>Group Name</label><input type="text" id="newGroupName" placeholder="e.g., Daily Savings Group"></div>
+        <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
+        <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><small style="display:block; margin-top:4px;">1 = daily, 7 = weekly, 30 = monthly</small></div>
+        <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
+        <div class="flex-btns" style="margin-top: 20px;">
+            <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
+            <button class="btn btn-outline" id="cancelCreateGroupBtn">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+// ============================================================
+//  Thrift Group Creation – adds a button to Staff Management section
+// ============================================================
+// Find the Staff Management section and add the "Create Group" button
+const staffSection = document.querySelector('.section:has(.section-title:contains("👥 Staff Management"))');
+if (staffSection) {
+    const existingBtn = document.getElementById('createThriftGroupBtn');
+    if (!existingBtn) {
+        const createGroupBtn = document.createElement('button');
+        createGroupBtn.id = 'createThriftGroupBtn';
+        createGroupBtn.className = 'btn btn-primary';
+        createGroupBtn.innerHTML = '➕ Create Thrift Group';
+        createGroupBtn.style.marginLeft = '10px';
+        const staffHeader = staffSection.querySelector('.flex-btns') || staffSection;
+        staffHeader.appendChild(createGroupBtn);
+        
+        const modal = document.getElementById('createGroupModal');
+        const closeModal = () => modal.classList.add('hidden');
+        const openModal = () => modal.classList.remove('hidden');
+        
+        createGroupBtn.onclick = openModal;
+        document.getElementById('cancelCreateGroupBtn').onclick = closeModal;
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        
+        document.getElementById('confirmCreateGroupBtn').onclick = async () => {
+            const name = document.getElementById('newGroupName').value.trim();
+            const amount = parseFloat(document.getElementById('newGroupAmount').value);
+            const frequencyDays = parseInt(document.getElementById('newGroupFrequency').value);
+            const maxMembers = parseInt(document.getElementById('newGroupMaxMembers').value);
+            const applyEsusu = document.getElementById('newGroupApplyEsusu').checked;
+            const applyProfitLoss = document.getElementById('newGroupApplyProfitLoss').checked;
+            
+            if (!name || isNaN(amount) || amount <= 0 || isNaN(frequencyDays) || frequencyDays < 1 || isNaN(maxMembers) || maxMembers < 2) {
+                alert("Please fill all fields correctly.");
+                return;
+            }
+            
+            try {
+                const currentUser = auth.currentUser;
+                if (!currentUser) throw new Error("Not logged in");
+                await addDoc(collection(db, "groups"), {
+                    name: name,
+                    contributionAmount: amount,
+                    frequencyDays: frequencyDays,
+                    maxMembers: maxMembers,
+                    applyEsusu: applyEsusu,
+                    applyProfitLoss: applyProfitLoss,
+                    members: [],
+                    currentPayoutIndex: 0,
+                    creatorId: currentUser.uid,
+                    createdAt: new Date().toISOString()
+                });
+                alert(`Thrift group "${name}" created successfully!`);
+                closeModal();
+                // Clear form
+                document.getElementById('newGroupName').value = '';
+                document.getElementById('newGroupAmount').value = '';
+                document.getElementById('newGroupFrequency').value = '7';
+                document.getElementById('newGroupMaxMembers').value = '10';
+                document.getElementById('newGroupApplyEsusu').checked = false;
+                document.getElementById('newGroupApplyProfitLoss').checked = false;
+                // Refresh groups table (if your admin page has a listener for "groups", it will auto‑update)
+                if (typeof loadAdminData === 'function') loadAdminData();
+                else location.reload();
+            } catch (err) {
+                alert("Error: " + err.message);
+            }
+        };
+    }
+}
+</script>
 </body>
 </html>
