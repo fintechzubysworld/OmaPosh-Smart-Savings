@@ -648,6 +648,138 @@
     });
   }
 })();
+// ============================================================
+// Biometric Login + Blue Loading Screen (with "Loading..." text)
+// ============================================================
+(function() {
+  if (window.__biometricFlowInitialised) return;
+  window.__biometricFlowInitialised = true;
+
+  const authSection = document.getElementById('authSection');
+  const dashboardSection = document.getElementById('dashboardSection');
+  const loginFormDiv = document.getElementById('loginForm');
+  const emailInput = document.getElementById('loginEmail');
+  const passwordInput = document.getElementById('loginPassword');
+  const loginBtn = document.getElementById('doLoginBtn');
+
+  // Create blue loading overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'biometric-loading-overlay';
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.backgroundColor = '#1e3c72';
+  overlay.style.display = 'flex';
+  overlay.style.flexDirection = 'column';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'center';
+  overlay.style.zIndex = '9999';
+  overlay.style.color = 'white';
+  overlay.innerHTML = `
+    <div style="text-align: center;">
+      <div class="loader-meter" style="width: 200px; height: 6px; background: rgba(255,255,255,0.3); border-radius: 10px; overflow: hidden; margin: 20px auto;">
+        <div style="width: 0%; height: 100%; background: #ffb347; border-radius: 10px; transition: width 0.3s;" id="loading-progress"></div>
+      </div>
+      <p style="margin-top: 20px; font-size: 1rem;">Loading...</p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const progressBar = overlay.querySelector('#loading-progress');
+
+  function setProgress(percent) {
+    if (progressBar) progressBar.style.width = percent + '%';
+  }
+
+  async function storeCredential(email, password, shouldSave) {
+    if (!shouldSave) return;
+    if (window.PasswordCredential && navigator.credentials) {
+      const cred = new PasswordCredential({ id: email, password: password, name: email });
+      await navigator.credentials.store(cred);
+    }
+  }
+
+  async function attemptBiometricLogin() {
+    if (!window.PasswordCredential || !navigator.credentials) return false;
+    try {
+      const cred = await navigator.credentials.get({ password: true, mediation: 'optional' });
+      if (cred && cred.type === 'password' && cred.id && cred.password) {
+        setProgress(70);
+        if (emailInput && passwordInput) {
+          emailInput.value = cred.id;
+          passwordInput.value = cred.password;
+        }
+        if (loginBtn) loginBtn.click();
+        return true;
+      }
+    } catch (err) {}
+    return false;
+  }
+
+  // Override login button to store credentials when "Save this device" is checked
+  const originalLoginHandler = loginBtn.onclick;
+  loginBtn.onclick = async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    const saveCheckbox = document.getElementById('saveBiometricCheckbox');
+    const shouldSave = saveCheckbox ? saveCheckbox.checked : false;
+    try {
+      const { signInWithEmailAndPassword } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js");
+      await signInWithEmailAndPassword(auth, email, password);
+      await storeCredential(email, password, shouldSave);
+    } catch (err) {
+      const authMsg = document.getElementById('authMessage');
+      if (authMsg) {
+        authMsg.innerText = err.message;
+        authMsg.classList.remove('hidden');
+        setTimeout(() => authMsg.classList.add('hidden'), 5000);
+      }
+    }
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      setProgress(100);
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        if (authSection) authSection.classList.add('hidden');
+        if (dashboardSection) dashboardSection.classList.remove('hidden');
+      }, 300);
+    } else {
+      setProgress(30);
+      const success = await attemptBiometricLogin();
+      if (!success) {
+        setProgress(100);
+        setTimeout(() => {
+          overlay.style.display = 'none';
+          if (authSection) authSection.classList.remove('hidden');
+          if (dashboardSection) dashboardSection.classList.add('hidden');
+        }, 500);
+      } else {
+        setProgress(90);
+      }
+    }
+  });
+
+  // Add "Save this device" checkbox to login form
+  const loginFormContainer = document.getElementById('loginForm');
+  if (loginFormContainer && !document.getElementById('saveBiometricCheckbox')) {
+    const checkboxGroup = document.createElement('div');
+    checkboxGroup.className = 'form-group';
+    checkboxGroup.innerHTML = `
+      <label style="display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="saveBiometricCheckbox" checked>
+        <span>🔐 Save this device for biometric login (fingerprint / face ID)</span>
+      </label>
+    `;
+    const loginButton = loginFormContainer.querySelector('#doLoginBtn');
+    if (loginButton) loginFormContainer.insertBefore(checkboxGroup, loginButton);
+    else loginFormContainer.appendChild(checkboxGroup);
+  }
+})();
 </script>
 </body>
 </html>
