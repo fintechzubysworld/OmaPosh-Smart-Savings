@@ -23,7 +23,8 @@
         .message-body { margin: 10px 0; line-height: 1.5; }
         .message-actions { display: flex; gap: 10px; margin-top: 10px; }
         .empty-state { text-align: center; padding: 50px; color: #666; }
-        .error-state { text-align: center; padding: 50px; color: #721c24; background: #f8d7da; border-radius: 12px; }
+        .error-state { text-align: center; padding: 50px; color: #721c24; background: #f8d7da; border-radius: 12px; margin: 20px; }
+        .error-state a { color: #0056b3; text-decoration: underline; }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
         @media (max-width: 768px) {
             .message-header { flex-direction: column; align-items: flex-start; }
@@ -124,13 +125,14 @@
             batch.update(doc.ref, { read: true });
         });
         await batch.commit();
-        // No need to re-render – snapshot listener will update
     }
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUserId = user.uid;
             const messagesRef = collection(db, "messages");
+            // Note: Order by createdAt descending requires a composite index in Firestore.
+            // If you see an index error, click the link in the error message to create it.
             const q = query(messagesRef, where("userId", "==", currentUserId), orderBy("createdAt", "desc"));
             if (unsubscribe) unsubscribe();
             unsubscribe = onSnapshot(q, (snapshot) => {
@@ -148,10 +150,23 @@
                 renderMessages(messages);
             }, (error) => {
                 console.error("Snapshot error:", error);
-                messagesContainer.innerHTML = `<div class="error-state">❌ Error loading messages: ${error.message}. Please check your connection.</div>`;
+                let errorHtml = `<div class="error-state">❌ Error loading messages: ${error.message}</div>`;
+                // Provide a helpful link if the error is about a missing index
+                if (error.message && error.message.includes('index')) {
+                    errorHtml = `<div class="error-state">
+                        <strong>⚠️ Missing Firestore Index</strong><br><br>
+                        Your query requires a composite index. Please click the link below to create it:<br><br>
+                        <a href="${error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]+/)?.[0] || '#'}" target="_blank" rel="noopener noreferrer">
+                            🔗 Create the required index in Firebase Console
+                        </a>
+                        <br><br>
+                        <small>After creating the index, wait a few minutes and refresh this page.</small>
+                    </div>`;
+                }
+                messagesContainer.innerHTML = errorHtml;
+                markAllReadBtn.style.display = 'none';
             });
         } else {
-            // Not logged in – redirect to index
             window.location.href = 'index.html';
         }
     });
