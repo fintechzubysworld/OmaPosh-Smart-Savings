@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh | Login or Register</title>
-    <!-- ========== CUSTOM DIALOG OVERRIDE (FIRST SCRIPT) ========== -->
+    <!-- ========== CUSTOM DIALOG OVERRIDE (NO "THIS PAGE SAYS") ========== -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
@@ -197,7 +197,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -221,6 +221,27 @@
         setTimeout(() => authMsg.classList.add('hidden'), 5000);
     }
 
+    // Helper: send welcome message to a new user
+    async function sendWelcomeMessage(userId) {
+        const configRef = doc(db, "admin_config", "messages");
+        const configSnap = await getDoc(configRef);
+        let subject = "Welcome to OmaPosh";
+        let body = "Thank you for joining OmaPosh Smart Savings! Start saving and joining thrift groups today.";
+        if (configSnap.exists()) {
+            const data = configSnap.data();
+            if (data.welcomeSubject) subject = data.welcomeSubject;
+            if (data.welcomeBody) body = data.welcomeBody;
+        }
+        await addDoc(collection(db, "messages"), {
+            userId: userId,
+            subject: subject,
+            message: body,
+            read: false,
+            createdAt: new Date(),
+            type: "welcome"
+        });
+    }
+
     document.getElementById('showRegisterBtn').onclick = () => {
         loginForm.classList.add('hidden');
         registerForm.classList.remove('hidden');
@@ -234,7 +255,6 @@
         const pwd = document.getElementById('loginPassword').value;
         try {
             await signInWithEmailAndPassword(auth, email, pwd);
-            // Redirect after successful login
             window.location.href = 'index.html';
         } catch(e) { showMessage(e.message); }
     };
@@ -245,12 +265,14 @@
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, pwd);
             await setDoc(doc(db, "users", cred.user.uid), { fullName, email, role: "user", createdAt: new Date().toISOString() });
+            // Send the welcome message (admin-defined)
+            await sendWelcomeMessage(cred.user.uid);
             showMessage("Registration successful! Redirecting...", false);
             setTimeout(() => window.location.href = 'index.html', 1500);
         } catch(e) { showMessage(e.message); }
     };
 
-    // If already logged in, go to dashboard
+    // If already logged in, redirect to dashboard
     onAuthStateChanged(auth, (user) => {
         if (user) window.location.href = 'index.html';
     });
