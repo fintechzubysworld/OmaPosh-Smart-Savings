@@ -4,6 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh | Login or Register</title>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import {
+            getAuth,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            onAuthStateChanged,
+            sendPasswordResetEmail
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import {
+            getFirestore,
+            doc,
+            setDoc,
+            addDoc,
+            collection,
+            getDoc
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+            authDomain: "omaposh-smart-savings.firebaseapp.com",
+            projectId: "omaposh-smart-savings",
+            storageBucket: "omaposh-smart-savings.firebasestorage.app",
+            messagingSenderId: "469614412839",
+            appId: "1:469614412839:web:d51a47b468daad6184fa02"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // ---------- EmailJS configuration ----------
+        // These are your real keys (already filled in)
+        const EMAILJS_PUBLIC_KEY = "uwDz5T65dSTM4RRJ3";
+        const EMAILJS_SERVICE_ID = "service_mpqnvxf";
+        const EMAILJS_WELCOME_TEMPLATE_ID = "WELCOME_TEMPLATE_ID"; // <-- replace with your welcome template ID
+
+        // Load EmailJS library (separate script tag, non-module, but fine)
+        // We'll initialize after DOM loads, because the script is loaded synchronously.
+        // Actually we'll load emailjs from CDN in a traditional script tag.
+    </script>
+    <!-- EmailJS CDN -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -50,12 +95,9 @@
                 <input type="password" id="loginPassword" placeholder="••••••">
             </div>
             <button class="btn btn-primary" id="doLoginBtn">Login</button>
-            
-            <!-- Forgot password link (styled as button-link) -->
             <div class="text-center small-link">
                 <button id="forgotPasswordBtn" class="btn-link">🔑 Forgot password?</button>
             </div>
-            
             <div class="flex-btns" style="justify-content: center; margin-top: 15px;">
                 <button class="btn btn-outline" id="showRegisterBtn">Create Account</button>
             </div>
@@ -81,7 +123,7 @@
             </div>
         </div>
 
-        <!-- PASSWORD RESET FORM -->
+        <!-- PASSWORD RESET FORM (uses Firebase built‑in reset email) -->
         <div id="resetForm" class="hidden">
             <div class="form-group">
                 <label>Email address</label>
@@ -94,31 +136,51 @@
             </div>
         </div>
 
-        <!-- Global message area (errors / success) -->
         <div id="authMessage" class="alert hidden"></div>
     </div>
     <footer>© 2026 OmaPosh Smart Savings</footer>
 </div>
 
+<script>
+    // Initialize EmailJS
+    (function() {
+        emailjs.init("uwDz5T65dSTM4RRJ3");
+    })();
+
+    // ---------- UI elements ----------
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const resetForm = document.getElementById('resetForm');
+    const authMsg = document.getElementById('authMessage');
+
+    // We can't access the Firebase modules directly from here because they're in a module script.
+    // So we'll use a small trick: attach needed functions to window inside the module.
+    // I'll rewrite the main logic to be inside the module script, but the UI event handlers
+    // that reference EmailJS must also be inside the module (or we can call EmailJS from there).
+    // Actually, the emailjs object is globally available because it's loaded via a classic script.
+    // So we can keep the main Firebase logic inside the module, and still call emailjs.
+    // I'll move the entire script into a single module script, including the UI event bindings.
+</script>
+
 <script type="module">
+    // Now we have access to both Firebase imports and the global emailjs object.
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { 
-        getAuth, 
-        createUserWithEmailAndPassword, 
-        signInWithEmailAndPassword, 
+    import {
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
         onAuthStateChanged,
-        sendPasswordResetEmail          // <-- import for password reset
+        sendPasswordResetEmail
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { 
-        getFirestore, 
-        doc, 
-        setDoc, 
-        addDoc, 
-        collection, 
-        getDoc 
+    import {
+        getFirestore,
+        doc,
+        setDoc,
+        addDoc,
+        collection,
+        getDoc
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Firebase configuration (using provided credentials)
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -132,17 +194,20 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // EmailJS credentials
+    const EMAILJS_SERVICE_ID = "service_mpqnvxf";
+    const EMAILJS_WELCOME_TEMPLATE_ID = "WELCOME_TEMPLATE_ID"; // <-- replace with your actual welcome template ID
+
     // DOM elements
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const resetForm = document.getElementById('resetForm');
     const authMsg = document.getElementById('authMessage');
 
-    // Flags to control redirect behavior
+    // Flags
     let isRegistering = false;
-    let isResetting = false;   // prevent redirect while password reset flow is active
+    let isResetting = false;
 
-    // Helper: display messages (error or success)
     function showMessage(msg, isError = true) {
         authMsg.innerText = msg;
         authMsg.classList.remove('hidden');
@@ -151,14 +216,31 @@
         setTimeout(() => authMsg.classList.add('hidden'), 8000);
     }
 
-    // Clear message when switching forms (optional)
     function clearMessage() {
         authMsg.classList.add('hidden');
         authMsg.innerText = '';
     }
 
-    // Send welcome message after registration (existing logic)
-    async function sendWelcomeMessage(userId) {
+    // Send welcome email via EmailJS
+    async function sendWelcomeEmail(email, fullName) {
+        if (EMAILJS_WELCOME_TEMPLATE_ID === "WELCOME_TEMPLATE_ID") {
+            console.warn("Welcome template ID not set. Skipping welcome email.");
+            return;
+        }
+        try {
+            const response = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_WELCOME_TEMPLATE_ID, {
+                to_email: email,
+                user_name: fullName
+            });
+            console.log("Welcome email sent:", response.status);
+        } catch (error) {
+            console.error("Welcome email failed:", error);
+            // Not critical – we don't show an error to the user for this
+        }
+    }
+
+    // Save welcome message in Firestore (optional, legacy feature)
+    async function sendWelcomeMessageToFirestore(userId) {
         try {
             const configRef = doc(db, "admin_config", "messages");
             const configSnap = await getDoc(configRef);
@@ -177,41 +259,32 @@
                 createdAt: new Date(),
                 type: "welcome"
             });
-            console.log("✅ Welcome message sent");
         } catch (err) {
-            console.warn("⚠️ Welcome message not sent:", err);
+            console.warn("Firestore welcome message not sent:", err);
         }
     }
 
-    // ---------- UI SWITCH LOGIC (Login <-> Register <-> Reset) ----------
+    // ---------- UI switching ----------
     document.getElementById('showRegisterBtn').onclick = () => {
         clearMessage();
         loginForm.classList.add('hidden');
         resetForm.classList.add('hidden');
         registerForm.classList.remove('hidden');
     };
-    
     document.getElementById('showLoginBtn').onclick = () => {
         clearMessage();
         registerForm.classList.add('hidden');
         resetForm.classList.add('hidden');
         loginForm.classList.remove('hidden');
     };
-    
-    // Forgot password: show reset form, hide others
     document.getElementById('forgotPasswordBtn').onclick = () => {
         clearMessage();
         loginForm.classList.add('hidden');
         registerForm.classList.add('hidden');
         resetForm.classList.remove('hidden');
-        // Pre-fill email from login field if available (UX improvement)
         const loginEmail = document.getElementById('loginEmail').value.trim();
-        if (loginEmail) {
-            document.getElementById('resetEmail').value = loginEmail;
-        }
+        if (loginEmail) document.getElementById('resetEmail').value = loginEmail;
     };
-    
-    // Back to login from reset form
     document.getElementById('backToLoginFromResetBtn').onclick = () => {
         clearMessage();
         resetForm.classList.add('hidden');
@@ -219,231 +292,138 @@
         loginForm.classList.remove('hidden');
         isResetting = false;
     };
-    
-    // Also ensure any registration or login resets the reset flag
-    // ---------- PASSWORD RESET FUNCTIONALITY (fully working) ----------
-    const doResetBtn = document.getElementById('doResetBtn');
-    const resetEmailInput = document.getElementById('resetEmail');
-    
-    doResetBtn.onclick = async () => {
-        const email = resetEmailInput.value.trim();
-        if (!email) {
-            showMessage("Please enter your email address to reset password.");
-            return;
-        }
-        
-        // simple email format check
-        if (!email.includes('@') || !email.includes('.')) {
-            showMessage("Please enter a valid email address.");
-            return;
-        }
-        
-        // disable button to prevent double submission
-        const originalBtnText = doResetBtn.innerText;
-        doResetBtn.innerText = "Sending...";
-        doResetBtn.disabled = true;
-        isResetting = true;   // prevent onAuthStateChanged redirect
-        
+
+    // ---------- Password Reset (Firebase) ----------
+    document.getElementById('doResetBtn').onclick = async () => {
+        const email = document.getElementById('resetEmail').value.trim();
+        if (!email) { showMessage("Please enter your email address."); return; }
+        if (!email.includes('@') || !email.includes('.')) { showMessage("Please enter a valid email address."); return; }
+
+        const btn = document.getElementById('doResetBtn');
+        const originalText = btn.innerText;
+        btn.innerText = "Sending...";
+        btn.disabled = true;
+        isResetting = true;
+
         try {
-            // Firebase password reset email
             await sendPasswordResetEmail(auth, email);
             showMessage(`✅ Password reset link sent to ${email}. Check your inbox (and spam folder).`, false);
-            
-            // Clear the input field
-            resetEmailInput.value = '';
-            
-            // After 3 seconds, optionally redirect back to login form
             setTimeout(() => {
-                // Hide reset form, show login
                 resetForm.classList.add('hidden');
                 loginForm.classList.remove('hidden');
                 clearMessage();
-                // Show an extra success tip on login screen
-                showMessage(`Reset email sent! Follow the instructions in your email to set a new password.`, false);
+                showMessage("Reset email sent! Follow the instructions to set a new password.", false);
                 isResetting = false;
             }, 3000);
-            
         } catch (error) {
-            console.error("Password reset error:", error);
-            let userFriendlyMsg = error.message;
-            // Provide more helpful messages based on error codes
-            if (error.code === 'auth/user-not-found') {
-                userFriendlyMsg = "No account found with this email address. Please register first.";
-            } else if (error.code === 'auth/invalid-email') {
-                userFriendlyMsg = "Invalid email format. Please check and try again.";
-            } else if (error.code === 'auth/too-many-requests') {
-                userFriendlyMsg = "Too many reset requests. Please wait a few minutes before trying again.";
-            } else if (error.code === 'auth/network-request-failed') {
-                userFriendlyMsg = "Network error. Check your internet connection.";
-            } else {
-                userFriendlyMsg = `Error: ${error.message}`;
-            }
-            showMessage(userFriendlyMsg);
+            console.error(error);
+            let msg = error.message;
+            if (error.code === 'auth/user-not-found') msg = "No account found with this email.";
+            else if (error.code === 'auth/too-many-requests') msg = "Too many attempts. Try again later.";
+            showMessage(msg);
             isResetting = false;
         } finally {
-            doResetBtn.innerText = originalBtnText;
-            doResetBtn.disabled = false;
+            btn.innerText = originalText;
+            btn.disabled = false;
         }
     };
-    
-    // ---------- LOGIN LOGIC ----------
+
+    // ---------- Login ----------
     document.getElementById('doLoginBtn').onclick = async () => {
         const email = document.getElementById('loginEmail').value.trim();
         const pwd = document.getElementById('loginPassword').value;
-        if (!email || !pwd) {
-            showMessage("Please enter both email and password.");
-            return;
-        }
+        if (!email || !pwd) { showMessage("Please enter email and password."); return; }
         try {
             await signInWithEmailAndPassword(auth, email, pwd);
-            // No redirect here, onAuthStateChanged will redirect unless flags false
-            // But we also set isRegistering/resetting false, so redirect works as expected
-        } catch(e) {
-            let errorMsg = e.message;
-            if (e.code === 'auth/user-not-found') errorMsg = "No account found with this email.";
-            else if (e.code === 'auth/wrong-password') errorMsg = "Incorrect password. Please try again.";
-            else if (e.code === 'auth/too-many-requests') errorMsg = "Too many failed attempts. Try again later.";
-            showMessage(errorMsg);
+            // redirect handled by onAuthStateChanged
+        } catch (e) {
+            let msg = e.message;
+            if (e.code === 'auth/user-not-found') msg = "No account found with this email.";
+            else if (e.code === 'auth/wrong-password') msg = "Incorrect password.";
+            showMessage(msg);
         }
     };
-    
-    // ---------- REGISTRATION LOGIC (with Firestore & welcome message) ----------
+
+    // ---------- Registration (with welcome email) ----------
     document.getElementById('doRegisterBtn').onclick = async () => {
         const email = document.getElementById('regEmail').value.trim();
         const pwd = document.getElementById('regPassword').value;
         const fullName = document.getElementById('regFullName').value.trim();
 
-        if (!email || !pwd || !fullName) {
-            showMessage("All fields are required.");
-            return;
-        }
-        if (pwd.length < 6) {
-            showMessage("Password must be at least 6 characters.");
-            return;
-        }
+        if (!email || !pwd || !fullName) { showMessage("All fields are required."); return; }
+        if (pwd.length < 6) { showMessage("Password must be at least 6 characters."); return; }
 
-        const registerBtn = document.getElementById('doRegisterBtn');
-        const originalText = registerBtn.innerText;
-        registerBtn.innerText = "Creating account...";
-        registerBtn.disabled = true;
-        isRegistering = true;    // block automatic redirect until done
+        const btn = document.getElementById('doRegisterBtn');
+        const originalText = btn.innerText;
+        btn.innerText = "Creating account...";
+        btn.disabled = true;
+        isRegistering = true;
 
         try {
-            // Step 1: Create Auth user
             const userCred = await createUserWithEmailAndPassword(auth, email, pwd);
             const uid = userCred.user.uid;
-            
-            // Step 2: Write user document to Firestore (retry logic)
-            const userData = {
+
+            // Firestore user document
+            await setDoc(doc(db, "users", uid), {
                 fullName: fullName,
                 email: email,
                 role: "user",
                 createdAt: new Date().toISOString(),
                 disabled: false,
                 permissions: {}
-            };
-            
-            let writeSuccess = false;
-            let retries = 3;
-            while (retries > 0 && !writeSuccess) {
-                try {
-                    await setDoc(doc(db, "users", uid), userData);
-                    writeSuccess = true;
-                } catch (firestoreErr) {
-                    console.warn(`Firestore write retry left: ${retries-1}`, firestoreErr.message);
-                    retries--;
-                    if (retries === 0) throw firestoreErr;
-                    await new Promise(r => setTimeout(r, 1000));
-                }
-            }
+            });
 
-            // Step 3: Send welcome message
-            await sendWelcomeMessage(uid);
-            
+            // Send welcome email via EmailJS (custom branded email)
+            sendWelcomeEmail(email, fullName);   // fire-and-forget, don't block UI
+
+            // Optional legacy Firestore message
+            sendWelcomeMessageToFirestore(uid);
+
             showMessage("Registration successful! Redirecting...", false);
             setTimeout(() => {
                 window.location.href = 'index.html';
             }, 1500);
-            
         } catch (error) {
-            console.error("Registration error:", error);
-            let errorMsg = error.message;
-            if (error.code === 'permission-denied') {
-                errorMsg = "Permission denied. Please check Firestore security rules. They must allow writing to 'users/{userId}' for authenticated users.";
-            } else if (error.code === 'auth/email-already-in-use') {
-                errorMsg = "Email already registered. Please login instead.";
-                // automatically switch to login form
+            console.error(error);
+            let msg = error.message;
+            if (error.code === 'auth/email-already-in-use') {
+                msg = "Email already registered. Please login instead.";
                 registerForm.classList.add('hidden');
                 loginForm.classList.remove('hidden');
-                showMessage(errorMsg);
-                isRegistering = false;
-                registerBtn.disabled = false;
-                registerBtn.innerText = originalText;
-                return;
             }
-            showMessage(errorMsg);
-            registerBtn.disabled = false;
-            registerBtn.innerText = originalText;
+            showMessage(msg);
             isRegistering = false;
+            btn.disabled = false;
+            btn.innerText = originalText;
         }
     };
-    
-    // ---------- GLOBAL AUTH STATE HANDLER: redirect to index.html upon successful login ----------
-    // Only redirect if we are NOT in the middle of registration or reset flow,
-    // and the user is authenticated (user != null). This prevents disruptive redirects.
+
+    // ---------- Redirect on auth state change ----------
     onAuthStateChanged(auth, (user) => {
         if (user && !isRegistering && !isResetting) {
-            // Avoid redirect loops if already on index.html? but fine.
-            // Check current location to avoid forever redirect
-            if (window.location.pathname.includes('login.html') || 
-                window.location.pathname.endsWith('/') || 
+            if (window.location.pathname.includes('login.html') ||
+                window.location.pathname.endsWith('/') ||
                 window.location.pathname === '' ||
                 window.location.pathname.includes('auth.html')) {
                 window.location.href = 'index.html';
             } else {
-                // Just in case we are on this same page but different route
                 window.location.href = 'index.html';
             }
         }
     });
-    
-    // Additional UX: pressing Enter in password reset field triggers reset
-    resetEmailInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            doResetBtn.click();
-        }
+
+    // Enter key shortcuts
+    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('doLoginBtn').click(); }
     });
-    
-    // Also allow Enter on login and register forms
-    const loginPasswordInput = document.getElementById('loginPassword');
-    loginPasswordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('doLoginBtn').click();
-        }
+    document.getElementById('regPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('doRegisterBtn').click(); }
     });
-    
-    const regPasswordInput = document.getElementById('regPassword');
-    regPasswordInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('doRegisterBtn').click();
-        }
+    document.getElementById('resetEmail').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('doResetBtn').click(); }
     });
-    
-    // Small enhancement: if user clicks "Forgot password?" from reset form already, but fine.
-    // Ensure if reset succeeds, we avoid redirect issues
-    // Additionally, clear reset flag when form is hidden manually via back button
-    const resetObserver = new MutationObserver(() => {
-        if (resetForm.classList.contains('hidden')) {
-            isResetting = false;
-        }
-    });
-    resetObserver.observe(resetForm, { attributes: true, attributeFilter: ['class'] });
-    
-    // If the user manually types in the login email and then uses reset, we pre-filled already.
-    console.log("✅ OmaPosh auth system ready with password reset feature.");
+
+    console.log("✅ OmaPosh ready – Firebase auth + EmailJS welcome emails integrated.");
 </script>
 </body>
 </html>
