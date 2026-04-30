@@ -846,6 +846,126 @@ onAuthStateChanged(auth, (user) => {
         buttonsAdded = false;
     }
 });
+    //WITHDRAWAL LOGIC
+    // ========== WITHDRAWAL – PROFILE CHECK & REQUEST SUBMISSION ==========
+
+const withdrawBtn = document.getElementById('withdrawBtn');   // make sure this matches your button id
+const withdrawalAmountInput = document.getElementById('withdrawalAmount'); // if you have an amount field
+
+// Required fields for a complete profile (adjust as needed)
+const REQUIRED_PROFILE_FIELDS = [
+    'fullName',
+    'bankName',
+    'accountNumber',
+    'accountName'
+    // add other fields if necessary, e.g., 'phone', 'address'
+];
+
+async function checkProfileComplete(uid) {
+    const userDocRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userDocRef);
+    if (!userSnap.exists()) return false;
+    const data = userSnap.data();
+    return REQUIRED_PROFILE_FIELDS.every(field => data[field] && data[field].toString().trim() !== '');
+}
+
+async function getUserProfile(uid) {
+    const userDocRef = doc(db, "users", uid);
+    const userSnap = await getDoc(userDocRef);
+    return userSnap.exists() ? userSnap.data() : null;
+}
+
+// When user clicks "Withdraw"
+if (withdrawBtn) {
+    withdrawBtn.addEventListener('click', async () => {
+        const user = auth.currentUser;
+        if (!user) {
+            showMessage("You must be logged in to withdraw.", true);
+            return;
+        }
+
+        // Optional: get withdrawal amount from an input
+        const amount = withdrawalAmountInput ? parseFloat(withdrawalAmountInput.value) : 0;
+        if (!amount || amount <= 0) {
+            showMessage("Please enter a valid withdrawal amount.", true);
+            return;
+        }
+
+        // 1️⃣ Check if profile is complete
+        const isProfileComplete = await checkProfileComplete(user.uid);
+        if (!isProfileComplete) {
+            sessionStorage.setItem('pendingWithdrawalAmount', amount);
+window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
+            // Redirect to profile.html with return URL
+            window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
+            return;
+        }
+
+        // 2️⃣ Profile is complete → create the withdrawal document directly
+        await createWithdrawalRequest(user.uid, amount);
+    });
+}
+
+async function createWithdrawalRequest(uid, amount) {
+    const profile = await getUserProfile(uid);
+    if (!profile) {
+        showMessage("Could not fetch your profile. Please try again.", true);
+        return;
+    }
+
+    const withdrawalData = {
+        userId: uid,
+        userEmail: auth.currentUser.email,
+        fullName: profile.fullName || 'Unknown',
+        amount: amount,
+        accountDetails: {
+            bankName: profile.bankName,
+            accountNumber: profile.accountNumber,
+            accountName: profile.accountName
+        },
+        status: "pending",
+        requestedAt: new Date().toISOString(),
+        processedAt: null,
+        adminNote: ""
+    };
+
+    try {
+        await addDoc(collection(db, "withdrawals"), withdrawalData);
+        showMessage("✅ Withdrawal request submitted. Admin will review it shortly.", false);
+        // Optionally clear the amount input
+        if (withdrawalAmountInput) withdrawalAmountInput.value = '';
+    } catch (error) {
+        console.error("Failed to submit withdrawal:", error);
+        showMessage("Failed to submit withdrawal request. Please try again.", true);
+    }
+}
+
+// ========== AUTO‑SUBMIT WITHDRAWAL AFTER RETURNING FROM PROFILE ==========
+(function handleReturnFromProfile() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('withdraw') === '1' && auth.currentUser) {
+        const user = auth.currentUser;
+        // Wait a brief moment for auth to be ready
+        setTimeout(async () => {
+            const isComplete = await checkProfileComplete(user.uid);
+            if (isComplete) {
+                // Since we came back from profile, we might want to re‑read the amount
+                // For safety, prompt user again or use a stored amount.
+                // Better: store the desired withdrawal amount in sessionStorage before redirecting.
+                const storedAmount = sessionStorage.getItem('pendingWithdrawalAmount');
+                if (storedAmount) {
+                    const amount = parseFloat(storedAmount);
+                    sessionStorage.removeItem('pendingWithdrawalAmount');
+                    await createWithdrawalRequest(user.uid, amount);
+                } else {
+                    showMessage("Profile completed. Please enter the withdrawal amount again.", false);
+                }
+            } else {
+                showMessage("Profile still incomplete. Please update all required fields.", true);
+            }
+        }, 500);
+    }
+})();
 </script>
 </body>
 </html>
