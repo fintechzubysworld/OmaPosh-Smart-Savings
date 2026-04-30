@@ -710,60 +710,91 @@
         return userSnap.exists() ? userSnap.data() : null;
     }
 
-    const withdrawBtn = document.getElementById('withdrawBtn');
-    const withdrawalAmountInput = document.getElementById('withdrawalAmount');
+  // ========== GLOBAL WITHDRAWAL – NOW WITH FLEXIBLE BALANCE CHECK ==========
+const withdrawBtn = document.getElementById('withdrawBtn');
+const withdrawalAmountInput = document.getElementById('withdrawalAmount');
 
-    if (withdrawBtn) {
-        withdrawBtn.addEventListener('click', async () => {
-            if (!currentUser) {
-                showToast("You must be logged in to withdraw.", true);
-                return;
-            }
-            const amount = parseFloat(withdrawalAmountInput.value);
-            if (!amount || amount <= 0) {
-                showToast("Please enter a valid withdrawal amount.", true);
-                return;
-            }
-            const isProfileComplete = await checkProfileComplete(currentUser.uid);
-            if (!isProfileComplete) {
-                sessionStorage.setItem('pendingWithdrawalAmount', amount);
-                window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
-                return;
-            }
-            await createAccountWithdrawalRequest(currentUser.uid, amount);
-        });
-    }
-
-    async function createAccountWithdrawalRequest(uid, amount) {
-        const profile = await getUserProfile(uid);
-        if (!profile) {
-            showToast("Could not fetch your profile. Please try again.", true);
+if (withdrawBtn) {
+    withdrawBtn.addEventListener('click', async () => {
+        if (!currentUser) {
+            showToast("You must be logged in to withdraw.", true);
             return;
         }
-        const withdrawalData = {
-            userId: uid,
-            userEmail: auth.currentUser.email,
-            fullName: profile.fullName || 'Unknown',
-            amount: amount,
-            accountDetails: {
-                bankName: profile.bankName,
-                accountNumber: profile.accountNumber,
-                accountName: profile.accountName
-            },
-            status: "pending",
-            requestedAt: new Date().toISOString(),
-            processedAt: null,
-            adminNote: ""
-        };
-        try {
-            await addDoc(collection(db, "withdrawals"), withdrawalData);
-            showToast("✅ Withdrawal request submitted. Admin will review it shortly.", false);
-            withdrawalAmountInput.value = '';
-        } catch (error) {
-            console.error("Failed to submit withdrawal:", error);
-            showToast("Failed to submit withdrawal request. Please try again.", true);
+        const amount = parseFloat(withdrawalAmountInput.value);
+        if (!amount || amount <= 0) {
+            showToast("Please enter a valid withdrawal amount.", true);
+            return;
         }
+
+        // 1. Profile completeness check
+        const isProfileComplete = await checkProfileComplete(currentUser.uid);
+        if (!isProfileComplete) {
+            sessionStorage.setItem('pendingWithdrawalAmount', amount);
+            window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
+            return;
+        }
+
+        // 2. Check flexible plan balance
+        try {
+            const flexQuery = query(
+                collection(db, "savings_plans"),
+                where("userId", "==", currentUser.uid),
+                where("type", "==", "flex")
+            );
+            const flexSnap = await getDocs(flexQuery);
+            if (flexSnap.empty) {
+                showToast("You do not have a flexible savings plan. Please create one first.", true);
+                return;
+            }
+            const flexPlan = flexSnap.docs[0].data();
+            const flexBalance = flexPlan.balance || 0;
+            if (amount > flexBalance) {
+                showToast(`Insufficient flexible balance. Your available balance is ₦${flexBalance.toFixed(2)}.`, true);
+                return;
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Could not verify your flexible balance. Please try again.", true);
+            return;
+        }
+
+        // 3. Submit the withdrawal request
+        await createAccountWithdrawalRequest(currentUser.uid, amount);
+    });
+}
+
+async function createAccountWithdrawalRequest(uid, amount) {
+    const profile = await getUserProfile(uid);
+    if (!profile) {
+        showToast("Could not fetch your profile. Please try again.", true);
+        return;
     }
+
+    const withdrawalData = {
+        userId: uid,
+        userEmail: auth.currentUser.email,
+        fullName: profile.fullName || 'Unknown',
+        amount: amount,
+        accountDetails: {
+            bankName: profile.bankName,
+            accountNumber: profile.accountNumber,
+            accountName: profile.accountName
+        },
+        status: "pending",
+        requestedAt: new Date().toISOString(),
+        processedAt: null,
+        adminNote: ""
+    };
+
+    try {
+        await addDoc(collection(db, "withdrawals"), withdrawalData);
+        showToast("✅ Withdrawal request submitted. Admin will review it shortly.", false);
+        withdrawalAmountInput.value = '';
+    } catch (error) {
+        console.error("Failed to submit withdrawal:", error);
+        showToast("Failed to submit withdrawal request. Please try again.", true);
+    }
+}
 
     // Auto‑submit withdrawal after returning from profile
     (function handleReturnFromProfile() {
