@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
     <style>
-        /* --- styles unchanged from your original --- */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: #f0f2f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .auth-container { max-width: 450px; width: 100%; margin: auto; }
@@ -107,14 +106,13 @@
 </div>
 
 <script type="module">
-    // ========== FIREBASE IMPORTS ==========
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { 
         getAuth, 
         createUserWithEmailAndPassword, 
         signInWithEmailAndPassword, 
         onAuthStateChanged,
-        sendPasswordResetEmail   // Firebase's built-in reset email
+        sendPasswordResetEmail
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { 
         getFirestore, 
@@ -125,7 +123,6 @@
         getDoc 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // ========== FIREBASE CONFIG ==========
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -139,12 +136,11 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // ========== EMAILJS SETUP (from reset.html) ==========
-    const EMAILJS_PUBLIC_KEY = "uwDz5T65dSTM4RRJ3";      // Your public key
-    const EMAILJS_SERVICE_ID = "service_mpqnvxf";        // Your service ID
-    const EMAILJS_TEMPLATE_ID = "template_6sxcqx1";      // Your template ID
+    // ========== EMAILJS SETUP ==========
+    const EMAILJS_PUBLIC_KEY = "uwDz5T65dSTM4RRJ3";
+    const EMAILJS_SERVICE_ID = "service_mpqnvxf";
+    const EMAILJS_TEMPLATE_ID = "template_6sxcqx1";
 
-    // Initialize EmailJS
     emailjs.init(EMAILJS_PUBLIC_KEY);
 
     // ========== UI ELEMENTS ==========
@@ -156,7 +152,7 @@
     let isRegistering = false;
     let isResetting = false;
 
-    // ========== HELPER FUNCTIONS ==========
+    // ========== HELPERS ==========
     function showMessage(msg, isError = true) {
         authMsg.innerText = msg;
         authMsg.classList.remove('hidden');
@@ -233,13 +229,37 @@
     const doResetBtn = document.getElementById('doResetBtn');
     const resetEmailInput = document.getElementById('resetEmail');
 
+    async function performResetFlow(email) {
+        // Show the reset form and fill the email
+        loginForm.classList.add('hidden');
+        registerForm.classList.add('hidden');
+        resetForm.classList.remove('hidden');
+        resetEmailInput.value = email;
+
+        // Send EmailJS custom email
+        try {
+            await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+                to_email: email
+            });
+            showMessage(`✅ Custom reset email sent to ${email}.`, false);
+        } catch (e) {
+            console.warn("EmailJS failed, but we'll still try Firebase:", e);
+            showMessage("Custom email failed, but we'll still send the Firebase reset.", false);
+        }
+
+        // **Now trigger Firebase’s password reset email (the real reset link)**
+        try {
+            await sendPasswordResetEmail(auth, email);
+            showMessage(`✅ Secure reset link sent from Firebase. Check your inbox (and spam).`, false);
+        } catch (firebaseErr) {
+            showMessage("Could not send Firebase reset email. Please try again later.");
+            console.error(firebaseErr);
+        }
+    }
+
     doResetBtn.onclick = async () => {
         const email = resetEmailInput.value.trim();
-        if (!email) {
-            showMessage("Please enter your email address.");
-            return;
-        }
-        if (!email.includes('@') || !email.includes('.')) {
+        if (!email || !email.includes('@') || !email.includes('.')) {
             showMessage("Please enter a valid email address.");
             return;
         }
@@ -249,41 +269,17 @@
         doResetBtn.disabled = true;
         isResetting = true;
 
-        try {
-            // 1. Send custom email via EmailJS (the message from reset.html)
-            await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-                to_email: email  // must match {{to_email}} in your EmailJS template
-            });
-            showMessage(`✅ Custom reset email sent to ${email} via EmailJS.`, false);
+        await performResetFlow(email);
 
-            // 2. Also send the Firebase password reset email (so the user gets a real reset link)
-            try {
-                await sendPasswordResetEmail(auth, email);
-                showMessage(`✅ Firebase reset email also sent. Check your inbox for two emails.`, false);
-            } catch (firebaseErr) {
-                console.warn("Firebase reset email failed:", firebaseErr);
-                // Don't overwrite the previous success – the EmailJS part worked.
-            }
-
-            resetEmailInput.value = '';
-            
-            // Show confirmation and redirect back to login after a short delay
-            setTimeout(() => {
-                resetForm.classList.add('hidden');
-                loginForm.classList.remove('hidden');
-                clearMessage();
-                showMessage("Check your email (and spam folder) for reset instructions.", false);
-                isResetting = false;
-            }, 3000);
-
-        } catch (emailjsErr) {
-            console.error("EmailJS send failed:", emailjsErr);
-            showMessage("Failed to send reset email. Please try again later.");
+        doResetBtn.innerText = originalBtnText;
+        doResetBtn.disabled = false;
+        // We keep resetForm visible for a few seconds, then redirect to login
+        setTimeout(() => {
+            resetForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            clearMessage();
             isResetting = false;
-        } finally {
-            doResetBtn.innerText = originalBtnText;
-            doResetBtn.disabled = false;
-        }
+        }, 4000);
     };
 
     // ========== LOGIN ==========
@@ -339,7 +335,6 @@
                 permissions: {}
             };
             
-            // Retry logic for Firestore
             let writeSuccess = false;
             let retries = 3;
             while (retries > 0 && !writeSuccess) {
@@ -402,7 +397,6 @@
         }
     });
 
-    // Prevent redirect on manual form hide
     const resetObserver = new MutationObserver(() => {
         if (resetForm.classList.contains('hidden')) {
             isResetting = false;
@@ -410,7 +404,27 @@
     });
     resetObserver.observe(resetForm, { attributes: true, attributeFilter: ['class'] });
 
-    console.log("✅ OmaPosh auth system ready – EmailJS + Firebase password reset active.");
+    // =============================================
+    // 🔥 NEW: AUTO‑RESET HANDLER FROM CUSTOM LINK
+    // =============================================
+    (function handleDirectResetLink() {
+        const params = new URLSearchParams(window.location.search);
+        const resetFlag = params.get('reset');      // ?reset=1
+        const emailParam = params.get('email');      // &email=user@example.com
+
+        if (resetFlag === '1' && emailParam) {
+            // Immediately trigger the full reset flow
+            clearMessage();
+            performResetFlow(emailParam);
+            // Optionally clean the URL without reloading
+            if (window.history.replaceState) {
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+    })();
+
+    console.log("✅ OmaPosh auth system ready – EmailJS + Firebase reset, plus deep‑link auto‑reset.");
 </script>
 </body>
 </html>
