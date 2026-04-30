@@ -258,6 +258,18 @@
             // Switch back to read-only mode
             readonlyView.style.display = 'block';
             profileForm.style.display = 'none';
+
+            // ---- NEW: Handle return URL after save ----
+            const urlParams = new URLSearchParams(window.location.search);
+            const returnTo = urlParams.get('returnTo');   // e.g., "index.html"
+            const action = urlParams.get('action');       // e.g., "withdraw"
+
+            if (returnTo) {
+                // Build return URL with a flag so index.html knows to continue withdrawal
+                const returnUrl = `${returnTo}?withdraw=1`;
+                window.location.href = returnUrl;
+            }
+            // If no returnTo, stay on profile (already showing readonlyView)
         } catch (error) {
             console.error("Save error:", error);
             showAlert("Failed to save: " + error.message);
@@ -309,6 +321,6 @@
     document.getElementById('editBtn').addEventListener('click', enableEditMode);
     document.getElementById('backToDashboardBtn').addEventListener('click', goBackToDashboard);
     document.getElementById('backToDashboardBtn2').addEventListener('click', goBackToDashboard);
-    </script>
+</script>
 </body>
 </html>
