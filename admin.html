@@ -1118,6 +1118,30 @@ if (staffSection) {
         };
     }
 }
+    //WHAT THE ADMIN SEES
+    import { collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const withdrawalsCol = collection(db, "withdrawals");
+const q = query(withdrawalsCol, orderBy("requestedAt", "desc"));
+
+onSnapshot(q, (snapshot) => {
+    const withdrawalsList = document.getElementById('withdrawalsList'); // a container in admin.html
+    withdrawalsList.innerHTML = '';
+    snapshot.forEach((doc) => {
+        const data = doc.data();
+        const div = document.createElement('div');
+        div.className = 'withdrawal-item';
+        div.innerHTML = `
+            <p><strong>${data.fullName}</strong> (${data.userEmail})</p>
+            <p>Amount: ₦${data.amount.toLocaleString()}</p>
+            <p>Bank: ${data.accountDetails.bankName} – ${data.accountDetails.accountNumber} (${data.accountDetails.accountName})</p>
+            <p>Status: ${data.status} | Requested: ${new Date(data.requestedAt).toLocaleString()}</p>
+            <button onclick="approveWithdrawal('${doc.id}')">Approve</button>
+            <button onclick="rejectWithdrawal('${doc.id}')">Reject</button>
+        `;
+        withdrawalsList.appendChild(div);
+    });
+});
 </script>
 </body>
 </html>
