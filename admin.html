@@ -104,12 +104,12 @@
             <!-- Pending Deposit Requests -->
             <div class="section"><div class="section-title">💰 Pending Deposit Requests</div><div id="pendingDepositsTable"></div></div>
 
-            <!-- Pending Withdrawal Requests (plan-based) -->
-            <div class="section"><div class="section-title">💸 Pending Withdrawal Requests</div><div id="withdrawalRequestsTable"></div></div>
+            <!-- Pending Plan Withdrawal Requests -->
+            <div class="section"><div class="section-title">💸 Pending Plan Withdrawal Requests</div><div id="withdrawalRequestsTable"></div></div>
 
-            <!-- NEW: Profile Withdrawal Requests (from index.html global Withdraw) -->
+            <!-- NEW: Profile Withdrawal Requests (from global Withdraw) -->
             <div class="section">
-                <div class="section-title">🧾 Withdrawal Requests</div>
+                <div class="section-title">🧾 Profile Withdrawal Requests (from Global Withdraw)</div>
                 <div id="profileWithdrawalsTable"></div>
             </div>
 
@@ -177,6 +177,23 @@
         <div class="flex-btns" style="margin-top:20px;">
             <button class="btn btn-outline" id="cancelReviewBtn">Cancel</button>
             <button class="btn btn-success" id="confirmReviewBtn">✅ Confirm Approval</button>
+        </div>
+    </div>
+</div>
+
+<!-- Thrift Group Creation Modal -->
+<div id="createGroupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(2px);">
+    <div style="background: white; max-width: 500px; width: 90%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto;">
+        <h3 style="color: #1e3c72; margin-bottom: 20px;">➕ Create New Thrift Group</h3>
+        <div class="form-group"><label>Group Name</label><input type="text" id="newGroupName" placeholder="e.g., Daily Savings Group"></div>
+        <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
+        <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><small style="display:block; margin-top:4px;">1 = daily, 7 = weekly, 30 = monthly</small></div>
+        <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
+        <div class="flex-btns" style="margin-top: 20px;">
+            <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
+            <button class="btn btn-outline" id="cancelCreateGroupBtn">Cancel</button>
         </div>
     </div>
 </div>
@@ -375,7 +392,7 @@
         document.getElementById('cancelSingleBtn').onclick = closeModal;
     }
 
-    // ======================= PENDING DEPOSITS =======================
+    // ======================= PENDING DEPOSIT REQUESTS =======================
     async function loadPendingDeposits() {
         const q = query(collection(db, "deposit_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
@@ -399,24 +416,46 @@
                     <p><strong>Amount:</strong> ₦${reqData.amount.toFixed(2)}</p>
                     <p><strong>Request Date:</strong> ${new Date(reqData.requestDate).toLocaleString()}</p>
                     <p><strong>Reference:</strong> ${reqData.transactionReference || 'N/A'}</p>
-                    <p>⚠️ This action will credit the user's savings plan.</p>
+                    <p>⚠️ This will deduct the amount from the user's flexible plan and credit the target/locked plan.</p>
                 `, () => approveDeposit(requestId));
             });
             document.querySelectorAll('.reject-deposit').forEach(btn => btn.onclick = () => rejectDeposit(btn.dataset.id));
         });
     }
+
+    // ---------- MODIFIED: deposit now funded from flexible plan ----------
     async function approveDeposit(requestId) {
         try {
             const reqRef = doc(db, "deposit_requests", requestId);
             const reqSnap = await getDoc(reqRef);
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
+
+            // Find user's flexible plan
+            const flexQuery = query(collection(db, "savings_plans"),
+                where("userId", "==", req.userId),
+                where("type", "==", "flex"));
+            const flexSnap = await getDocs(flexQuery);
+            if (flexSnap.empty) return showMessage("User does not have a flexible plan to fund this deposit.");
+            const flexRef = flexSnap.docs[0].ref;
+            const flexBalance = flexSnap.docs[0].data().balance || 0;
+            if (flexBalance < req.amount) return showMessage("Insufficient flexible balance to cover this deposit.");
+
+            // Deduct from flexible, credit to target/locked plan
             const planRef = doc(db, "savings_plans", req.planId);
-            await updateDoc(planRef, { balance: increment(req.amount) });
-            await addDoc(collection(db, "transactions"), { userId: req.userId, planId: req.planId, amount: req.amount, type: "deposit", date: new Date().toISOString(), description: "Admin approved deposit" });
-            await updateDoc(reqRef, { status: "approved", processedAt: new Date().toISOString() });
+            await runTransaction(db, async (transaction) => {
+                transaction.update(flexRef, { balance: increment(-req.amount) });
+                transaction.update(planRef, { balance: increment(req.amount) });
+                transaction.update(reqRef, { status: "approved", processedAt: new Date().toISOString() });
+            });
+
+            await addDoc(collection(db, "transactions"), {
+                userId: req.userId, planId: req.planId, amount: req.amount,
+                type: "deposit", date: new Date().toISOString(),
+                description: "Deposit funded from flexible plan"
+            });
             await logAudit("approve_deposit", req.userId, { amount: req.amount });
-            showMessage("Deposit approved", false);
+            showMessage("Deposit approved – amount transferred from flexible plan.", false);
         } catch(e) { showMessage(e.message); }
     }
     async function rejectDeposit(requestId) {
@@ -425,7 +464,7 @@
         showMessage("Deposit rejected", false);
     }
 
-    // ======================= PENDING WITHDRAWALS (plan-based) =======================
+    // ======================= PENDING PLAN WITHDRAWAL REQUESTS =======================
     async function loadWithdrawalRequests() {
         const q = query(collection(db, "withdrawal_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
@@ -443,34 +482,62 @@
             document.querySelectorAll('.approve-withdrawal').forEach(btn => btn.onclick = () => {
                 const req = JSON.parse(btn.dataset.req);
                 const requestId = btn.dataset.id;
-                showReviewModal("Approve Withdrawal Request", `
+                showReviewModal("Approve Plan Withdrawal Request", `
                     <p><strong>User:</strong> ${escapeHtml(req.userId)}</p>
                     <p><strong>Plan Type:</strong> ${req.planType}</p>
                     <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
                     <p><strong>Request Date:</strong> ${new Date(req.requestedAt).toLocaleString()}</p>
-                    <p>⚠️ This will deduct from the user's savings plan.</p>
+                    <p>⚠️ This will transfer the amount from the plan to the user's flexible plan.</p>
                 `, () => approveWithdrawal(requestId));
             });
             document.querySelectorAll('.reject-withdrawal').forEach(btn => btn.onclick = () => rejectWithdrawal(btn.dataset.id));
         });
     }
+
+    // ---------- MODIFIED: plan withdrawal now transfers to flexible plan ----------
     async function approveWithdrawal(requestId) {
         try {
             const reqRef = doc(db, "withdrawal_requests", requestId);
             const reqSnap = await getDoc(reqRef);
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
+
             const planRef = doc(db, "savings_plans", req.planId);
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists()) return showMessage("Plan not found");
-            if (planSnap.data().balance < req.amount) return showMessage("Insufficient balance");
+            if (planSnap.data().balance < req.amount) return showMessage("Insufficient plan balance");
+
+            // Find or create flexible plan for this user
+            const flexQuery = query(collection(db, "savings_plans"),
+                where("userId", "==", req.userId),
+                where("type", "==", "flex"));
+            let flexSnap = await getDocs(flexQuery);
+            let flexRef;
+            if (flexSnap.empty) {
+                flexRef = await addDoc(collection(db, "savings_plans"), {
+                    userId: req.userId,
+                    type: "flex",
+                    balance: 0,
+                    createdAt: new Date().toISOString()
+                });
+            } else {
+                flexRef = flexSnap.docs[0].ref;
+            }
+
+            // Deduct from plan, add to flexible
             await runTransaction(db, async (transaction) => {
                 transaction.update(planRef, { balance: increment(-req.amount) });
+                transaction.update(flexRef, { balance: increment(req.amount) });
                 transaction.update(reqRef, { status: "approved", processedAt: new Date().toISOString() });
             });
-            await addDoc(collection(db, "transactions"), { userId: req.userId, planId: req.planId, amount: req.amount, type: "withdrawal", date: new Date().toISOString(), description: "Admin approved withdrawal" });
+
+            await addDoc(collection(db, "transactions"), {
+                userId: req.userId, planId: req.planId, amount: req.amount,
+                type: "withdrawal_to_flex", date: new Date().toISOString(),
+                description: "Plan withdrawal transferred to flexible plan"
+            });
             await logAudit("approve_withdrawal", req.userId, { amount: req.amount });
-            showMessage("Withdrawal approved", false);
+            showMessage("Withdrawal approved – amount transferred to flexible plan.", false);
         } catch(e) { showMessage(e.message); }
     }
     async function rejectWithdrawal(requestId) {
@@ -505,15 +572,33 @@
             document.querySelectorAll('.reject-profile-wd').forEach(btn => btn.onclick = () => rejectProfileWithdrawal(btn.dataset.id));
         });
     }
+
+    // ---------- MODIFIED: profile withdrawal deducts from flexible plan ----------
     async function approveProfileWithdrawal(requestId) {
         try {
             const reqRef = doc(db, "withdrawals", requestId);
             const reqSnap = await getDoc(reqRef);
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
-            await updateDoc(reqRef, { status: "approved", processedAt: new Date().toISOString(), adminNote: "Approved by admin" });
+
+            // Fetch flexible plan & check balance
+            const flexQuery = query(collection(db, "savings_plans"),
+                where("userId", "==", req.userId),
+                where("type", "==", "flex"));
+            const flexSnap = await getDocs(flexQuery);
+            if (flexSnap.empty) return showMessage("User has no flexible plan – cannot process withdrawal.");
+            const flexRef = flexSnap.docs[0].ref;
+            const flexBalance = flexSnap.docs[0].data().balance || 0;
+            if (flexBalance < req.amount) return showMessage("Insufficient flexible balance to cover this withdrawal.");
+
+            // Deduct from flexible, mark approved
+            await runTransaction(db, async (transaction) => {
+                transaction.update(flexRef, { balance: increment(-req.amount) });
+                transaction.update(reqRef, { status: "approved", processedAt: new Date().toISOString(), adminNote: "Approved by admin" });
+            });
+
             await logAudit("approve_profile_withdrawal", req.userId, { amount: req.amount });
-            showMessage("Withdrawal approved.", false);
+            showMessage("Withdrawal approved – amount deducted from flexible plan.", false);
         } catch(e) { showMessage(e.message); }
     }
     async function rejectProfileWithdrawal(requestId) {
@@ -547,39 +632,74 @@
                     <p><strong>Group:</strong> ${req.groupName || req.groupId}</p>
                     <p><strong>Amount:</strong> ₦${req.amount.toFixed(2)}</p>
                     <p><strong>Request Date:</strong> ${new Date(req.requestedAt).toLocaleString()}</p>
-                    <p>⚠️ This will add the contribution to the group's cycle after deductions (Esusu/Profit).</p>
+                    <p>⚠️ This will deduct the required amount from the user's flexible plan (after Esusu/Profit deductions).</p>
                 `, () => approveContribution(requestId));
             });
             document.querySelectorAll('.reject-contribution').forEach(btn => btn.onclick = () => rejectContribution(btn.dataset.id));
         });
     }
+
+    // ---------- MODIFIED: thrift contribution now funded from flexible plan ----------
     async function approveContribution(requestId) {
         try {
             const reqRef = doc(db, "contribution_requests", requestId);
             const reqSnap = await getDoc(reqRef);
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
+
+            // Verify group & membership
             const groupRef = doc(db, "groups", req.groupId);
             const groupSnap = await getDoc(groupRef);
             if (!groupSnap.exists()) return showMessage("Group not found");
             const group = groupSnap.data();
             if (!group.members?.includes(req.userId)) return showMessage("User not a member");
-            let finalAmount = req.amount;
+
+            // Calculate deductions
             let esusuDeduction = 0;
+            let profitDeduction = 0;
+            let netFromUser = req.amount;  // amount that must be covered by flexible balance
+
             if (group.applyEsusu) {
                 esusuDeduction = req.amount * esusuFraction;
-                finalAmount = req.amount - esusuDeduction;
-                await updateDoc(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
+                netFromUser -= esusuDeduction;
             }
             if (group.applyProfitLoss) {
-                const profitDeduction = req.amount * 0.01;
-                finalAmount = finalAmount - profitDeduction;
-                await updateDoc(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
+                profitDeduction = req.amount * 0.01;
+                netFromUser -= profitDeduction;
             }
-            await addDoc(collection(db, "contributions"), { groupId: req.groupId, userId: req.userId, amount: finalAmount, date: new Date().toISOString(), originalAmount: req.amount, esusuDeduction, approvedBy: currentAdmin.uid });
-            await updateDoc(reqRef, { status: "approved", processedAt: new Date().toISOString() });
+
+            // Fetch flexible plan
+            const flexQuery = query(collection(db, "savings_plans"),
+                where("userId", "==", req.userId),
+                where("type", "==", "flex"));
+            const flexSnap = await getDocs(flexQuery);
+            if (flexSnap.empty) return showMessage("User does not have a flexible plan to fund this contribution.");
+            const flexRef = flexSnap.docs[0].ref;
+            const flexBalance = flexSnap.docs[0].data().balance || 0;
+            if (flexBalance < netFromUser) return showMessage("Insufficient flexible balance to cover this contribution (after deductions).");
+
+            // Deduct from flexible, move deductions, record contribution
+            await runTransaction(db, async (transaction) => {
+                transaction.update(flexRef, { balance: increment(-netFromUser) });
+                if (esusuDeduction > 0) transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
+                if (profitDeduction > 0) transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
+                // Record the contribution (only the net credited amount)
+                const contribRef = doc(collection(db, "contributions"));
+                transaction.set(contribRef, {
+                    groupId: req.groupId,
+                    userId: req.userId,
+                    amount: req.amount - esusuDeduction - profitDeduction, // net credited to group
+                    date: new Date().toISOString(),
+                    originalAmount: req.amount,
+                    esusuDeduction,
+                    profitDeduction,
+                    approvedBy: currentAdmin.uid
+                });
+                transaction.update(reqRef, { status: "approved", processedAt: new Date().toISOString() });
+            });
+
             await logAudit("approve_thrift_contribution", req.userId, { groupId: req.groupId, amount: req.amount });
-            showMessage("Contribution approved", false);
+            showMessage("Contribution approved – funded from flexible plan.", false);
         } catch(e) { showMessage(e.message); }
     }
     async function rejectContribution(requestId) {
@@ -588,7 +708,7 @@
         showMessage("Contribution rejected", false);
     }
 
-    // ======================= PENDING THRIFT PAYOUTS =======================
+    // ======================= PENDING THRIFT PAYOUTS (unchanged) =======================
     async function loadPendingPayouts() {
         const q = query(collection(db, "payout_requests"), where("status", "==", "pending"));
         onSnapshot(q, async (snapshot) => {
@@ -712,7 +832,7 @@
         document.getElementById('cancelPrivilegesBtn').onclick = closeModal;
     }
 
-    // ======================= OTHER ADMIN FUNCTIONS (fully implemented) =======================
+    // ======================= LOAD ADMIN DATA (all tables) =======================
     async function loadAdminData() {
         if (!currentAdmin) return;
         await loadUserManagement();
@@ -821,7 +941,7 @@
         });
     }
 
-    // ======================= USER & STAFF MANAGEMENT (full implementations) =======================
+    // ======================= STAFF / USER / LOAN / MANUAL DEPOSIT FUNCTIONS (unchanged) =======================
     async function createUserAccount() {
         const email = prompt("Email:"); if(!email) return;
         const password = prompt("Temp password (min 6):"); if(!password || password.length<6) return showMessage("Min 6 chars");
@@ -1042,7 +1162,7 @@
     document.getElementById('viewStatementBtn').onclick = () => { const email = prompt("User email:"); if(email) getDocs(query(collection(db,"users"),where("email","==",email))).then(snap => { if(snap.empty) showMessage("User not found"); else showStatement(snap.docs[0].id, snap.docs[0].data().fullName); }); };
     document.getElementById('viewAuditTrailBtn').onclick = viewAuditTrail;
 
-    // Authentication and initial load
+    // Auth state & init
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -1073,7 +1193,7 @@
                 onSnapshot(collection(db, "loans"), () => loadLoans());
                 onSnapshot(query(collection(db, "deposit_requests"), where("status", "==", "pending")), () => loadPendingDeposits());
                 onSnapshot(query(collection(db, "withdrawal_requests"), where("status", "==", "pending")), () => loadWithdrawalRequests());
-                onSnapshot(query(collection(db, "withdrawals"), where("status", "==", "pending")), () => loadProfileWithdrawals());  // auto-refresh
+                onSnapshot(query(collection(db, "withdrawals"), where("status", "==", "pending")), () => loadProfileWithdrawals());
                 onSnapshot(query(collection(db, "contribution_requests"), where("status", "==", "pending")), () => loadPendingContributions());
                 onSnapshot(query(collection(db, "payout_requests"), where("status", "==", "pending")), () => loadPendingPayouts());
                 return;
@@ -1085,26 +1205,8 @@
     logoutBtn.onclick = async () => { await signOut(auth); window.location.href = 'index.html'; };
 </script>
 
-<!-- ========== THRIFT GROUP CREATION MODAL & BUTTON ========== -->
-<div id="createGroupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(2px);">
-    <div style="background: white; max-width: 500px; width: 90%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto;">
-        <h3 style="color: #1e3c72; margin-bottom: 20px;">➕ Create New Thrift Group</h3>
-        <div class="form-group"><label>Group Name</label><input type="text" id="newGroupName" placeholder="e.g., Daily Savings Group"></div>
-        <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
-        <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><small style="display:block; margin-top:4px;">1 = daily, 7 = weekly, 30 = monthly</small></div>
-        <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
-        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label></div>
-        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
-        <div class="flex-btns" style="margin-top: 20px;">
-            <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
-            <button class="btn btn-outline" id="cancelCreateGroupBtn">Cancel</button>
-        </div>
-    </div>
-</div>
-
+<!-- Thrift group creation script (separate module) -->
 <script type="module">
-    // This script adds the thrift group creation button and handles the modal.
-    // It uses the same Firebase app, auth, db from the global scope (already initialized above).
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -1172,14 +1274,12 @@
                     });
                     alert(`Thrift group "${name}" created successfully!`);
                     closeModal();
-                    // Clear form
                     document.getElementById('newGroupName').value = '';
                     document.getElementById('newGroupAmount').value = '';
                     document.getElementById('newGroupFrequency').value = '7';
                     document.getElementById('newGroupMaxMembers').value = '10';
                     document.getElementById('newGroupApplyEsusu').checked = false;
                     document.getElementById('newGroupApplyProfitLoss').checked = false;
-                    // Refresh groups table (the main script's loadAdminData will be triggered by snapshot)
                     if (typeof loadAdminData === 'function') loadAdminData();
                     else location.reload();
                 } catch (err) {
