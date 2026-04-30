@@ -253,6 +253,18 @@
         </div>
     </header>
     <div class="main-content" id="mainContent">
+        <!-- Withdraw button (global) -->
+        <div class="section" id="withdrawSection" style="display: none;">
+            <div class="section-title">💸 Request Account Withdrawal</div>
+            <div class="form-group">
+                <label>Amount (₦)</label>
+                <input type="number" id="withdrawalAmount" placeholder="Enter amount" step="100" min="0">
+            </div>
+            <button class="btn btn-primary" id="withdrawBtn">Request Withdrawal</button>
+            <p class="info-banner" style="margin-top:10px;">Your profile must be complete (bank details) before you can request a withdrawal.</p>
+        </div>
+
+        <!-- Dashboard content (savings plans, groups) -->
         <div id="dashboardContent" class="hidden">
             <div class="info-banner" id="permWarning" style="display:none;">⚠️ Firestore permission error – update rules.</div>
             <div class="section">
@@ -270,6 +282,7 @@
                 <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Join, then deposit contributions via payment gateway. All payments require admin approval.</p>
             </div>
         </div>
+
         <div id="loginPrompt" class="login-prompt hidden">
             <h2>🔐 Welcome to OmaPosh</h2>
             <p style="margin-bottom: 30px;">Please log in or create an account to access your savings and thrift groups.</p>
@@ -336,6 +349,7 @@
 
     // DOM elements
     const dashboardContent = document.getElementById('dashboardContent');
+    const withdrawSection = document.getElementById('withdrawSection');
     const loginPrompt = document.getElementById('loginPrompt');
     const userNameSpan = document.getElementById('userName');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -452,8 +466,8 @@
                             ${extra}
                             <div class="flex-btns">
                                 <button class="btn btn-sm btn-primary" data-plan="${p.id}" data-action="deposit">Request Deposit</button>
-                                <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw" style="background:#f8f9fa; color:#333; border:1px solid #ccc;">Request Withdrawal</button>
-                                <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history" style="background:#eef2f7;">View History & Requests</button>
+                                <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="withdraw">Request Withdrawal</button>
+                                <button class="btn btn-sm btn-outline" data-plan="${p.id}" data-action="history">View History & Requests</button>
                             </div>
                             <div>${pendingText}</div>
                             <div class="pending-badge">⏳ Deposits require payment via Moniepoint and admin approval.</div>
@@ -461,7 +475,7 @@
             }
             plansList.innerHTML = html;
             document.querySelectorAll('[data-action="deposit"]').forEach(btn => btn.onclick = () => initiateSavingsDeposit(btn.dataset.plan));
-            document.querySelectorAll('[data-action="withdraw"]').forEach(btn => btn.onclick = () => createWithdrawalRequest(btn.dataset.plan));
+            document.querySelectorAll('[data-action="withdraw"]').forEach(btn => btn.onclick = () => submitPlanWithdrawalRequest(btn.dataset.plan));
             document.querySelectorAll('[data-action="history"]').forEach(btn => btn.onclick = () => viewFullHistory(btn.dataset.plan));
         } catch(err) { handleFirestoreError(err); }
     }
@@ -490,7 +504,7 @@
         } catch(err) { handleFirestoreError(err); }
     }
 
-    async function createWithdrawalRequest(planId) {
+    async function submitPlanWithdrawalRequest(planId) {
         try {
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
@@ -679,6 +693,102 @@
         document.body.appendChild(btn);
     }
 
+    // ========== WITHDRAWAL – PROFILE CHECK & REQUEST SUBMISSION ==========
+    const REQUIRED_PROFILE_FIELDS = ['fullName', 'bankName', 'accountNumber', 'accountName'];
+
+    async function checkProfileComplete(uid) {
+        const userDocRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userDocRef);
+        if (!userSnap.exists()) return false;
+        const data = userSnap.data();
+        return REQUIRED_PROFILE_FIELDS.every(field => data[field] && data[field].toString().trim() !== '');
+    }
+
+    async function getUserProfile(uid) {
+        const userDocRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userDocRef);
+        return userSnap.exists() ? userSnap.data() : null;
+    }
+
+    const withdrawBtn = document.getElementById('withdrawBtn');
+    const withdrawalAmountInput = document.getElementById('withdrawalAmount');
+
+    if (withdrawBtn) {
+        withdrawBtn.addEventListener('click', async () => {
+            if (!currentUser) {
+                showToast("You must be logged in to withdraw.", true);
+                return;
+            }
+            const amount = parseFloat(withdrawalAmountInput.value);
+            if (!amount || amount <= 0) {
+                showToast("Please enter a valid withdrawal amount.", true);
+                return;
+            }
+            const isProfileComplete = await checkProfileComplete(currentUser.uid);
+            if (!isProfileComplete) {
+                sessionStorage.setItem('pendingWithdrawalAmount', amount);
+                window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
+                return;
+            }
+            await createAccountWithdrawalRequest(currentUser.uid, amount);
+        });
+    }
+
+    async function createAccountWithdrawalRequest(uid, amount) {
+        const profile = await getUserProfile(uid);
+        if (!profile) {
+            showToast("Could not fetch your profile. Please try again.", true);
+            return;
+        }
+        const withdrawalData = {
+            userId: uid,
+            userEmail: auth.currentUser.email,
+            fullName: profile.fullName || 'Unknown',
+            amount: amount,
+            accountDetails: {
+                bankName: profile.bankName,
+                accountNumber: profile.accountNumber,
+                accountName: profile.accountName
+            },
+            status: "pending",
+            requestedAt: new Date().toISOString(),
+            processedAt: null,
+            adminNote: ""
+        };
+        try {
+            await addDoc(collection(db, "withdrawals"), withdrawalData);
+            showToast("✅ Withdrawal request submitted. Admin will review it shortly.", false);
+            withdrawalAmountInput.value = '';
+        } catch (error) {
+            console.error("Failed to submit withdrawal:", error);
+            showToast("Failed to submit withdrawal request. Please try again.", true);
+        }
+    }
+
+    // Auto‑submit withdrawal after returning from profile
+    (function handleReturnFromProfile() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('withdraw') === '1' && auth.currentUser) {
+            const user = auth.currentUser;
+            setTimeout(async () => {
+                const isComplete = await checkProfileComplete(user.uid);
+                if (isComplete) {
+                    const storedAmount = sessionStorage.getItem('pendingWithdrawalAmount');
+                    if (storedAmount) {
+                        const amount = parseFloat(storedAmount);
+                        sessionStorage.removeItem('pendingWithdrawalAmount');
+                        await createAccountWithdrawalRequest(user.uid, amount);
+                    } else {
+                        showToast("Profile completed. Please enter the withdrawal amount again.", false);
+                        withdrawSection.style.display = 'block';
+                    }
+                } else {
+                    showToast("Profile still incomplete. Please update all required fields.", true);
+                }
+            }, 500);
+        }
+    })();
+
     // ========== CONTRIBUTION REMINDER SYSTEM ==========
     async function checkContributionReminders() {
         if (!currentUser) return;
@@ -731,16 +841,25 @@
             let role = userDoc.exists() ? userDoc.data().role : null;
             if (role === 'admin') { window.location.href = "admin.html"; return; }
             dashboardContent.classList.remove('hidden');
+            withdrawSection.style.display = 'block';   // show the account withdrawal section
             loginPrompt.classList.add('hidden');
             const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
             userNameSpan.innerText = `${getGreeting()}, ${fullName}`;
             logoutBtn.style.display = 'inline-flex';
             await renderUserPlans();
             listenUserGroups();
-            await checkContributionReminders();  // send reminders on login
+            await checkContributionReminders();
             addLedgerButton();
+
+            // Auto‑trigger withdrawal from stored amount/return URL
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('withdraw') === '1') {
+                // handled by the immediate self‑invoking function above; just ensure the section is visible
+                withdrawSection.style.display = 'block';
+            }
         } else {
             dashboardContent.classList.add('hidden');
+            withdrawSection.style.display = 'none';
             loginPrompt.classList.remove('hidden');
             if (userNameSpan) userNameSpan.innerText = '';
             if (logoutBtn) logoutBtn.style.display = 'none';
@@ -846,126 +965,6 @@ onAuthStateChanged(auth, (user) => {
         buttonsAdded = false;
     }
 });
-    //WITHDRAWAL LOGIC
-    // ========== WITHDRAWAL – PROFILE CHECK & REQUEST SUBMISSION ==========
-
-const withdrawBtn = document.getElementById('withdrawBtn');   // make sure this matches your button id
-const withdrawalAmountInput = document.getElementById('withdrawalAmount'); // if you have an amount field
-
-// Required fields for a complete profile (adjust as needed)
-const REQUIRED_PROFILE_FIELDS = [
-    'fullName',
-    'bankName',
-    'accountNumber',
-    'accountName'
-    // add other fields if necessary, e.g., 'phone', 'address'
-];
-
-async function checkProfileComplete(uid) {
-    const userDocRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userDocRef);
-    if (!userSnap.exists()) return false;
-    const data = userSnap.data();
-    return REQUIRED_PROFILE_FIELDS.every(field => data[field] && data[field].toString().trim() !== '');
-}
-
-async function getUserProfile(uid) {
-    const userDocRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userDocRef);
-    return userSnap.exists() ? userSnap.data() : null;
-}
-
-// When user clicks "Withdraw"
-if (withdrawBtn) {
-    withdrawBtn.addEventListener('click', async () => {
-        const user = auth.currentUser;
-        if (!user) {
-            showMessage("You must be logged in to withdraw.", true);
-            return;
-        }
-
-        // Optional: get withdrawal amount from an input
-        const amount = withdrawalAmountInput ? parseFloat(withdrawalAmountInput.value) : 0;
-        if (!amount || amount <= 0) {
-            showMessage("Please enter a valid withdrawal amount.", true);
-            return;
-        }
-
-        // 1️⃣ Check if profile is complete
-        const isProfileComplete = await checkProfileComplete(user.uid);
-        if (!isProfileComplete) {
-            sessionStorage.setItem('pendingWithdrawalAmount', amount);
-window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
-            // Redirect to profile.html with return URL
-            window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
-            return;
-        }
-
-        // 2️⃣ Profile is complete → create the withdrawal document directly
-        await createWithdrawalRequest(user.uid, amount);
-    });
-}
-
-async function createWithdrawalRequest(uid, amount) {
-    const profile = await getUserProfile(uid);
-    if (!profile) {
-        showMessage("Could not fetch your profile. Please try again.", true);
-        return;
-    }
-
-    const withdrawalData = {
-        userId: uid,
-        userEmail: auth.currentUser.email,
-        fullName: profile.fullName || 'Unknown',
-        amount: amount,
-        accountDetails: {
-            bankName: profile.bankName,
-            accountNumber: profile.accountNumber,
-            accountName: profile.accountName
-        },
-        status: "pending",
-        requestedAt: new Date().toISOString(),
-        processedAt: null,
-        adminNote: ""
-    };
-
-    try {
-        await addDoc(collection(db, "withdrawals"), withdrawalData);
-        showMessage("✅ Withdrawal request submitted. Admin will review it shortly.", false);
-        // Optionally clear the amount input
-        if (withdrawalAmountInput) withdrawalAmountInput.value = '';
-    } catch (error) {
-        console.error("Failed to submit withdrawal:", error);
-        showMessage("Failed to submit withdrawal request. Please try again.", true);
-    }
-}
-
-// ========== AUTO‑SUBMIT WITHDRAWAL AFTER RETURNING FROM PROFILE ==========
-(function handleReturnFromProfile() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('withdraw') === '1' && auth.currentUser) {
-        const user = auth.currentUser;
-        // Wait a brief moment for auth to be ready
-        setTimeout(async () => {
-            const isComplete = await checkProfileComplete(user.uid);
-            if (isComplete) {
-                // Since we came back from profile, we might want to re‑read the amount
-                // For safety, prompt user again or use a stored amount.
-                // Better: store the desired withdrawal amount in sessionStorage before redirecting.
-                const storedAmount = sessionStorage.getItem('pendingWithdrawalAmount');
-                if (storedAmount) {
-                    const amount = parseFloat(storedAmount);
-                    sessionStorage.removeItem('pendingWithdrawalAmount');
-                    await createWithdrawalRequest(user.uid, amount);
-                } else {
-                    showMessage("Profile completed. Please enter the withdrawal amount again.", false);
-                }
-            } else {
-                showMessage("Profile still incomplete. Please update all required fields.", true);
-            }
-        }, 500);
-    }
-})();
 </script>
 </body>
 </html>
