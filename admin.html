@@ -1288,6 +1288,7 @@
             };
         }
     }
+</script>
     <script type="module">
     // ========== THRIFT GROUP CREATION (standalone) ==========
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -1309,10 +1310,10 @@
 
     // Find the Staff Management section
     const staffSection = document.querySelector('.section:has(.section-title:contains("👥 Staff Management"))');
-    if (!staffSection) return;   // section not found, exit
+    if (!staffSection) return; // section not found, exit
 
     const existingBtn = document.getElementById('createThriftGroupBtn');
-    if (existingBtn) return;     // already added
+    if (existingBtn) return;   // already added
 
     // Create the button
     const createGroupBtn = document.createElement('button');
@@ -1326,7 +1327,10 @@
     staffHeader.appendChild(createGroupBtn);
 
     const modal = document.getElementById('createGroupModal');
-    if (!modal) return;   // modal not in DOM, add it if needed (but should be present from the full admin.html)
+    if (!modal) {
+        console.error('Missing #createGroupModal modal in HTML');
+        return;
+    }
 
     const closeModal = () => modal.classList.add('hidden');
     const openModal = () => modal.classList.remove('hidden');
@@ -1374,7 +1378,7 @@
             document.getElementById('newGroupApplyEsusu').checked = false;
             document.getElementById('newGroupApplyProfitLoss').checked = false;
 
-            // Refresh groups table (if loadAdminData exists in main script, it will update)
+            // Refresh groups table (if loadAdminData exists in main script)
             if (typeof loadAdminData === 'function') loadAdminData();
             else location.reload();
         } catch (err) {
@@ -1382,6 +1386,20 @@
         }
     });
 </script>
-</script>
+    <div id="createGroupModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10001; backdrop-filter: blur(2px);">
+    <div style="background: white; max-width: 500px; width: 90%; border-radius: 28px; padding: 24px; max-height: 85vh; overflow-y: auto;">
+        <h3 style="color: #1e3c72; margin-bottom: 20px;">➕ Create New Thrift Group</h3>
+        <div class="form-group"><label>Group Name</label><input type="text" id="newGroupName" placeholder="e.g., Daily Savings Group"></div>
+        <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
+        <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><small style="display:block; margin-top:4px;">1 = daily, 7 = weekly, 30 = monthly</small></div>
+        <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
+        <div class="flex-btns" style="margin-top: 20px;">
+            <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
+            <button class="btn btn-outline" id="cancelCreateGroupBtn">Cancel</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
