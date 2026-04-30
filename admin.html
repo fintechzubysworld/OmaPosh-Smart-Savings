@@ -1188,6 +1188,100 @@
             };
         }
     }
+    <script type="module">
+    // ========== THRIFT GROUP CREATION (standalone) ==========
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Find the Staff Management section
+    const staffSection = document.querySelector('.section:has(.section-title:contains("👥 Staff Management"))');
+    if (!staffSection) return;   // section not found, exit
+
+    const existingBtn = document.getElementById('createThriftGroupBtn');
+    if (existingBtn) return;     // already added
+
+    // Create the button
+    const createGroupBtn = document.createElement('button');
+    createGroupBtn.id = 'createThriftGroupBtn';
+    createGroupBtn.className = 'btn btn-primary';
+    createGroupBtn.innerHTML = '➕ Create Thrift Group';
+    createGroupBtn.style.marginLeft = '10px';
+
+    // Append to the flex container (or the section itself)
+    const staffHeader = staffSection.querySelector('.flex-btns') || staffSection;
+    staffHeader.appendChild(createGroupBtn);
+
+    const modal = document.getElementById('createGroupModal');
+    if (!modal) return;   // modal not in DOM, add it if needed (but should be present from the full admin.html)
+
+    const closeModal = () => modal.classList.add('hidden');
+    const openModal = () => modal.classList.remove('hidden');
+
+    createGroupBtn.onclick = openModal;
+    document.getElementById('cancelCreateGroupBtn')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('confirmCreateGroupBtn')?.addEventListener('click', async () => {
+        const name = document.getElementById('newGroupName')?.value.trim();
+        const amount = parseFloat(document.getElementById('newGroupAmount')?.value);
+        const frequencyDays = parseInt(document.getElementById('newGroupFrequency')?.value);
+        const maxMembers = parseInt(document.getElementById('newGroupMaxMembers')?.value);
+        const applyEsusu = document.getElementById('newGroupApplyEsusu')?.checked;
+        const applyProfitLoss = document.getElementById('newGroupApplyProfitLoss')?.checked;
+
+        if (!name || isNaN(amount) || amount <= 0 || isNaN(frequencyDays) || frequencyDays < 1 || isNaN(maxMembers) || maxMembers < 2) {
+            alert("Please fill all fields correctly.");
+            return;
+        }
+
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error("Not logged in");
+            await addDoc(collection(db, "groups"), {
+                name: name,
+                contributionAmount: amount,
+                frequencyDays: frequencyDays,
+                maxMembers: maxMembers,
+                applyEsusu: applyEsusu,
+                applyProfitLoss: applyProfitLoss,
+                members: [],
+                currentPayoutIndex: 0,
+                creatorId: currentUser.uid,
+                createdAt: new Date().toISOString()
+            });
+            alert(`Thrift group "${name}" created successfully!`);
+            closeModal();
+
+            // Clear form
+            document.getElementById('newGroupName').value = '';
+            document.getElementById('newGroupAmount').value = '';
+            document.getElementById('newGroupFrequency').value = '7';
+            document.getElementById('newGroupMaxMembers').value = '10';
+            document.getElementById('newGroupApplyEsusu').checked = false;
+            document.getElementById('newGroupApplyProfitLoss').checked = false;
+
+            // Refresh groups table (if loadAdminData exists in main script, it will update)
+            if (typeof loadAdminData === 'function') loadAdminData();
+            else location.reload();
+        } catch (err) {
+            alert("Error: " + err.message);
+        }
+    });
+</script>
 </script>
 </body>
 </html>
