@@ -1,0 +1,132 @@
+<!-- reset.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset</title>
+    <!-- EmailJS library -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f2f6ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 420px;
+        }
+        h2 {
+            margin-bottom: 0.5rem;
+            color: #1e293b;
+        }
+        p {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+        input {
+            width: 100%;
+            padding: 0.9rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            transition: border 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+        }
+        button {
+            width: 100%;
+            padding: 0.9rem;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #4f46e5; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        #message {
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+            min-height: 1.5rem;
+        }
+        .success { color: #16a34a; }
+        .error   { color: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Reset your password</h2>
+        <p>Enter the email address associated with your account and we'll send you a reset link.</p>
+        
+        <input type="email" id="emailInput" placeholder="you@example.com" required autocomplete="email">
+        <button id="sendBtn" onclick="sendResetEmail()">Send reset link</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        // ===== YOUR EMAILJS CREDENTIALS =====
+        const EMAILJS_PUBLIC_KEY = "uwDz5T65dSTM4RRJ3";      // Public key
+        const EMAILJS_SERVICE_ID = "service_mpqnvxf";        // Service ID
+        const EMAILJS_TEMPLATE_ID = "template_6sxcqx1";      // Template ID
+        // ===================================
+        
+        // Initialize EmailJS
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+        
+        const msgDiv = document.getElementById("message");
+        
+        function showMessage(text, isSuccess) {
+            msgDiv.textContent = text;
+            msgDiv.className = isSuccess ? "success" : "error";
+        }
+        
+        async function sendResetEmail() {
+            const email = document.getElementById("emailInput").value.trim();
+            if (!email || !email.includes("@")) {
+                showMessage("Please enter a valid email address.", false);
+                return;
+            }
+            
+            const btn = document.getElementById("sendBtn");
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+            showMessage("", false);
+            
+            try {
+                const response = await emailjs.send(
+                    EMAILJS_SERVICE_ID,
+                    EMAILJS_TEMPLATE_ID,
+                    { to_email: email }
+                );
+                console.log("Email sent successfully", response.status, response.text);
+                showMessage("✔ Reset link sent! Check your inbox.", true);
+            } catch (error) {
+                console.error("Email send failed:", error);
+                showMessage("Something went wrong. Please try again later.", false);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Send reset link";
+            }
+        }
+    </script>
+</body>
+</html>
