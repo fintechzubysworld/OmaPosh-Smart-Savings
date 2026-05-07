@@ -418,7 +418,7 @@
             if (!reqSnap.exists()) return showMessage("Request not found");
             const req = reqSnap.data();
             const planRef = doc(db, "savings_plans", req.planId);
-            // Deduct 3% to profit & loss account (as per business rule)
+            // Deduct 3% to profit & loss account
             const profitDeduction = req.amount * 0.03;
             const netToPlan = req.amount - profitDeduction;
             await runTransaction(db, async (transaction) => {
@@ -525,7 +525,7 @@
                     </td>
                 </tr>`;
             }
-            html += '</tbody></table>';
+            html += '</tbody><tr>';
             container.innerHTML = html;
             document.querySelectorAll('.approve-profile-wd').forEach(btn => btn.onclick = () => approveProfileWithdrawal(btn.dataset.id));
             document.querySelectorAll('.reject-profile-wd').forEach(btn => btn.onclick = () => rejectProfileWithdrawal(btn.dataset.id));
@@ -561,7 +561,7 @@
     // ======================= USER MANAGEMENT & PRIVILEGES =======================
     async function loadUserManagement() {
         const usersSnap = await getDocs(collection(db, "users"));
-        let html = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead></table><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>';
         for (const docSnap of usersSnap.docs) {
             const u = docSnap.data();
             const status = u.disabled ? "Disabled" : "Active";
@@ -757,15 +757,14 @@
         loadAdminData();
         loadLoans();
     }
-    // ========== FIXED: loadLoans (renamed loop variable to avoid shadowing) ==========
     async function loadLoans() {
         const loans = await getDocs(collection(db, "loans"));
-        let html = '<table><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th></table></thead><tbody>';
-        for (const loanDoc of loans.docs) {    // <-- FIX: changed variable name from 'doc' to 'loanDoc'
+        let html = '<tr><thead><tr><th>User</th><th>Amount</th><th>Interest</th><th>Months</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+        for (const loanDoc of loans.docs) {
             const l = loanDoc.data();
             const userDoc = await getDoc(doc(db, "users", l.userId));
             const userName = userDoc.exists() ? userDoc.data().fullName : l.userId;
-            html += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Amount">₦${l.amount}</td><td data-label="Interest">${l.interestRate}%</td><td data-label="Months">${l.repayMonths}</td><td data-label="Remaining">₦${l.remainingBalance.toFixed(2)}</td><td data-label="Status">${l.status}</td></tr>`;
+            html += `<tr><td data-label="User">${escapeHtml(userName)}<td><td data-label="Amount">₦${l.amount}</td><td data-label="Interest">${l.interestRate}%</td><td data-label="Months">${l.repayMonths}</td><td data-label="Remaining">₦${l.remainingBalance.toFixed(2)}</td><td data-label="Status">${l.status}</td></tr>`;
         }
         html += '</tbody></table>';
         document.getElementById('loanList').innerHTML = html;
@@ -791,14 +790,14 @@
         const fullName = userDoc.exists() ? userDoc.data().fullName : userName;
         const txns = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
         let html = `<h4>Statement for ${escapeHtml(fullName)}</h4><table class="statement-table"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody>`;
-        txns.forEach(txDoc => { const t = txDoc.data(); html += `<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type}</td><td>₦${t.amount.toFixed(2)}</td><td>${t.description || ''}</td></tr>`; });
+        txns.forEach(txDoc => { const t = txDoc.data(); html += `<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type}</td><td>₦${t.amount.toFixed(2)}</td><td>${t.description || ''}</td>`; });
         html += '</tbody></table>';
         showModal("User Statement", html);
     }
     async function viewAuditTrail() {
         const audit = await getDocs(query(collection(db, "audit_logs"), where("adminId", "==", currentAdmin?.uid)));
         let html = '<table class="statement-table"><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody>';
-        audit.forEach(auditDoc => { const a = auditDoc.data(); html += `<tr><td>${new Date(a.timestamp).toLocaleString()}</td><td>${a.action}</td><td>${a.targetUserId || '-'}</td><td>${JSON.stringify(a.details)}</td></tr>`; });
+        audit.forEach(auditDoc => { const a = auditDoc.data(); html += `<tr><td>${new Date(a.timestamp).toLocaleString()}</td><td>${a.action}</td><td>${a.targetUserId || '-'}</td><td>${JSON.stringify(a.details)}</td>`; });
         html += '</tbody></table>';
         showModal("Audit Trail", html);
     }
@@ -820,10 +819,10 @@
             <div class="stat-card"><div class="stat-number">${pendingRequestsSnap.size}</div><div class="stat-label">Pending Withdrawals</div></div>
         `;
         // All Users table
-        let usersHtml = '</tr><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
+        let usersHtml = '<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>';
         for (const userDoc of usersSnap.docs) {
             const u = userDoc.data();
-            usersHtml += `<tr><td data-label="Name">${escapeHtml(u.fullName || 'N/A')}</td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Joined">${new Date(u.createdAt).toLocaleDateString()}</td></tr>`;
+            usersHtml += `<tr><td data-label="Name">${escapeHtml(u.fullName || 'N/A')}</td><td data-label="Email">${escapeHtml(u.email)}</td><td data-label="Role">${u.role || 'user'}</td><td data-label="Joined">${new Date(u.createdAt).toLocaleDateString()}</td>`;
         }
         usersHtml += '</tbody></table>';
         document.getElementById('allUsersTable').innerHTML = usersHtml;
@@ -839,7 +838,7 @@
         document.querySelectorAll('.edit-role').forEach(btn => btn.onclick = () => editStaffRole(btn.dataset.uid));
         document.querySelectorAll('.disable-staff').forEach(btn => btn.onclick = () => disableStaff(btn.dataset.uid));
         // All Plans table
-        let plansHtml = '</table><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
+        let plansHtml = '<td><thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Details</th></tr></thead><tbody>';
         for (const planDoc of plansSnap.docs) {
             const p = planDoc.data();
             const userDoc = await getDoc(doc(db, "users", p.userId));
@@ -847,7 +846,7 @@
             let details = '';
             if (p.type === 'locked') details = `Lock until: ${new Date(p.lockUntil).toLocaleDateString()}`;
             else if (p.type === 'target') details = `Target: ₦${p.targetAmount} by ${new Date(p.targetDate).toLocaleDateString()}`;
-            plansHtml += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Type">${p.type}</td><td data-label="Balance">₦${(p.balance||0).toFixed(2)}</td><td data-label="Details">${details}</td></tr>`;
+            plansHtml += `<tr><td data-label="User">${escapeHtml(userName)}</td><td data-label="Type">${p.type}</td><td data-label="Balance">₦${(p.balance||0).toFixed(2)}</td><td data-label="Details">${details}</td>`;
         }
         plansHtml += '</tbody></table>';
         document.getElementById('allPlansTable').innerHTML = plansHtml;
@@ -917,10 +916,22 @@
                 return;
             }
         }
-        window.location.href = 'index.html';
+        // If not logged in or not admin, redirect to authentication page
+        window.location.href = 'authentication.html';
     });
 
-    logoutBtn.onclick = async () => { await signOut(auth); window.location.href = 'authentication.html'; };
+    // Logout button: ensure redirect to authentication.html
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await signOut(auth);
+            } catch (err) {
+                console.error("Sign out error:", err);
+            }
+            window.location.href = 'authentication.html';
+        });
+    }
 </script>
 </body>
 </html>
