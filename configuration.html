@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>OmaPosh | Esusu Fraction Configuration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .config-card {
+            background: white;
+            max-width: 550px;
+            width: 100%;
+            border-radius: 32px;
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }
+
+        .config-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 28px 30px;
+            text-align: center;
+        }
+
+        .config-header h1 {
+            font-size: 1.9rem;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        .config-header p {
+            opacity: 0.85;
+            font-size: 0.9rem;
+        }
+
+        .config-body {
+            padding: 30px;
+        }
+
+        .info-box {
+            background: #f0f7ff;
+            border-left: 5px solid #ffb347;
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 28px;
+            font-size: 0.95rem;
+            color: #1e2a3e;
+        }
+
+        .info-box strong {
+            color: #1e3c72;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .info-box p {
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+
+        .current-value-card {
+            background: #f8f9fc;
+            border-radius: 24px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 28px;
+            border: 1px solid #e9ecef;
+        }
+
+        .current-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+
+        .current-percent {
+            font-size: 3.2rem;
+            font-weight: 800;
+            color: #2a5298;
+            line-height: 1;
+        }
+
+        .current-percent small {
+            font-size: 1.2rem;
+            font-weight: 400;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e3c72;
+            font-size: 0.9rem;
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 1rem;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #ffb347;
+            box-shadow: 0 0 0 3px rgba(255, 179, 71, 0.2);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #ffb347;
+            color: #1e2a3e;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #ff9f1a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #495057;
+            margin-top: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: #dee2e6;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 40px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .message-success {
+            background: #d1e7dd;
+            color: #0f5132;
+            border-left: 4px solid #198754;
+        }
+
+        .message-error {
+            background: #f8d7da;
+            color: #842029;
+            border-left: 4px solid #dc3545;
+        }
+
+        .message-info {
+            background: #cff4fc;
+            color: #055160;
+            border-left: 4px solid #0dcaf0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #ffb347;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .admin-badge {
+            background: #1e3c72;
+            color: white;
+            border-radius: 60px;
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            display: inline-block;
+            margin-top: 12px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            font-size: 0.75rem;
+            color: #6c757d;
+            border-top: 1px solid #edf2f7;
+        }
+
+        @media (max-width: 500px) {
+            .config-body {
+                padding: 24px 20px;
+            }
+            .current-percent {
+                font-size: 2.5rem;
+            }
+        }
+
+        .note {
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-top: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="config-card">
+        <div class="config-header">
+            <h1>⚙️ Esusu Fraction</h1>
+            <p>Configure contribution deduction rate</p>
+            <div class="admin-badge" id="adminBadge">🔐 Secured Configuration</div>
+        </div>
+        <div class="config-body">
+            <div id="authMessage" class="message message-info" style="display: none;"></div>
+            <div id="loadingArea" class="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 12px;">Verifying admin access...</p>
+            </div>
+            <div id="configContent" style="display: none;">
+                <div class="info-box">
+                    <strong>📌 What is Esusu Fraction?</strong>
+                    <p>When a user contributes to a thrift group that has <strong>"Apply Esusu deduction"</strong> enabled, this percentage is deducted from the contribution amount and credited to the system's Esusu Account.</p>
+                    <p style="margin-top: 8px;">Example: If fraction = <strong>1% (0.01)</strong>, and contribution = ₦10,000 → ₦100 goes to Esusu fund, ₦9,900 goes to the group pot.</p>
+                </div>
+
+                <div class="current-value-card">
+                    <div class="current-label">Current Esusu Fraction</div>
+                    <div class="current-percent" id="currentPercentDisplay">--%</div>
+                    <div class="note">(of each contribution)</div>
+                </div>
+
+                <div class="form-group">
+                    <label>✏️ Update Fraction</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="fractionInput" step="0.001" min="0" max="1" value="0.01">
+                        <span style="font-weight: 600;">= <span id="percentPreview">1.0</span>%</span>
+                    </div>
+                    <div class="note">Value between 0 and 1. Example: 0.01 = 1%, 0.05 = 5%</div>
+                </div>
+
+                <button class="btn" id="saveFractionBtn">💾 Save Configuration</button>
+                <button class="btn btn-secondary" id="logoutBtn">🚪 Logout & Return</button>
+            </div>
+        </div>
+        <footer>
+            OmaPosh Smart Savings • Esusu deduction applies globally to all thrift groups & contributions that enable the Esusu model.
+        </footer>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Firebase configuration (same as admin dashboard)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+            authDomain: "omaposh-smart-savings.firebaseapp.com",
+            projectId: "omaposh-smart-savings",
+            storageBucket: "omaposh-smart-savings.firebasestorage.app",
+            messagingSenderId: "469614412839",
+            appId: "1:469614412839:web:d51a47b468daad6184fa02"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const loadingArea = document.getElementById('loadingArea');
+        const configContent = document.getElementById('configContent');
+        const authMessageDiv = document.getElementById('authMessage');
+        const currentPercentDisplay = document.getElementById('currentPercentDisplay');
+        const fractionInput = document.getElementById('fractionInput');
+        const percentPreviewSpan = document.getElementById('percentPreview');
+        const saveBtn = document.getElementById('saveFractionBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const adminBadge = document.getElementById('adminBadge');
+
+        let currentFraction = 0.01;
+        
+        // Helper: show temporary message
+        function showMessage(text, type = 'info') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message message-${type}`;
+            msgDiv.textContent = text;
+            const container = document.getElementById('configContent');
+            if (container) {
+                // remove any existing message divs (except the first)
+                const oldMessages = container.querySelectorAll('.message');
+                oldMessages.forEach(m => m.remove());
+                container.insertBefore(msgDiv, container.firstChild);
+                setTimeout(() => msgDiv.remove(), 4000);
+            } else {
+                alert(text);
+            }
+        }
+
+        // Update preview when input changes
+        function updatePreview() {
+            let val = parseFloat(fractionInput.value);
+            if (isNaN(val)) val = 0;
+            const percent = (val * 100).toFixed(2);
+            percentPreviewSpan.textContent = percent;
+        }
+        fractionInput.addEventListener('input', updatePreview);
+        
+        // Load current Esusu fraction from Firestore
+        async function loadCurrentFraction() {
+            try {
+                const configRef = doc(db, "system_config", "financial_models");
+                const docSnap = await getDoc(configRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    currentFraction = data.esusuFraction !== undefined ? data.esusuFraction : 0.01;
+                } else {
+                    // Create default if not exists
+                    currentFraction = 0.01;
+                    await setDoc(configRef, { esusuFraction: currentFraction, updatedAt: new Date().toISOString() });
+                }
+                // Update UI
+                fractionInput.value = currentFraction;
+                const percentValue = (currentFraction * 100).toFixed(2);
+                currentPercentDisplay.innerHTML = `${percentValue}% <small>(${currentFraction})</small>`;
+                percentPreviewSpan.textContent = percentValue;
+            } catch (error) {
+                console.error("Error loading fraction:", error);
+                showMessage("⚠️ Could not load current configuration. Please refresh.", "error");
+                currentPercentDisplay.innerHTML = "Error";
+            }
+        }
+
+        // Save updated fraction to Firestore
+        async function saveFraction(newFraction) {
+            try {
+                const configRef = doc(db, "system_config", "financial_models");
+                await setDoc(configRef, { 
+                    esusuFraction: newFraction,
+                    updatedAt: new Date().toISOString(),
+                    lastUpdatedBy: auth.currentUser?.uid || 'admin'
+                }, { merge: true });
+                
+                // Also update the global esusuFraction variable used in contributions approval (in main app)
+                // But here we just ensure it's saved. The main app will fetch latest on next operation.
+                currentFraction = newFraction;
+                const percentValue = (newFraction * 100).toFixed(2);
+                currentPercentDisplay.innerHTML = `${percentValue}% <small>(${newFraction})</small>`;
+                showMessage(`✅ Esusu fraction updated to ${percentValue}% (${newFraction}). This will affect all future approved contributions where Esusu model is enabled.`, "success");
+            } catch (error) {
+                console.error("Error saving fraction:", error);
+                showMessage("❌ Failed to save configuration. Check your permissions and try again.", "error");
+                throw error;
+            }
+        }
+
+        // Check if current user is admin (role = 'admin' or specific email)
+        async function isUserAdmin(user) {
+            if (!user) return false;
+            try {
+                const userRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    if (userData.role === 'admin') return true;
+                    if (user.email === "admin@omaposhsmartsavings.com") return true;
+                }
+                // fallback: check email directly (super admin)
+                return user.email === "admin@omaposhsmartsavings.com";
+            } catch (err) {
+                console.warn("Admin check error", err);
+                return false;
+            }
+        }
+
+        // Initialize based on auth state
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const isAdmin = await isUserAdmin(user);
+                if (isAdmin) {
+                    // Admin granted access
+                    loadingArea.style.display = 'none';
+                    configContent.style.display = 'block';
+                    authMessageDiv.style.display = 'none';
+                    adminBadge.textContent = `👑 Admin: ${user.email}`;
+                    await loadCurrentFraction();
+                } else {
+                    // Logged in but not admin
+                    loadingArea.style.display = 'none';
+                    configContent.style.display = 'block';
+                    authMessageDiv.style.display = 'block';
+                    authMessageDiv.className = 'message message-error';
+                    authMessageDiv.innerHTML = `⛔ Access Denied: Your account (${user.email}) does not have admin privileges. Only administrators can modify the Esusu fraction.<br><br><button id="forceLogoutBtn" style="background:#dc3545; color:white; border:none; padding:8px 16px; border-radius:40px; margin-top:8px; cursor:pointer;">Logout</button>`;
+                    const logoutBtnForce = document.getElementById('forceLogoutBtn');
+                    if (logoutBtnForce) logoutBtnForce.onclick = async () => { await signOut(auth); window.location.reload(); };
+                    configContent.querySelectorAll('#saveFractionBtn, #fractionInput').forEach(el => el.disabled = true);
+                }
+            } else {
+                // Not logged in
+                loadingArea.style.display = 'none';
+                configContent.style.display = 'block';
+                authMessageDiv.style.display = 'block';
+                authMessageDiv.className = 'message message-error';
+                authMessageDiv.innerHTML = `🔒 You must be logged in as an administrator to configure the Esusu fraction.<br><br><a href="index.html" style="color:#ffb347; font-weight:600;">→ Go to Login Page</a>`;
+                configContent.querySelectorAll('#saveFractionBtn, #fractionInput').forEach(el => el.disabled = true);
+            }
+        });
+
+        // Save button handler
+        saveBtn.addEventListener('click', async () => {
+            const newValue = parseFloat(fractionInput.value);
+            if (isNaN(newValue)) {
+                showMessage("Please enter a valid number between 0 and 1.", "error");
+                return;
+            }
+            if (newValue < 0 || newValue > 1) {
+                showMessage("Fraction must be between 0 and 1 (0% to 100%).", "error");
+                return;
+            }
+            
+            // confirm with user
+            const percentVal = (newValue * 100).toFixed(2);
+            const confirmMsg = `Change Esusu deduction from ${(currentFraction*100).toFixed(2)}% to ${percentVal}%?\n\nThis will affect all future thrift contributions where the Esusu model is enabled.`;
+            if (confirm(confirmMsg)) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = "Saving...";
+                try {
+                    await saveFraction(newValue);
+                    // After saving, also update the local variable if needed
+                    currentFraction = newValue;
+                } catch (err) {
+                    // error already shown
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = "💾 Save Configuration";
+                }
+            }
+        });
+
+        // Logout handler
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = 'index.html';
+        });
+        
+        // initial preview update
+        updatePreview();
+    </script>
+</body>
+</html>
