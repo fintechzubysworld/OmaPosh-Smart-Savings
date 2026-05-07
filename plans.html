@@ -700,5 +700,55 @@
 
     document.getElementById('backBtn').onclick = () => window.location.href = 'index.html';
 </script>
+    <!-- Add this script to any page where you want guaranteed logout redirect -->
+<script type="module">
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+
+    // Firebase config (same as your project)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Function to perform logout and redirect
+    async function logoutAndRedirect() {
+        try {
+            await signOut(auth);
+            window.location.href = "authentication.html";
+        } catch (error) {
+            console.error("Logout error:", error);
+            // Fallback redirect anyway
+            window.location.href = "authentication.html";
+        }
+    }
+
+    // Attach to existing logout button (if present)
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        // Remove any existing listeners and add ours
+        const newBtn = logoutBtn.cloneNode(true);
+        logoutBtn.parentNode.replaceChild(newBtn, logoutBtn);
+        newBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutAndRedirect();
+        });
+    }
+
+    // Global listener: if auth state changes to no user, redirect
+    onAuthStateChanged(auth, (user) => {
+        if (!user && window.location.pathname !== '/authentication.html') {
+            // Avoid infinite redirect on the login page itself
+            window.location.href = "authentication.html";
+        }
+    });
+</script>
 </body>
 </html>
