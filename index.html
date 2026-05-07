@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
-    <!-- ========== CUSTOM DIALOG OVERRIDE ========== -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
@@ -242,7 +241,6 @@
         }
         .login-prompt h2 { color: #1e3c72; margin-bottom: 20px; }
         .login-prompt .btn-large { padding: 14px 32px; font-size: 1.1rem; }
-        /* Balance card styles */
         .balance-card {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border-radius: 24px;
@@ -298,7 +296,7 @@
         </div>
     </header>
     <div class="main-content" id="mainContent">
-        <!-- Clickable Savings Balances (replaces wallet icon) -->
+        <!-- Clickable Savings Balances -->
         <div class="section">
             <div class="section-title" id="plansHeading">
                 📈 My Savings Plans
@@ -328,10 +326,10 @@
         <div class="section">
             <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
             <div id="groupsList" class="card-grid">Loading groups...</div>
-            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Join, then deposit contributions via payment gateway. All payments require admin approval.</p>
+            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Contributions are auto-deducted from your Flexible plan after Esusu/Profit deductions.</p>
         </div>
 
-        <!-- Withdrawal Section (moved to bottom, after thrift groups) -->
+        <!-- Withdrawal Section (bottom) -->
         <div class="section" id="withdrawSection" style="display: none;">
             <div class="section-title">💸 Request Account Withdrawal</div>
             <div class="form-group">
@@ -339,7 +337,7 @@
                 <input type="number" id="withdrawalAmount" placeholder="Enter amount" step="100" min="0">
             </div>
             <button class="btn btn-primary" id="withdrawBtn">Request Withdrawal</button>
-            <p class="info-banner" style="margin-top:10px;">Your profile must be complete (bank details) before you can request a withdrawal. Funds are taken from your flexible plan.</p>
+            <p class="info-banner" style="margin-top:10px;">Funds are taken from your flexible plan and require admin approval.</p>
         </div>
 
         <div id="loginPrompt" class="login-prompt hidden">
@@ -351,7 +349,7 @@
     <footer>© 2026 OmaPosh Smart Savings</footer>
 </div>
 
-<!-- Payment Gateway Modal -->
+<!-- Payment Gateway Modal (only for flexible deposits) -->
 <div id="paymentModal" class="hidden">
     <div>
         <h3 id="paymentModalTitle">Complete Payment</h3>
@@ -392,7 +390,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, onSnapshot, arrayUnion, increment, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, onSnapshot, arrayUnion, increment, runTransaction, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -470,8 +468,14 @@
     document.getElementById('closeModalBtn').onclick = closeModal;
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
+    let paymentModalAllowed = false;
     function showPaymentGateway(amount, purpose, onCreateRequest) {
         return new Promise((resolve) => {
+            if (!paymentModalAllowed) {
+                console.warn("Payment modal blocked: not triggered by user button click");
+                resolve(false);
+                return;
+            }
             paymentAmountDisplay.innerText = `₦${amount.toFixed(2)}`;
             document.getElementById('paymentModalTitle').innerText = purpose;
             transactionRefInput.value = '';
@@ -479,7 +483,7 @@
             pendingPaymentCallback = async () => {
                 const ref = transactionRefInput.value.trim() || "N/A";
                 await onCreateRequest(ref);
-                showToast(`Payment request of ₦${amount.toFixed(2)} recorded. Waiting for admin approval.`, false);
+                showToast(`Deposit request of ₦${amount.toFixed(2)} sent to admin for approval.`, false);
                 paymentModal.classList.add('hidden');
                 resolve(true);
             };
@@ -521,7 +525,23 @@
         });
     }
 
-    // ========== THRIFT GROUP FUNCTIONS ==========
+    // ========== THRIFT GROUP FUNCTIONS (auto deductions & payouts) ==========
+    async function getEsusuFraction() {
+        const configSnap = await getDoc(doc(db, "system_config", "financial_models"));
+        return configSnap.exists() ? (configSnap.data().esusuFraction || 0) : 0;
+    }
+
+    async function notifyAdmin(subject, message) {
+        await addDoc(collection(db, "messages"), {
+            userId: "admin_notification",
+            subject: subject,
+            message: message,
+            read: false,
+            createdAt: new Date(),
+            type: "auto_action"
+        });
+    }
+
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
         const q = query(collection(db, "groups"));
@@ -543,6 +563,7 @@
             }
             groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups yet. Admin will create.</p>';
             
+            // Join group handler
             document.querySelectorAll('.join-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -554,9 +575,18 @@
                     if (groupData.members?.length >= groupData.maxMembers) return showToast("Group full", true);
                     await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
                     showToast(`Joined "${groupData.name}"!`, false);
+                    
+                    // Notify admin
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `👥 User Joined Thrift Group: ${groupData.name}`,
+                        `Customer: ${userData.fullName || currentUser.email} (${currentUser.email})\nGroup: ${groupData.name}\nTime: ${new Date().toLocaleString()}`
+                    );
                 } catch(err) { showToast(err.message, true); }
             }));
             
+            // Auto contribution handler (deduct from flexible)
             document.querySelectorAll('.contribute-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -566,22 +596,51 @@
                     const group = groupSnap.data();
                     if (!group.members?.includes(currentUser.uid)) return showToast("Join first", true);
                     const amount = group.contributionAmount;
-                    await showPaymentGateway(amount, `Thrift Group Contribution: ${group.name}`, async (transactionRef) => {
-                        await addDoc(collection(db, "contribution_requests"), {
+                    
+                    const esusuFraction = await getEsusuFraction();
+                    let esusuDeduction = 0, profitDeduction = 0, netFromUser = amount;
+                    if (group.applyEsusu) { esusuDeduction = amount * esusuFraction; netFromUser -= esusuDeduction; }
+                    if (group.applyProfitLoss) { profitDeduction = amount * 0.01; netFromUser -= profitDeduction; }
+                    
+                    // Get flexible plan
+                    const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+                    const flexSnap = await getDocs(flexQuery);
+                    if (flexSnap.empty) return showToast("No flexible plan to fund contribution", true);
+                    const flexRef = flexSnap.docs[0].ref;
+                    const flexBalance = flexSnap.docs[0].data().balance || 0;
+                    if (flexBalance < netFromUser) return showToast(`Insufficient flexible balance. Need ₦${netFromUser.toFixed(2)}`, true);
+                    
+                    // Perform transaction
+                    await runTransaction(db, async (transaction) => {
+                        transaction.update(flexRef, { balance: increment(-netFromUser) });
+                        if (esusuDeduction > 0) transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
+                        if (profitDeduction > 0) transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
+                        const contribRef = doc(collection(db, "contributions"));
+                        transaction.set(contribRef, {
                             groupId: groupId,
                             userId: currentUser.uid,
-                            amount: amount,
-                            status: "pending",
-                            requestedAt: new Date().toISOString(),
-                            transactionReference: transactionRef,
-                            paymentMethod: "Moniepoint",
-                            groupName: group.name
+                            amount: amount - esusuDeduction - profitDeduction,
+                            date: new Date().toISOString(),
+                            originalAmount: amount,
+                            esusuDeduction,
+                            profitDeduction,
+                            approvedBy: "auto_system"
                         });
-                        showToast(`Contribution request of ₦${amount} sent to admin for approval.`, false);
                     });
+                    
+                    // Notify admin
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `💰 Thrift Contribution: ${userData.fullName || currentUser.email} → ${group.name}`,
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction: ₦${esusuDeduction.toFixed(2)} (${esusuFraction*100}%)\nProfit deduction: ₦${profitDeduction.toFixed(2)} (1%)\nNet from Flexible: ₦${netFromUser.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
+                    );
+                    
+                    showToast(`Contribution of ₦${amount.toFixed(2)} recorded.`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
             
+            // Auto payout handler (credit to flexible)
             document.querySelectorAll('.claim-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -591,18 +650,34 @@
                     const members = group.members || [];
                     const idx = group.currentPayoutIndex || 0;
                     if (members[idx] !== currentUser.uid) return showToast("Not your turn", true);
+                    
                     const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
                     const contribSnap = await getDocs(contribQuery);
                     const counts = {};
                     contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
-                    for (let m of members) if ((counts[m] || 0) <= idx) return showToast("Not all members have completed approved contributions for this cycle.", true);
+                    for (let m of members) if ((counts[m] || 0) <= idx) return showToast("Not all members have completed contributions for this cycle.", true);
+                    
                     const pot = group.contributionAmount * members.length;
+                    
+                    // Credit to flexible plan
                     const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
-                    const flexSnap = await getDocs(flexQuery);
-                    if (flexSnap.empty) await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
-                    else await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+                    let flexSnap = await getDocs(flexQuery);
+                    if (flexSnap.empty) {
+                        await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
+                    } else {
+                        await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+                    }
                     await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
                     await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString() });
+                    
+                    // Notify admin
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `🎉 Thrift Payout: ${userData.fullName || currentUser.email} from ${group.name}`,
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nPayout Amount: ₦${pot.toFixed(2)}\nMembers: ${members.length}\nContribution per member: ₦${group.contributionAmount}\nTime: ${new Date().toLocaleString()}\nAuto-credited to flexible plan.`
+                    );
+                    
                     showToast(`Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
@@ -618,7 +693,7 @@
         document.body.appendChild(btn);
     }
 
-    // ========== WITHDRAWAL – PROFILE CHECK & REQUEST SUBMISSION ==========
+    // ========== WITHDRAWAL FROM FLEXIBLE PLAN (admin approval) ==========
     const REQUIRED_PROFILE_FIELDS = ['fullName', 'bankName', 'accountNumber', 'accountName'];
 
     async function checkProfileComplete(uid) {
@@ -661,7 +736,7 @@
                 const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
                 const flexSnap = await getDocs(flexQuery);
                 if (flexSnap.empty) {
-                    showToast("You do not have a flexible savings plan. Please create one first.", true);
+                    showToast("You do not have a flexible savings plan.", true);
                     return;
                 }
                 const flexPlan = flexSnap.docs[0].data();
@@ -812,12 +887,11 @@
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
     
-    // Redirect to plans.html when clicking the heading OR the balance card
     if (plansHeading) plansHeading.addEventListener('click', () => { window.location.href = 'plans.html'; });
     if (balanceCard) balanceCard.addEventListener('click', () => { window.location.href = 'plans.html'; });
 </script>
 
-<!-- ========== NOTIFICATION BUTTONS (Floating Inbox & Bell) ========== -->
+<!-- Notification Buttons -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
