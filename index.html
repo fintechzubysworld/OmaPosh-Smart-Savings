@@ -267,7 +267,7 @@
         <!-- Dashboard content (savings plans, groups) -->
         <div id="dashboardContent" class="hidden">
             <div class="info-banner" id="permWarning" style="display:none;">⚠️ Firestore permission error – update rules.</div>
-            <div class="section">
+          <!--  <div class="section">
                 <div class="section-title">📈 My Savings Plans</div>
                 <div class="flex-btns" style="margin-bottom:20px;">
                     <button class="btn btn-primary" id="createFlexBtn">+ Flexible Plan</button>
@@ -281,7 +281,36 @@
                 <div id="groupsList" class="card-grid">Loading groups...</div>
                 <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Join, then deposit contributions via payment gateway. All payments require admin approval.</p>
             </div>
+        </div> -->
+            <!-- Inside index.html, replace the Savings Plans section with this -->
+<div class="section">
+    <div class="section-title" style="cursor: pointer; transition: text-shadow 0.2s; animation: slowFlash 1.5s infinite;" onclick="window.location.href='plans.html'">
+        📈 My Savings Plans
+    </div>
+    <div class="wallet-icon" style="text-align: center; margin: 20px 0;">
+        <div style="display: inline-block; background: #f4d03f; border-radius: 20px; padding: 30px 40px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); position: relative;">
+            <div style="font-size: 4rem;">👛</div>
+            <div style="position: absolute; top: -10px; right: -10px; background: #2ecc71; border-radius: 50%; padding: 8px 12px; font-weight: bold; color: white;">₦</div>
+            <div style="position: absolute; bottom: -15px; left: 20px; background: #27ae60; border-radius: 12px; padding: 6px 12px; font-size: 0.8rem; color: white;">💵💵</div>
         </div>
+        <p style="margin-top: 12px; color: #7f8c8d;">Manage your savings plans</p>
+    </div>
+</div>
+
+<style>
+@keyframes slowFlash {
+    0% { text-shadow: 0 0 0px #2ecc71; opacity: 1; }
+    50% { text-shadow: 0 0 12px #2ecc71, 0 0 8px #2ecc71; color: #2ecc71; }
+    100% { text-shadow: 0 0 0px #2ecc71; opacity: 1; }
+}
+.section-title {
+    transition: all 0.2s;
+}
+.section-title:hover {
+    transform: scale(1.02);
+}
+</style>
+
 
         <div id="loginPrompt" class="login-prompt hidden">
             <h2>🔐 Welcome to OmaPosh</h2>
