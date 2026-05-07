@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
+    <!-- ========== CUSTOM DIALOG OVERRIDE ========== -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
@@ -163,7 +164,7 @@
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
         .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; cursor: pointer; transition: all 0.2s; }
         .section-title:hover { transform: scale(1.02); }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 15px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; margin-top: 15px; }
         .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; position: relative; transition: 0.2s; }
         .plan-type { display: inline-block; background: #e9f0ff; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: bold; color: #1e3c72; margin-bottom: 12px; }
         .amount { font-size: 1.8rem; font-weight: bold; margin: 10px 0; word-break: break-word; }
@@ -284,6 +285,14 @@
         }
         .total-balance span:first-child { font-weight: normal; color: #6c757d; }
         .total-balance .total-number { font-size: 1.6rem; font-weight: bold; color: #2a5298; }
+        .deduction-badge {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            margin: 4px 0;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -326,7 +335,7 @@
         <div class="section">
             <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
             <div id="groupsList" class="card-grid">Loading groups...</div>
-            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Contributions are auto-deducted from your Flexible plan after 4.76% Esusu deduction and 1% Profit/Loss deduction.</p>
+            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Contributions are auto-deducted from your Flexible plan after group-specific deductions (Esusu & Profit/Loss).</p>
         </div>
 
         <!-- Withdrawal Section (bottom) -->
@@ -525,7 +534,7 @@
         });
     }
 
-    // ========== THRIFT GROUP FUNCTIONS (auto deductions with fixed 4.76% Esusu, 1% Profit) ==========
+    // ========== THRIFT GROUP FUNCTIONS ==========
     async function notifyAdmin(subject, message) {
         await addDoc(collection(db, "messages"), {
             userId: "admin_notification",
@@ -552,10 +561,22 @@
                 const maxMembers = group.maxMembers || 10;
                 const isFull = memberCount >= maxMembers;
                 const groupName = (group.name || 'Unnamed Group').replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'); });
+                const esusuPercent = ((group.esusuRate || 0) * 100).toFixed(2);
+                const profitPercent = ((group.profitRate || 0.01) * 100).toFixed(2);
                 let joinButton = !isMember ? (isFull ? `<button class="btn btn-sm" disabled>❌ Group Full</button>` : `<button class="btn btn-sm btn-primary join-group-btn" data-group-id="${group.id}">➕ Join This Thrift Group</button>`) : `<button class="btn btn-sm" disabled style="background:#28a745; color:white;">✅ Already a Member</button>`;
                 let actionButtons = isMember ? `<div class="flex-btns" style="margin-top:12px;"><button class="btn btn-sm btn-primary contribute-group-btn" data-group-id="${group.id}">💰 Deposit Contribution (₦${group.contributionAmount})</button><button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${group.id}" style="background:green;">💸 Withdraw Payout (Claim)</button></div>` : '';
                 let groupBalance = group.balance || 0;
-                html += `<div class="card"><div class="plan-type">THRIFT GROUP</div><h3>${groupName}</h3><div>💰 Contribution: ₦${group.contributionAmount} every ${group.frequencyDays} days</div><div>👥 Members: ${memberCount}/${maxMembers}</div><div>🏦 Group Balance: ₦${groupBalance.toFixed(2)}</div><div>🔄 Next payout: ${group.currentPayoutIndex || 0}</div>${joinButton}${actionButtons}</div>`;
+                html += `<div class="card">
+                            <div class="plan-type">THRIFT GROUP</div>
+                            <h3>${groupName}</h3>
+                            <div>💰 Contribution: ₦${group.contributionAmount} every ${group.frequencyDays} days</div>
+                            <div>👥 Members: ${memberCount}/${maxMembers}</div>
+                            <div>🏦 Group Balance: ₦${groupBalance.toFixed(2)}</div>
+                            <div>📊 Deductions: Esusu ${esusuPercent}% / Profit ${profitPercent}%</div>
+                            <div>🔄 Next payout: ${group.currentPayoutIndex || 0}</div>
+                            ${joinButton}
+                            ${actionButtons}
+                        </div>`;
             }
             groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups yet. Admin will create.</p>';
             
@@ -581,7 +602,7 @@
                 } catch(err) { showToast(err.message, true); }
             }));
             
-            // Auto contribution handler (deduct from flexible, apply fixed 4.76% Esusu, 1% Profit/Loss, add net to group balance)
+            // Auto contribution handler (use group-specific deduction rates)
             document.querySelectorAll('.contribute-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -592,12 +613,17 @@
                     if (!group.members?.includes(currentUser.uid)) return showToast("Join first", true);
                     const amount = group.contributionAmount;
                     
-                    // Fixed deductions: 4.76% Esusu, 1% Profit/Loss
-                    const esusuRate = 0.0476;   // 4.76%
-                    const profitRate = 0.01;     // 1%
+                    // Use group-specific rates (default to 0% if not set)
+                    const esusuRate = group.esusuRate || 0;
+                    const profitRate = group.profitRate || 0.01; // default 1% profit if missing (backward compatible)
                     const esusuDeduction = amount * esusuRate;
                     const profitDeduction = amount * profitRate;
                     const netToGroup = amount - esusuDeduction - profitDeduction;
+                    
+                    if (netToGroup < 0) {
+                        showToast("Deductions exceed contribution amount!", true);
+                        return;
+                    }
                     
                     // Get flexible plan
                     const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
@@ -610,9 +636,8 @@
                     // Perform transaction
                     await runTransaction(db, async (transaction) => {
                         transaction.update(flexRef, { balance: increment(-netToGroup) });
-                        transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
-                        transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
-                        // Add net amount to group balance
+                        if (esusuDeduction > 0) transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
+                        if (profitDeduction > 0) transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
                         transaction.update(groupRef, { balance: increment(netToGroup) });
                         const contribRef = doc(collection(db, "contributions"));
                         transaction.set(contribRef, {
@@ -632,14 +657,14 @@
                     const userData = userDoc.data();
                     await notifyAdmin(
                         `💰 Thrift Contribution: ${userData.fullName || currentUser.email} → ${group.name}`,
-                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction 4.76%: ₦${esusuDeduction.toFixed(2)}\nProfit deduction 1%: ₦${profitDeduction.toFixed(2)}\nNet added to group pot: ₦${netToGroup.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction ${(esusuRate*100).toFixed(2)}%: ₦${esusuDeduction.toFixed(2)}\nProfit deduction ${(profitRate*100).toFixed(2)}%: ₦${profitDeduction.toFixed(2)}\nNet added to group pot: ₦${netToGroup.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
                     );
                     
-                    showToast(`Contribution of ₦${amount.toFixed(2)} recorded. Net ₦${netToGroup.toFixed(2)} added to group pot.`, false);
+                    showToast(`Contribution recorded. Net ₦${netToGroup.toFixed(2)} added to group.`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
             
-            // Auto payout handler (credit group balance to flexible plan, then reset group balance to zero)
+            // Auto payout handler (credits group balance to flexible plan)
             document.querySelectorAll('.claim-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -650,7 +675,7 @@
                     const idx = group.currentPayoutIndex || 0;
                     if (members[idx] !== currentUser.uid) return showToast("Not your turn", true);
                     
-                    // Check that all members have contributed at least (idx+1) times
+                    // Verify all members have contributed enough times
                     const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
                     const contribSnap = await getDocs(contribQuery);
                     const counts = {};
