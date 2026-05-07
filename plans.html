@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OmaPosh | My Savings Plans</title>
-    <!-- ========== CUSTOM DIALOG OVERRIDE ========== -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
@@ -223,7 +222,7 @@
     <footer>© 2026 OmaPosh Smart Savings</footer>
 </div>
 
-<!-- Payment Modal -->
+<!-- Payment Modal (only for flexible plan deposits) -->
 <div id="paymentModal" class="hidden" style="display: none !important;">
     <div>
         <h3 id="paymentModalTitle">Complete Payment</h3>
@@ -263,7 +262,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, increment, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -286,7 +285,6 @@
     let pendingPaymentCallback = null;
     const flexWarning = document.getElementById('flexWarning');
 
-    // Force hide payment modal on load
     if (paymentModal) {
         paymentModal.style.display = 'none';
         paymentModal.classList.add('hidden');
@@ -337,7 +335,7 @@
             pendingPaymentCallback = async () => {
                 const ref = document.getElementById('transactionRef').value.trim() || "N/A";
                 await onCreateRequest(ref);
-                showToast(`Payment request of ₦${amount.toFixed(2)} recorded. Awaiting admin approval.`, false);
+                showToast(`Deposit request of ₦${amount.toFixed(2)} sent to admin for approval.`, false);
                 paymentModal.style.display = 'none';
                 paymentModal.classList.add('hidden');
                 resolve(true);
@@ -375,7 +373,6 @@
         } catch(e) { return { deposits: 0, withdrawals: 0 }; }
     }
 
-    // Check if user already has a flexible plan
     async function hasFlexiblePlan() {
         if (!currentUser) return false;
         const q = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
@@ -383,7 +380,6 @@
         return !snap.empty;
     }
 
-    // Update UI: disable flexible plan button if already exists
     async function updateFlexibleButtonState() {
         const flexBtn = document.getElementById('createFlexBtn');
         if (!flexBtn) return;
@@ -404,6 +400,17 @@
         }
     }
 
+    async function notifyAdmin(subject, message) {
+        await addDoc(collection(db, "messages"), {
+            userId: "admin_notification",
+            subject: subject,
+            message: message,
+            read: false,
+            createdAt: new Date(),
+            type: "auto_transfer"
+        });
+    }
+
     function listenToPlans() {
         if (plansUnsubscribe) plansUnsubscribe();
         if (!currentUser) return;
@@ -420,7 +427,7 @@
                 const pendingCounts = await getPendingCounts(p.id);
                 let pendingText = '';
                 if (pendingCounts.withdrawals > 0) pendingText += `<span class="request-badge">⏳ ${pendingCounts.withdrawals} pending withdrawal(s)</span>`;
-                if (pendingCounts.deposits > 0) pendingText += `<span class="request-badge">💰 ${pendingCounts.deposits} pending deposit(s)</span>`;
+                if (pendingCounts.deposits > 0 && p.type === 'flex') pendingText += `<span class="request-badge">💰 ${pendingCounts.deposits} pending deposit(s)</span>`;
                 let progress = p.type === 'target' ? `<div class="progress-bar"><div class="progress-fill" style="width:${(p.balance/p.targetAmount)*100}%"></div></div><div>₦${p.balance.toFixed(2)} / ₦${p.targetAmount.toFixed(2)} (${((p.balance/p.targetAmount)*100).toFixed(1)}%)</div>` : `<div class="amount">₦${p.balance.toFixed(2)}</div>`;
                 let extra = p.type === 'locked' ? `<div>🔓 Available after: ${new Date(p.lockUntil).toLocaleDateString()}</div>` : (p.type === 'target' ? `<div>🎯 Target date: ${new Date(p.targetDate).toLocaleDateString()}</div>` : '');
                 html += `<div class="card">
@@ -433,7 +440,7 @@
                                 <button class="btn btn-sm btn-outline history-btn" data-plan="${p.id}">View History</button>
                             </div>
                             <div>${pendingText}</div>
-                            <div class="pending-badge">⏳ Deposits require payment and admin approval.</div>
+                            <div class="pending-badge">${p.type === 'flex' ? '⏳ Deposits require payment and admin approval.' : '✅ Transfers from Flexible plan happen instantly.'}</div>
                         </div>`;
             }
             plansList.innerHTML = html;
@@ -447,56 +454,130 @@
         });
     }
 
+    // Deposit handler: flexible = admin approval; locked/target = auto transfer from flexible
     async function initiateSavingsDeposit(planId) {
-        const amount = parseFloat(await prompt("Enter deposit amount (₦):"));
-        if (isNaN(amount) || amount <= 0) return showToast("Invalid amount", true);
-        try {
-            const planRef = doc(db, "savings_plans", planId);
-            const planSnap = await getDoc(planRef);
-            if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showToast("Invalid plan", true);
+        const planRef = doc(db, "savings_plans", planId);
+        const planSnap = await getDoc(planRef);
+        if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showToast("Invalid plan", true);
+        const targetPlan = planSnap.data();
+        
+        if (targetPlan.type === 'flex') {
+            const amount = parseFloat(await prompt("Enter deposit amount (₦):"));
+            if (isNaN(amount) || amount <= 0) return showToast("Invalid amount", true);
             paymentModalAllowed = true;
-            await showPaymentGateway(amount, "Deposit to Savings Plan", async (transactionRef) => {
+            await showPaymentGateway(amount, "Deposit to Flexible Plan", async (transactionRef) => {
                 await addDoc(collection(db, "deposit_requests"), {
                     userId: currentUser.uid,
                     planId: planId,
                     amount: amount,
                     status: "pending",
                     requestDate: new Date().toISOString(),
-                    planType: planSnap.data().type,
+                    planType: 'flex',
                     transactionReference: transactionRef,
                     paymentMethod: "Moniepoint"
                 });
-                showToast(`Deposit request of ₦${amount.toFixed(2)} sent.`, false);
             });
             paymentModalAllowed = false;
+            return;
+        }
+        
+        // Locked or Target plan: transfer from flexible
+        const amount = parseFloat(await prompt(`Enter amount to transfer from Flexible to ${targetPlan.type.toUpperCase()} plan (₦):`));
+        if (isNaN(amount) || amount <= 0) return showToast("Invalid amount", true);
+        
+        try {
+            const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+            const flexSnap = await getDocs(flexQuery);
+            if (flexSnap.empty) return showToast("You don't have a flexible plan.", true);
+            const flexPlan = flexSnap.docs[0];
+            const flexBalance = flexPlan.data().balance || 0;
+            if (flexBalance < amount) return showToast(`Insufficient flexible balance. Available: ₦${flexBalance.toFixed(2)}`, true);
+            
+            await runTransaction(db, async (transaction) => {
+                transaction.update(flexPlan.ref, { balance: increment(-amount) });
+                transaction.update(planRef, { balance: increment(amount) });
+            });
+            
+            await addDoc(collection(db, "transactions"), {
+                userId: currentUser.uid,
+                planId: planId,
+                amount: amount,
+                type: "transfer_from_flex",
+                date: new Date().toISOString(),
+                description: `Auto transfer from Flexible to ${targetPlan.type} plan`
+            });
+            
+            const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            const userData = userDoc.data();
+            await notifyAdmin(
+                `💰 Auto Transfer: ${userData.fullName || currentUser.email} deposited to ${targetPlan.type} plan`,
+                `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nPlan Type: ${targetPlan.type.toUpperCase()}\nAmount: ₦${amount.toFixed(2)}\nSource: Flexible Plan (balance after deduction: ₦${(flexBalance - amount).toFixed(2)})\nTime: ${new Date().toLocaleString()}\nNo admin approval required.`
+            );
+            
+            showToast(`✅ ₦${amount.toFixed(2)} transferred to ${targetPlan.type} plan.`, false);
         } catch(err) { showToast(err.message, true); }
     }
 
+    // Withdrawal handler: flexible = admin approval; locked/target = auto transfer to flexible
     async function submitPlanWithdrawalRequest(planId) {
-        try {
-            const planRef = doc(db, "savings_plans", planId);
-            const planSnap = await getDoc(planRef);
-            if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showToast("Not your plan", true);
-            const plan = planSnap.data();
-            const amount = parseFloat(await prompt(`Enter withdrawal amount (₦): Max ₦${plan.balance.toFixed(2)}`));
-            if (isNaN(amount) || amount <= 0 || amount > plan.balance) return showToast("Invalid amount", true);
-            if (plan.type === 'locked' && new Date() < new Date(plan.lockUntil)) {
-                const ok = await confirm(`Plan locked until ${new Date(plan.lockUntil).toLocaleDateString()}. Request anyway?`);
-                if (!ok) return;
-            } else if (plan.type === 'target') {
-                const ok = await confirm("Target plan withdrawal requires admin approval. Continue?");
-                if (!ok) return;
-            }
+        const planRef = doc(db, "savings_plans", planId);
+        const planSnap = await getDoc(planRef);
+        if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showToast("Not your plan", true);
+        const sourcePlan = planSnap.data();
+        
+        if (sourcePlan.type === 'flex') {
+            const amount = parseFloat(await prompt(`Enter withdrawal amount from Flexible plan (₦): Max ₦${sourcePlan.balance.toFixed(2)}`));
+            if (isNaN(amount) || amount <= 0 || amount > sourcePlan.balance) return showToast("Invalid amount", true);
             await addDoc(collection(db, "withdrawal_requests"), {
                 userId: currentUser.uid,
                 planId: planId,
-                planType: plan.type,
+                planType: 'flex',
                 amount: amount,
                 status: "pending",
                 requestedAt: new Date().toISOString(),
                 userName: currentUser.email
             });
-            showToast(`Withdrawal request submitted.`, false);
+            showToast(`Withdrawal request from Flexible plan submitted to admin.`, false);
+            return;
+        }
+        
+        // Locked or Target plan: transfer to flexible
+        const amount = parseFloat(await prompt(`Enter amount to withdraw from ${sourcePlan.type.toUpperCase()} plan to Flexible (₦): Max ₦${sourcePlan.balance.toFixed(2)}`));
+        if (isNaN(amount) || amount <= 0 || amount > sourcePlan.balance) return showToast("Invalid amount", true);
+        
+        try {
+            let flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+            let flexSnap = await getDocs(flexQuery);
+            let flexRef;
+            if (flexSnap.empty) {
+                const newFlex = await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: 0, createdAt: new Date().toISOString() });
+                flexRef = newFlex;
+            } else {
+                flexRef = flexSnap.docs[0].ref;
+            }
+            
+            await runTransaction(db, async (transaction) => {
+                transaction.update(planRef, { balance: increment(-amount) });
+                transaction.update(flexRef, { balance: increment(amount) });
+            });
+            
+            await addDoc(collection(db, "transactions"), {
+                userId: currentUser.uid,
+                planId: planId,
+                amount: amount,
+                type: "transfer_to_flex",
+                date: new Date().toISOString(),
+                description: `Auto transfer from ${sourcePlan.type} plan to Flexible`
+            });
+            
+            const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            const userData = userDoc.data();
+            await notifyAdmin(
+                `🔄 Auto Transfer: ${userData.fullName || currentUser.email} withdrew from ${sourcePlan.type} plan`,
+                `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nSource Plan: ${sourcePlan.type.toUpperCase()}\nAmount: ₦${amount.toFixed(2)}\nDestination: Flexible Plan\nTime: ${new Date().toLocaleString()}\nNo admin approval required.`
+            );
+            
+            showToast(`✅ ₦${amount.toFixed(2)} transferred to Flexible plan.`, false);
         } catch(err) { showToast(err.message, true); }
     }
 
@@ -528,7 +609,6 @@
     }
 
     async function createPlanWithInitialDeposit(planData, initialDepositAmt) {
-        // Extra safety: prevent duplicate flexible plan creation
         if (planData.type === 'flex') {
             const exists = await hasFlexiblePlan();
             if (exists) {
@@ -539,21 +619,50 @@
         try {
             const planRef = await addDoc(collection(db, "savings_plans"), { ...planData, balance: 0, createdAt: new Date().toISOString() });
             if (initialDepositAmt > 0) {
-                paymentModalAllowed = true;
-                await showPaymentGateway(initialDepositAmt, `Initial deposit for ${planData.type} plan`, async (transactionRef) => {
-                    await addDoc(collection(db, "deposit_requests"), {
-                        userId: currentUser.uid,
-                        planId: planRef.id,
-                        amount: initialDepositAmt,
-                        status: "pending",
-                        requestDate: new Date().toISOString(),
-                        planType: planData.type,
-                        transactionReference: transactionRef,
-                        paymentMethod: "Moniepoint"
+                if (planData.type === 'flex') {
+                    paymentModalAllowed = true;
+                    await showPaymentGateway(initialDepositAmt, `Initial deposit for ${planData.type} plan`, async (transactionRef) => {
+                        await addDoc(collection(db, "deposit_requests"), {
+                            userId: currentUser.uid,
+                            planId: planRef.id,
+                            amount: initialDepositAmt,
+                            status: "pending",
+                            requestDate: new Date().toISOString(),
+                            planType: planData.type,
+                            transactionReference: transactionRef,
+                            paymentMethod: "Moniepoint"
+                        });
+                        showToast(`Initial deposit request of ₦${initialDepositAmt} sent.`, false);
                     });
-                    showToast(`Initial deposit request of ₦${initialDepositAmt} sent.`, false);
-                });
-                paymentModalAllowed = false;
+                    paymentModalAllowed = false;
+                } else {
+                    // Auto transfer from flexible for locked/target initial deposit
+                    const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+                    const flexSnap = await getDocs(flexQuery);
+                    if (flexSnap.empty) {
+                        showToast("You need a flexible plan to fund initial deposit. Create a flexible plan first.", true);
+                        await deleteDoc(planRef);
+                        return;
+                    }
+                    const flexRef = flexSnap.docs[0].ref;
+                    const flexBalance = flexSnap.docs[0].data().balance || 0;
+                    if (flexBalance < initialDepositAmt) {
+                        showToast(`Insufficient flexible balance. Need ₦${initialDepositAmt}`, true);
+                        await deleteDoc(planRef);
+                        return;
+                    }
+                    await runTransaction(db, async (transaction) => {
+                        transaction.update(flexRef, { balance: increment(-initialDepositAmt) });
+                        transaction.update(planRef, { balance: increment(initialDepositAmt) });
+                    });
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `💰 Auto Transfer (Initial Deposit): ${userData.fullName || currentUser.email} → ${planData.type} plan`,
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nPlan Type: ${planData.type.toUpperCase()}\nAmount: ₦${initialDepositAmt.toFixed(2)}\nSource: Flexible Plan\nTime: ${new Date().toLocaleString()}\nNo admin approval required.`
+                    );
+                    showToast(`${planData.type} plan created with ₦${initialDepositAmt} from Flexible plan.`, false);
+                }
             } else {
                 showToast(`${planData.type.charAt(0).toUpperCase() + planData.type.slice(1)} plan created.`, false);
             }
@@ -561,9 +670,7 @@
     }
 
     document.getElementById('createFlexBtn').onclick = async () => {
-        // Check before opening modal
-        const exists = await hasFlexiblePlan();
-        if (exists) {
+        if (await hasFlexiblePlan()) {
             showToast("You already have a flexible plan. Only one flexible plan is allowed.", true);
             return;
         }
@@ -571,11 +678,11 @@
         .then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('flexDeposit')?.value) || 0; if (amt < 0) amt = 0; await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "flex" }, amt); } closeModal(); });
     };
     document.getElementById('createLockedBtn').onclick = () => {
-        showModal("Create Locked Plan", `<div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, true, "Create")
+        showModal("Create Locked Plan", `<div class="form-group"><label>Initial deposit (₦) from Flexible</label><input type="number" id="lockAmount" value="0"></div><div class="form-group"><label>Lock until (YYYY-MM-DD)</label><input type="date" id="lockUntil"></div>`, true, "Create")
         .then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('lockAmount')?.value) || 0; let until = document.getElementById('lockUntil')?.value; if(!until) { showToast("Lock until date required", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "locked", lockUntil: until }, amt); } closeModal(); });
     };
     document.getElementById('createTargetBtn').onclick = () => {
-        showModal("Create Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦)</label><input type="number" id="targetDeposit" value="0"></div>`, true, "Create")
+        showModal("Create Target Plan", `<div class="form-group"><label>Target amount (₦)</label><input type="number" id="targetAmount"></div><div class="form-group"><label>Target date (YYYY-MM-DD)</label><input type="date" id="targetDate"></div><div class="form-group"><label>Initial deposit (₦) from Flexible</label><input type="number" id="targetDeposit" value="0"></div>`, true, "Create")
         .then(async ok => { if(ok && currentUser) { let target = parseFloat(document.getElementById('targetAmount')?.value); let date = document.getElementById('targetDate')?.value; let deposit = parseFloat(document.getElementById('targetDeposit')?.value) || 0; if(!target || !date) { showToast("Target amount & date required", true); closeModal(); return; } if (target <=0) { showToast("Target amount must be positive", true); closeModal(); return; } await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "target", targetAmount: target, targetDate: date }, deposit); } closeModal(); });
     };
 
