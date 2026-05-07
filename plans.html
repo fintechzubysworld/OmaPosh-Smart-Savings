@@ -700,12 +700,11 @@
 
     document.getElementById('backBtn').onclick = () => window.location.href = 'index.html';
 </script>
-    <!-- Add this script to any page where you want guaranteed logout redirect -->
-<script type="module">
+   <script type="module">
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 
-    // Firebase config (same as your project)
+    // Firebase config (use your project config)
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
         authDomain: "omaposh-smart-savings.firebaseapp.com",
@@ -718,34 +717,44 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // Function to perform logout and redirect
-    async function logoutAndRedirect() {
+    // Function to handle logout + redirect to authentication.html
+    async function performLogout() {
         try {
             await signOut(auth);
+            // Force redirect after signOut
             window.location.href = "authentication.html";
         } catch (error) {
             console.error("Logout error:", error);
-            // Fallback redirect anyway
+            // Still redirect
             window.location.href = "authentication.html";
         }
     }
 
-    // Attach to existing logout button (if present)
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        // Remove any existing listeners and add ours
-        const newBtn = logoutBtn.cloneNode(true);
-        logoutBtn.parentNode.replaceChild(newBtn, logoutBtn);
-        newBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutAndRedirect();
+    // Find all logout buttons (including those that may be added dynamically)
+    function attachLogoutHandler() {
+        const buttons = document.querySelectorAll('#logoutBtn, .logout-btn, [data-logout]');
+        buttons.forEach(btn => {
+            // Remove all existing click listeners by cloning and replacing
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                performLogout();
+            });
         });
     }
 
-    // Global listener: if auth state changes to no user, redirect
+    // Run on page load and also observe for dynamically added buttons
+    attachLogoutHandler();
+    const observer = new MutationObserver(() => attachLogoutHandler());
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Global auth state listener: if user becomes null, redirect to auth page
     onAuthStateChanged(auth, (user) => {
-        if (!user && window.location.pathname !== '/authentication.html') {
-            // Avoid infinite redirect on the login page itself
+        const currentPath = window.location.pathname;
+        const isAuthPage = currentPath.endsWith('authentication.html') || currentPath === '/' || currentPath === '/index.html';
+        if (!user && !isAuthPage) {
             window.location.href = "authentication.html";
         }
     });
