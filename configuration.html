@@ -3,175 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>OmaPosh | Esusu Fraction Configuration</title>
+    <title>OmaPosh | Esusu & Thrift Group Configuration</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            padding: 30px 20px;
         }
-
-        .config-card {
+        .container {
+            max-width: 1300px;
+            margin: auto;
             background: white;
-            max-width: 550px;
-            width: 100%;
             border-radius: 32px;
-            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 20px 35px rgba(0,0,0,0.2);
             overflow: hidden;
-            transition: transform 0.2s ease;
         }
-
-        .config-header {
+        header {
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: white;
-            padding: 28px 30px;
-            text-align: center;
-        }
-
-        .config-header h1 {
-            font-size: 1.9rem;
-            margin-bottom: 6px;
-            letter-spacing: 1px;
-        }
-
-        .config-header p {
-            opacity: 0.85;
-            font-size: 0.9rem;
-        }
-
-        .config-body {
-            padding: 30px;
-        }
-
-        .info-box {
-            background: #f0f7ff;
-            border-left: 5px solid #ffb347;
-            border-radius: 16px;
-            padding: 18px;
-            margin-bottom: 28px;
-            font-size: 0.95rem;
-            color: #1e2a3e;
-        }
-
-        .info-box strong {
-            color: #1e3c72;
-            display: block;
-            margin-bottom: 8px;
-            font-size: 1rem;
-        }
-
-        .info-box p {
-            margin: 6px 0;
-            line-height: 1.5;
-        }
-
-        .current-value-card {
-            background: #f8f9fc;
-            border-radius: 24px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 28px;
-            border: 1px solid #e9ecef;
-        }
-
-        .current-label {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #6c757d;
-            margin-bottom: 10px;
-        }
-
-        .current-percent {
-            font-size: 3.2rem;
-            font-weight: 800;
-            color: #2a5298;
-            line-height: 1;
-        }
-
-        .current-percent small {
-            font-size: 1.2rem;
-            font-weight: 400;
-        }
-
-        .form-group {
-            margin-bottom: 24px;
-        }
-
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #1e3c72;
-            font-size: 0.9rem;
-        }
-
-        .input-wrapper {
+            padding: 24px 30px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
             flex-wrap: wrap;
+            gap: 12px;
         }
-
-        input {
-            flex: 1;
-            padding: 14px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 20px;
-            font-size: 1rem;
-            transition: all 0.2s;
-            background: white;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #ffb347;
-            box-shadow: 0 0 0 3px rgba(255, 179, 71, 0.2);
-        }
-
+        .logo h1 { font-size: 1.8rem; letter-spacing: 1px; }
+        .logo p { font-size: 0.8rem; opacity: 0.8; }
         .btn {
-            padding: 12px 24px;
+            padding: 8px 18px;
             border: none;
             border-radius: 40px;
-            font-weight: 600;
-            font-size: 0.95rem;
             cursor: pointer;
+            font-weight: 600;
             transition: 0.2s;
-            background: #ffb347;
-            color: #1e2a3e;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+            min-height: 42px;
+        }
+        .btn-primary { background: #ffb347; color: #1e2a3e; }
+        .btn-primary:hover { background: #ff9f1a; }
+        .btn-outline { background: transparent; border: 1px solid white; color: white; }
+        .btn-outline:hover { background: rgba(255,255,255,0.1); }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; min-height: 34px; }
+        .main-content { padding: 30px; }
+        .section {
+            margin-bottom: 45px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 30px;
+        }
+        .section-title {
+            font-size: 1.6rem;
+            margin-bottom: 20px;
+            color: #1e3c72;
+            border-left: 5px solid #ffb347;
+            padding-left: 15px;
+        }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; color: #1e3c72; }
+        input, select, textarea {
             width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 16px;
+            font-size: 1rem;
         }
-
-        .btn:hover {
-            background: #ff9f1a;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        .flex-btns { display: flex; gap: 15px; flex-wrap: wrap; margin: 20px 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            overflow-x: auto;
+            display: block;
         }
-
-        .btn:active {
-            transform: translateY(0);
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
         }
-
-        .btn-secondary {
-            background: #e9ecef;
-            color: #495057;
-            margin-top: 12px;
-        }
-
-        .btn-secondary:hover {
-            background: #dee2e6;
-        }
-
+        th { background: #f5f5f5; }
+        .hidden { display: none !important; }
         .message {
             padding: 12px 16px;
             border-radius: 40px;
@@ -179,31 +97,10 @@
             font-size: 0.85rem;
             text-align: center;
         }
-
-        .message-success {
-            background: #d1e7dd;
-            color: #0f5132;
-            border-left: 4px solid #198754;
-        }
-
-        .message-error {
-            background: #f8d7da;
-            color: #842029;
-            border-left: 4px solid #dc3545;
-        }
-
-        .message-info {
-            background: #cff4fc;
-            color: #055160;
-            border-left: 4px solid #0dcaf0;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #6c757d;
-        }
-
+        .message-success { background: #d1e7dd; color: #0f5132; border-left: 4px solid #198754; }
+        .message-error { background: #f8d7da; color: #842029; border-left: 4px solid #dc3545; }
+        .message-info { background: #cff4fc; color: #055160; border-left: 4px solid #0dcaf0; }
+        .loading { text-align: center; padding: 40px; color: #6c757d; }
         .spinner {
             display: inline-block;
             width: 30px;
@@ -213,11 +110,7 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        @keyframes spin { to { transform: rotate(360deg); } }
         .admin-badge {
             background: #1e3c72;
             color: white;
@@ -225,276 +118,421 @@
             padding: 4px 12px;
             font-size: 0.7rem;
             display: inline-block;
-            margin-top: 12px;
         }
-
+        .system-account-card {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 18px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ffb347;
+        }
+        .member-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #edf2f7;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .member-name { font-weight: 600; color: #0f172a; }
+        .member-email { font-size: 0.75rem; color: #475569; }
+        .note { font-size: 0.75rem; color: #6c757d; margin-top: 6px; }
         footer {
             text-align: center;
-            padding: 20px 30px;
+            padding: 20px;
             background: #f8f9fa;
             font-size: 0.75rem;
             color: #6c757d;
-            border-top: 1px solid #edf2f7;
         }
-
-        @media (max-width: 500px) {
-            .config-body {
-                padding: 24px 20px;
-            }
-            .current-percent {
-                font-size: 2.5rem;
-            }
+        @media (max-width: 700px) {
+            .main-content { padding: 20px; }
+            .section-title { font-size: 1.3rem; }
+            th, td { display: block; text-align: left; }
+            td:before { content: attr(data-label); font-weight: bold; display: inline-block; width: 40%; }
         }
-
-        .note {
-            font-size: 0.75rem;
-            color: #6c757d;
-            margin-top: 8px;
-            text-align: center;
+        /* Modal */
+        .modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+            padding: 16px;
+        }
+        .modal > div {
+            background: white;
+            max-width: 700px;
+            width: 100%;
+            border-radius: 28px;
+            padding: 24px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.2);
         }
     </style>
 </head>
 <body>
-    <div class="config-card">
-        <div class="config-header">
-            <h1>⚙️ Esusu Fraction</h1>
-            <p>Configure contribution deduction rate</p>
-            <div class="admin-badge" id="adminBadge">🔐 Secured Configuration</div>
+<div class="container">
+    <header>
+        <div class="logo">
+            <h1>⚙️ OmaPosh Configuration Hub</h1>
+            <p>Esusu Fraction • Thrift Groups Management</p>
         </div>
-        <div class="config-body">
-            <div id="authMessage" class="message message-info" style="display: none;"></div>
-            <div id="loadingArea" class="loading">
-                <div class="spinner"></div>
-                <p style="margin-top: 12px;">Verifying admin access...</p>
-            </div>
-            <div id="configContent" style="display: none;">
-                <div class="info-box">
-                    <strong>📌 What is Esusu Fraction?</strong>
-                    <p>When a user contributes to a thrift group that has <strong>"Apply Esusu deduction"</strong> enabled, this percentage is deducted from the contribution amount and credited to the system's Esusu Account.</p>
-                    <p style="margin-top: 8px;">Example: If fraction = <strong>1% (0.01)</strong>, and contribution = ₦10,000 → ₦100 goes to Esusu fund, ₦9,900 goes to the group pot.</p>
+        <div class="user-info">
+            <span id="adminName"></span>
+            <button class="btn btn-outline" id="backToAdminBtn">← Back to Admin Dashboard</button>
+        </div>
+    </header>
+    <div class="main-content">
+        <div id="loadingSpinner" class="loading">
+            <div class="spinner"></div>
+            <p>Verifying admin access...</p>
+        </div>
+        <div id="configContent" class="hidden">
+            <!-- ========== ESUSU FRACTION SECTION ========== -->
+            <div class="section">
+                <div class="section-title">📊 Esusu Deduction Rate</div>
+                <div class="system-account-card">
+                    <div style="font-weight: bold; margin-bottom: 8px;">Current Esusu Fraction</div>
+                    <div id="currentPercentDisplay" style="font-size: 2rem; font-weight: 800; color: #2a5298;">--%</div>
+                    <div class="note">of every contribution in groups with "Apply Esusu deduction" enabled.</div>
                 </div>
-
-                <div class="current-value-card">
-                    <div class="current-label">Current Esusu Fraction</div>
-                    <div class="current-percent" id="currentPercentDisplay">--%</div>
-                    <div class="note">(of each contribution)</div>
-                </div>
-
                 <div class="form-group">
-                    <label>✏️ Update Fraction</label>
-                    <div class="input-wrapper">
-                        <input type="number" id="fractionInput" step="0.001" min="0" max="1" value="0.01">
-                        <span style="font-weight: 600;">= <span id="percentPreview">1.0</span>%</span>
+                    <label>Update Fraction (0 to 1)</label>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                        <input type="number" id="fractionInput" step="0.001" min="0" max="1" value="0.01" style="flex:2;">
+                        <span>= <strong id="percentPreview">1.0</strong>%</span>
                     </div>
-                    <div class="note">Value between 0 and 1. Example: 0.01 = 1%, 0.05 = 5%</div>
+                    <div class="note">Example: 0.01 = 1%, 0.05 = 5%</div>
                 </div>
+                <button class="btn btn-primary" id="saveFractionBtn">💾 Save Esusu Fraction</button>
+            </div>
 
-                <button class="btn" id="saveFractionBtn">💾 Save Configuration</button>
-                <button class="btn btn-secondary" id="logoutBtn">🚪 Logout & Return</button>
+            <!-- ========== THRIFT GROUP MANAGEMENT ========== -->
+            <div class="section">
+                <div class="section-title">👥 Thrift Groups Management</div>
+                <div class="flex-btns">
+                    <button class="btn btn-primary" id="createGroupBtn">➕ Create New Thrift Group</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="groupsTable">
+                        <thead>
+                            <tr><th>Group Name</th><th>Contribution</th><th>Frequency</th><th>Members</th><th>Models</th><th>Actions</th>
+                        </thead>
+                        <tbody><tr><td colspan="6">Loading groups...</td></tr>
+                    </table>
+                </div>
             </div>
         </div>
-        <footer>
-            OmaPosh Smart Savings • Esusu deduction applies globally to all thrift groups & contributions that enable the Esusu model.
-        </footer>
     </div>
+    <footer>© 2026 OmaPosh Smart Savings — Configuration & Thrift Management</footer>
+</div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+<!-- CREATE GROUP MODAL -->
+<div id="createGroupModal" class="modal hidden">
+    <div>
+        <h3 style="color: #1e3c72; margin-bottom: 20px;">➕ Create New Thrift Group</h3>
+        <div class="form-group"><label>Group Name</label><input type="text" id="newGroupName" placeholder="e.g., Daily Savings Group"></div>
+        <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
+        <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><div class="note">1 = daily, 7 = weekly, 30 = monthly</div></div>
+        <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
+        <div class="flex-btns" style="margin-top: 20px;">
+            <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
+            <button class="btn btn-outline" id="cancelCreateGroupBtn">Cancel</button>
+        </div>
+    </div>
+</div>
 
-        // Firebase configuration (same as admin dashboard)
-        const firebaseConfig = {
-            apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
-            authDomain: "omaposh-smart-savings.firebaseapp.com",
-            projectId: "omaposh-smart-savings",
-            storageBucket: "omaposh-smart-savings.firebasestorage.app",
-            messagingSenderId: "469614412839",
-            appId: "1:469614412839:web:d51a47b468daad6184fa02"
-        };
+<!-- VIEW MEMBERS MODAL (dynamic) -->
+<div id="viewMembersModal" class="modal hidden">
+    <div>
+        <h3 id="membersModalTitle">Group Members</h3>
+        <div id="membersList"></div>
+        <div class="flex-btns"><button class="btn btn-outline" id="closeMembersModalBtn">Close</button></div>
+    </div>
+</div>
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // DOM Elements
-        const loadingArea = document.getElementById('loadingArea');
-        const configContent = document.getElementById('configContent');
-        const authMessageDiv = document.getElementById('authMessage');
-        const currentPercentDisplay = document.getElementById('currentPercentDisplay');
-        const fractionInput = document.getElementById('fractionInput');
-        const percentPreviewSpan = document.getElementById('percentPreview');
-        const saveBtn = document.getElementById('saveFractionBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const adminBadge = document.getElementById('adminBadge');
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
 
-        let currentFraction = 0.01;
-        
-        // Helper: show temporary message
-        function showMessage(text, type = 'info') {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message message-${type}`;
-            msgDiv.textContent = text;
-            const container = document.getElementById('configContent');
-            if (container) {
-                // remove any existing message divs (except the first)
-                const oldMessages = container.querySelectorAll('.message');
-                oldMessages.forEach(m => m.remove());
-                container.insertBefore(msgDiv, container.firstChild);
-                setTimeout(() => msgDiv.remove(), 4000);
-            } else {
-                alert(text);
-            }
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // DOM elements
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const configContent = document.getElementById('configContent');
+    const adminNameSpan = document.getElementById('adminName');
+    const backToAdminBtn = document.getElementById('backToAdminBtn');
+    const fractionInput = document.getElementById('fractionInput');
+    const percentPreviewSpan = document.getElementById('percentPreview');
+    const saveFractionBtn = document.getElementById('saveFractionBtn');
+    const currentPercentDisplay = document.getElementById('currentPercentDisplay');
+    const createGroupBtn = document.getElementById('createGroupBtn');
+    const createGroupModal = document.getElementById('createGroupModal');
+    const confirmCreateGroupBtn = document.getElementById('confirmCreateGroupBtn');
+    const cancelCreateGroupBtn = document.getElementById('cancelCreateGroupBtn');
+    const viewMembersModal = document.getElementById('viewMembersModal');
+    const membersModalTitle = document.getElementById('membersModalTitle');
+    const membersListDiv = document.getElementById('membersList');
+    const closeMembersModalBtn = document.getElementById('closeMembersModalBtn');
+
+    let currentAdmin = null;
+    let currentFraction = 0.01;
+
+    // Helper functions
+    function showMessage(msg, type = 'info') {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message message-${type}`;
+        msgDiv.textContent = msg;
+        const container = configContent;
+        const oldMsg = container.querySelector('.message');
+        if (oldMsg) oldMsg.remove();
+        container.insertBefore(msgDiv, container.firstChild);
+        setTimeout(() => msgDiv.remove(), 4000);
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
+
+    async function logAudit(action, targetUserId = null, details = {}) {
+        if (!currentAdmin) return;
+        await addDoc(collection(db, "audit_logs"), { adminId: currentAdmin.uid, adminEmail: currentAdmin.email, action, targetUserId, details, timestamp: new Date().toISOString() });
+    }
+
+    // ========== ESUSU FRACTION LOGIC ==========
+    async function loadFraction() {
+        const configRef = doc(db, "system_config", "financial_models");
+        const docSnap = await getDoc(configRef);
+        if (docSnap.exists()) {
+            currentFraction = docSnap.data().esusuFraction ?? 0.01;
+        } else {
+            currentFraction = 0.01;
+            await setDoc(configRef, { esusuFraction: 0.01 });
         }
+        fractionInput.value = currentFraction;
+        const percent = (currentFraction * 100).toFixed(2);
+        currentPercentDisplay.innerHTML = `${percent}% <span style="font-size:1rem;">(${currentFraction})</span>`;
+        percentPreviewSpan.textContent = percent;
+    }
 
-        // Update preview when input changes
-        function updatePreview() {
-            let val = parseFloat(fractionInput.value);
-            if (isNaN(val)) val = 0;
-            const percent = (val * 100).toFixed(2);
-            percentPreviewSpan.textContent = percent;
+    async function saveFraction(newFraction) {
+        const configRef = doc(db, "system_config", "financial_models");
+        await setDoc(configRef, { esusuFraction: newFraction, updatedAt: new Date().toISOString(), lastUpdatedBy: currentAdmin?.uid }, { merge: true });
+        currentFraction = newFraction;
+        const percent = (newFraction * 100).toFixed(2);
+        currentPercentDisplay.innerHTML = `${percent}% <span style="font-size:1rem;">(${newFraction})</span>`;
+        showMessage(`Esusu fraction updated to ${percent}% (${newFraction}).`, 'success');
+        await logAudit("update_esusu_fraction", null, { newFraction });
+    }
+
+    fractionInput.addEventListener('input', () => {
+        let val = parseFloat(fractionInput.value);
+        if (isNaN(val)) val = 0;
+        const percent = (val * 100).toFixed(2);
+        percentPreviewSpan.textContent = percent;
+    });
+
+    saveFractionBtn.onclick = async () => {
+        let newVal = parseFloat(fractionInput.value);
+        if (isNaN(newVal) || newVal < 0 || newVal > 1) {
+            showMessage("Please enter a number between 0 and 1.", 'error');
+            return;
         }
-        fractionInput.addEventListener('input', updatePreview);
-        
-        // Load current Esusu fraction from Firestore
-        async function loadCurrentFraction() {
-            try {
-                const configRef = doc(db, "system_config", "financial_models");
-                const docSnap = await getDoc(configRef);
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    currentFraction = data.esusuFraction !== undefined ? data.esusuFraction : 0.01;
-                } else {
-                    // Create default if not exists
-                    currentFraction = 0.01;
-                    await setDoc(configRef, { esusuFraction: currentFraction, updatedAt: new Date().toISOString() });
-                }
-                // Update UI
-                fractionInput.value = currentFraction;
-                const percentValue = (currentFraction * 100).toFixed(2);
-                currentPercentDisplay.innerHTML = `${percentValue}% <small>(${currentFraction})</small>`;
-                percentPreviewSpan.textContent = percentValue;
-            } catch (error) {
-                console.error("Error loading fraction:", error);
-                showMessage("⚠️ Could not load current configuration. Please refresh.", "error");
-                currentPercentDisplay.innerHTML = "Error";
-            }
+        if (confirm(`Change Esusu deduction from ${(currentFraction*100).toFixed(2)}% to ${(newVal*100).toFixed(2)}%?`)) {
+            await saveFraction(newVal);
         }
+    };
 
-        // Save updated fraction to Firestore
-        async function saveFraction(newFraction) {
-            try {
-                const configRef = doc(db, "system_config", "financial_models");
-                await setDoc(configRef, { 
-                    esusuFraction: newFraction,
-                    updatedAt: new Date().toISOString(),
-                    lastUpdatedBy: auth.currentUser?.uid || 'admin'
-                }, { merge: true });
-                
-                // Also update the global esusuFraction variable used in contributions approval (in main app)
-                // But here we just ensure it's saved. The main app will fetch latest on next operation.
-                currentFraction = newFraction;
-                const percentValue = (newFraction * 100).toFixed(2);
-                currentPercentDisplay.innerHTML = `${percentValue}% <small>(${newFraction})</small>`;
-                showMessage(`✅ Esusu fraction updated to ${percentValue}% (${newFraction}). This will affect all future approved contributions where Esusu model is enabled.`, "success");
-            } catch (error) {
-                console.error("Error saving fraction:", error);
-                showMessage("❌ Failed to save configuration. Check your permissions and try again.", "error");
-                throw error;
-            }
-        }
+    // ========== THRIFT GROUP MANAGEMENT ==========
+    let groupsUnsubscribe = null;
 
-        // Check if current user is admin (role = 'admin' or specific email)
-        async function isUserAdmin(user) {
-            if (!user) return false;
-            try {
-                const userRef = doc(db, "users", user.uid);
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                    const userData = userSnap.data();
-                    if (userData.role === 'admin') return true;
-                    if (user.email === "admin@omaposhsmartsavings.com") return true;
-                }
-                // fallback: check email directly (super admin)
-                return user.email === "admin@omaposhsmartsavings.com";
-            } catch (err) {
-                console.warn("Admin check error", err);
-                return false;
-            }
-        }
-
-        // Initialize based on auth state
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                const isAdmin = await isUserAdmin(user);
-                if (isAdmin) {
-                    // Admin granted access
-                    loadingArea.style.display = 'none';
-                    configContent.style.display = 'block';
-                    authMessageDiv.style.display = 'none';
-                    adminBadge.textContent = `👑 Admin: ${user.email}`;
-                    await loadCurrentFraction();
-                } else {
-                    // Logged in but not admin
-                    loadingArea.style.display = 'none';
-                    configContent.style.display = 'block';
-                    authMessageDiv.style.display = 'block';
-                    authMessageDiv.className = 'message message-error';
-                    authMessageDiv.innerHTML = `⛔ Access Denied: Your account (${user.email}) does not have admin privileges. Only administrators can modify the Esusu fraction.<br><br><button id="forceLogoutBtn" style="background:#dc3545; color:white; border:none; padding:8px 16px; border-radius:40px; margin-top:8px; cursor:pointer;">Logout</button>`;
-                    const logoutBtnForce = document.getElementById('forceLogoutBtn');
-                    if (logoutBtnForce) logoutBtnForce.onclick = async () => { await signOut(auth); window.location.reload(); };
-                    configContent.querySelectorAll('#saveFractionBtn, #fractionInput').forEach(el => el.disabled = true);
-                }
-            } else {
-                // Not logged in
-                loadingArea.style.display = 'none';
-                configContent.style.display = 'block';
-                authMessageDiv.style.display = 'block';
-                authMessageDiv.className = 'message message-error';
-                authMessageDiv.innerHTML = `🔒 You must be logged in as an administrator to configure the Esusu fraction.<br><br><a href="index.html" style="color:#ffb347; font-weight:600;">→ Go to Login Page</a>`;
-                configContent.querySelectorAll('#saveFractionBtn, #fractionInput').forEach(el => el.disabled = true);
-            }
-        });
-
-        // Save button handler
-        saveBtn.addEventListener('click', async () => {
-            const newValue = parseFloat(fractionInput.value);
-            if (isNaN(newValue)) {
-                showMessage("Please enter a valid number between 0 and 1.", "error");
+    async function loadGroups() {
+        if (groupsUnsubscribe) groupsUnsubscribe();
+        const q = collection(db, "groups");
+        groupsUnsubscribe = onSnapshot(q, async (snapshot) => {
+            const tbody = document.querySelector('#groupsTable tbody');
+            if (snapshot.empty) {
+                tbody.innerHTML = '<tr><td colspan="6">No thrift groups created yet. Use the button above to create one.</td></tr>';
                 return;
             }
-            if (newValue < 0 || newValue > 1) {
-                showMessage("Fraction must be between 0 and 1 (0% to 100%).", "error");
+            let html = '';
+            for (const docSnap of snapshot.docs) {
+                const g = docSnap.data();
+                const creatorDoc = await getDoc(doc(db, "users", g.creatorId));
+                const creatorName = creatorDoc.exists() ? creatorDoc.data().fullName : g.creatorId;
+                let models = '';
+                if (g.applyProfitLoss) models += '📊 Profit/Loss ';
+                if (g.applyEsusu) models += '🔄 Esusu ';
+                if (!models) models = 'None';
+                const freqText = g.frequencyDays === 1 ? 'Daily' : (g.frequencyDays === 7 ? 'Weekly' : (g.frequencyDays === 30 ? 'Monthly' : `${g.frequencyDays} days`));
+                html += `<tr>
+                    <td data-label="Group Name"><strong>${escapeHtml(g.name)}</strong><br><small>by ${escapeHtml(creatorName)}</small></td>
+                    <td data-label="Contribution">₦${g.contributionAmount.toLocaleString()}</td>
+                    <td data-label="Frequency">${freqText}</td>
+                    <td data-label="Members">${g.members?.length || 0} / ${g.maxMembers}</td>
+                    <td data-label="Models">${models}</td>
+                    <td data-label="Actions">
+                        <button class="btn btn-sm btn-primary view-members" data-id="${docSnap.id}" data-name="${escapeHtml(g.name)}">👥 Members</button>
+                        <button class="btn btn-sm btn-danger delete-group" data-id="${docSnap.id}">🗑️ Delete</button>
+                    </td>
+                </tr>`;
+            }
+            tbody.innerHTML = html;
+
+            // attach event listeners
+            document.querySelectorAll('.view-members').forEach(btn => {
+                btn.onclick = () => viewGroupMembers(btn.dataset.id, btn.dataset.name);
+            });
+            document.querySelectorAll('.delete-group').forEach(btn => {
+                btn.onclick = async () => {
+                    if (confirm("Delete this group permanently? All contribution history will remain but group will be removed.")) {
+                        await deleteDoc(doc(db, "groups", btn.dataset.id));
+                        await logAudit("delete_group", null, { groupId: btn.dataset.id });
+                        showMessage("Group deleted.", 'success');
+                    }
+                };
+            });
+        });
+    }
+
+    async function viewGroupMembers(groupId, groupName) {
+        try {
+            const groupSnap = await getDoc(doc(db, "groups", groupId));
+            if (!groupSnap.exists()) {
+                showMessage("Group not found.", 'error');
                 return;
             }
-            
-            // confirm with user
-            const percentVal = (newValue * 100).toFixed(2);
-            const confirmMsg = `Change Esusu deduction from ${(currentFraction*100).toFixed(2)}% to ${percentVal}%?\n\nThis will affect all future thrift contributions where the Esusu model is enabled.`;
-            if (confirm(confirmMsg)) {
-                saveBtn.disabled = true;
-                saveBtn.textContent = "Saving...";
-                try {
-                    await saveFraction(newValue);
-                    // After saving, also update the local variable if needed
-                    currentFraction = newValue;
-                } catch (err) {
-                    // error already shown
-                } finally {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = "💾 Save Configuration";
+            const memberIds = groupSnap.data().members || [];
+            if (memberIds.length === 0) {
+                membersListDiv.innerHTML = '<p>No members in this group.</p>';
+            } else {
+                let html = `<div><strong>Total members: ${memberIds.length}</strong></div>`;
+                for (const uid of memberIds) {
+                    const userSnap = await getDoc(doc(db, "users", uid));
+                    const user = userSnap.exists() ? userSnap.data() : { fullName: "Unknown", email: "" };
+                    html += `<div class="member-item">
+                        <div>
+                            <div class="member-name">${escapeHtml(user.fullName)}</div>
+                            <div class="member-email">${escapeHtml(user.email)}</div>
+                        </div>
+                        <button class="btn btn-sm btn-danger remove-member" data-group="${groupId}" data-uid="${uid}" data-name="${escapeHtml(user.fullName)}">Remove</button>
+                    </div>`;
                 }
+                membersListDiv.innerHTML = html;
+                document.querySelectorAll('.remove-member').forEach(btn => {
+                    btn.onclick = async () => {
+                        if (confirm(`Remove ${btn.dataset.name} from this group?`)) {
+                            await updateDoc(doc(db, "groups", btn.dataset.group), { members: arrayRemove(btn.dataset.uid) });
+                            await logAudit("remove_member_from_group", btn.dataset.uid, { groupId });
+                            showMessage(`Removed ${btn.dataset.name} from group.`, 'success');
+                            viewGroupMembers(groupId, groupName); // refresh modal
+                        }
+                    };
+                });
             }
-        });
+            membersModalTitle.innerText = `Members of "${escapeHtml(groupName)}"`;
+            viewMembersModal.classList.remove('hidden');
+        } catch (err) {
+            showMessage(err.message, 'error');
+        }
+    }
 
-        // Logout handler
-        logoutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            window.location.href = 'index.html';
-        });
-        
-        // initial preview update
-        updatePreview();
-    </script>
+    function closeModal(modalEl) { modalEl.classList.add('hidden'); }
+
+    // Create group modal logic
+    createGroupBtn.onclick = () => createGroupModal.classList.remove('hidden');
+    cancelCreateGroupBtn.onclick = () => closeModal(createGroupModal);
+    confirmCreateGroupBtn.onclick = async () => {
+        const name = document.getElementById('newGroupName').value.trim();
+        const amount = parseFloat(document.getElementById('newGroupAmount').value);
+        const frequencyDays = parseInt(document.getElementById('newGroupFrequency').value);
+        const maxMembers = parseInt(document.getElementById('newGroupMaxMembers').value);
+        const applyEsusu = document.getElementById('newGroupApplyEsusu').checked;
+        const applyProfitLoss = document.getElementById('newGroupApplyProfitLoss').checked;
+
+        if (!name || isNaN(amount) || amount <= 0 || isNaN(frequencyDays) || frequencyDays < 1 || isNaN(maxMembers) || maxMembers < 2) {
+            showMessage("Please fill all fields correctly (name, positive amount, frequency ≥1, max members ≥2).", 'error');
+            return;
+        }
+        try {
+            if (!currentAdmin) throw new Error("Not authenticated");
+            await addDoc(collection(db, "groups"), {
+                name: name,
+                contributionAmount: amount,
+                frequencyDays: frequencyDays,
+                maxMembers: maxMembers,
+                applyEsusu: applyEsusu,
+                applyProfitLoss: applyProfitLoss,
+                members: [],
+                currentPayoutIndex: 0,
+                creatorId: currentAdmin.uid,
+                createdAt: new Date().toISOString()
+            });
+            showMessage(`Thrift group "${name}" created successfully!`, 'success');
+            await logAudit("create_thrift_group", null, { groupName: name });
+            closeModal(createGroupModal);
+            // reset form
+            document.getElementById('newGroupName').value = '';
+            document.getElementById('newGroupAmount').value = '';
+            document.getElementById('newGroupFrequency').value = '7';
+            document.getElementById('newGroupMaxMembers').value = '10';
+            document.getElementById('newGroupApplyEsusu').checked = false;
+            document.getElementById('newGroupApplyProfitLoss').checked = false;
+        } catch (err) {
+            showMessage("Error: " + err.message, 'error');
+        }
+    };
+
+    // Close member modal
+    closeMembersModalBtn.onclick = () => closeModal(viewMembersModal);
+    viewMembersModal.addEventListener('click', (e) => { if (e.target === viewMembersModal) closeModal(viewMembersModal); });
+    createGroupModal.addEventListener('click', (e) => { if (e.target === createGroupModal) closeModal(createGroupModal); });
+
+    // ========== REDIRECT TO ADMIN DASHBOARD ==========
+    backToAdminBtn.onclick = () => {
+        window.location.href = 'admin_dashboard.html';  // change this to your actual admin main page filename
+    };
+
+    // ========== AUTHENTICATION & INIT ==========
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            let role = userDoc.exists() ? userDoc.data().role : null;
+            if (user.email === "admin@omaposhsmartsavings.com" && role !== 'admin') {
+                await setDoc(doc(db, "users", user.uid), { fullName: "Administrator", email: user.email, role: "admin", createdAt: new Date().toISOString() }, { merge: true });
+                role = 'admin';
+            }
+            if (role === 'admin') {
+                currentAdmin = user;
+                adminNameSpan.innerText = `👋 ${userDoc.exists() ? userDoc.data().fullName : user.email}`;
+                loadingSpinner.classList.add('hidden');
+                configContent.classList.remove('hidden');
+                await loadFraction();
+                await loadGroups();
+                return;
+            }
+        }
+        // Not admin or not logged in
+        loadingSpinner.innerHTML = '<div class="message message-error">⛔ Access Denied. Admin privileges required. <br><br><button id="redirectLogin" class="btn btn-primary">Go to Login</button></div>';
+        const redirectBtn = document.getElementById('redirectLogin');
+        if (redirectBtn) redirectBtn.onclick = () => window.location.href = 'index.html';
+    });
+</script>
 </body>
 </html>
