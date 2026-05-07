@@ -326,7 +326,7 @@
         <div class="section">
             <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
             <div id="groupsList" class="card-grid">Loading groups...</div>
-            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Contributions are auto-deducted from your Flexible plan after Esusu/Profit deductions.</p>
+            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Contributions are auto-deducted from your Flexible plan after 4.76% Esusu deduction and 1% Profit/Loss deduction.</p>
         </div>
 
         <!-- Withdrawal Section (bottom) -->
@@ -525,12 +525,7 @@
         });
     }
 
-    // ========== THRIFT GROUP FUNCTIONS (auto deductions & payouts) ==========
-    async function getEsusuFraction() {
-        const configSnap = await getDoc(doc(db, "system_config", "financial_models"));
-        return configSnap.exists() ? (configSnap.data().esusuFraction || 0) : 0;
-    }
-
+    // ========== THRIFT GROUP FUNCTIONS (auto deductions with fixed 4.76% Esusu, 1% Profit) ==========
     async function notifyAdmin(subject, message) {
         await addDoc(collection(db, "messages"), {
             userId: "admin_notification",
@@ -544,7 +539,7 @@
 
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
-        const q = query(collection(db, "groups"));
+        const q = collection(db, "groups");
         unsubscribeGroups = onSnapshot(q, async (snapshot) => {
             if (!currentUser) return;
             let html = '';
@@ -559,7 +554,8 @@
                 const groupName = (group.name || 'Unnamed Group').replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'); });
                 let joinButton = !isMember ? (isFull ? `<button class="btn btn-sm" disabled>❌ Group Full</button>` : `<button class="btn btn-sm btn-primary join-group-btn" data-group-id="${group.id}">➕ Join This Thrift Group</button>`) : `<button class="btn btn-sm" disabled style="background:#28a745; color:white;">✅ Already a Member</button>`;
                 let actionButtons = isMember ? `<div class="flex-btns" style="margin-top:12px;"><button class="btn btn-sm btn-primary contribute-group-btn" data-group-id="${group.id}">💰 Deposit Contribution (₦${group.contributionAmount})</button><button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${group.id}" style="background:green;">💸 Withdraw Payout (Claim)</button></div>` : '';
-                html += `<div class="card"><div class="plan-type">THRIFT GROUP</div><h3>${groupName}</h3><div>💰 Contribution: ₦${group.contributionAmount} every ${group.frequencyDays} days</div><div>👥 Members: ${memberCount}/${maxMembers}</div><div>🔄 Next payout: ${group.currentPayoutIndex || 0}</div>${joinButton}${actionButtons}</div>`;
+                let groupBalance = group.balance || 0;
+                html += `<div class="card"><div class="plan-type">THRIFT GROUP</div><h3>${groupName}</h3><div>💰 Contribution: ₦${group.contributionAmount} every ${group.frequencyDays} days</div><div>👥 Members: ${memberCount}/${maxMembers}</div><div>🏦 Group Balance: ₦${groupBalance.toFixed(2)}</div><div>🔄 Next payout: ${group.currentPayoutIndex || 0}</div>${joinButton}${actionButtons}</div>`;
             }
             groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups yet. Admin will create.</p>';
             
@@ -576,7 +572,6 @@
                     await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
                     showToast(`Joined "${groupData.name}"!`, false);
                     
-                    // Notify admin
                     const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                     const userData = userDoc.data();
                     await notifyAdmin(
@@ -586,7 +581,7 @@
                 } catch(err) { showToast(err.message, true); }
             }));
             
-            // Auto contribution handler (deduct from flexible)
+            // Auto contribution handler (deduct from flexible, apply fixed 4.76% Esusu, 1% Profit/Loss, add net to group balance)
             document.querySelectorAll('.contribute-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -597,10 +592,12 @@
                     if (!group.members?.includes(currentUser.uid)) return showToast("Join first", true);
                     const amount = group.contributionAmount;
                     
-                    const esusuFraction = await getEsusuFraction();
-                    let esusuDeduction = 0, profitDeduction = 0, netFromUser = amount;
-                    if (group.applyEsusu) { esusuDeduction = amount * esusuFraction; netFromUser -= esusuDeduction; }
-                    if (group.applyProfitLoss) { profitDeduction = amount * 0.01; netFromUser -= profitDeduction; }
+                    // Fixed deductions: 4.76% Esusu, 1% Profit/Loss
+                    const esusuRate = 0.0476;   // 4.76%
+                    const profitRate = 0.01;     // 1%
+                    const esusuDeduction = amount * esusuRate;
+                    const profitDeduction = amount * profitRate;
+                    const netToGroup = amount - esusuDeduction - profitDeduction;
                     
                     // Get flexible plan
                     const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
@@ -608,18 +605,20 @@
                     if (flexSnap.empty) return showToast("No flexible plan to fund contribution", true);
                     const flexRef = flexSnap.docs[0].ref;
                     const flexBalance = flexSnap.docs[0].data().balance || 0;
-                    if (flexBalance < netFromUser) return showToast(`Insufficient flexible balance. Need ₦${netFromUser.toFixed(2)}`, true);
+                    if (flexBalance < netToGroup) return showToast(`Insufficient flexible balance. Need ₦${netToGroup.toFixed(2)}`, true);
                     
                     // Perform transaction
                     await runTransaction(db, async (transaction) => {
-                        transaction.update(flexRef, { balance: increment(-netFromUser) });
-                        if (esusuDeduction > 0) transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
-                        if (profitDeduction > 0) transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
+                        transaction.update(flexRef, { balance: increment(-netToGroup) });
+                        transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
+                        transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
+                        // Add net amount to group balance
+                        transaction.update(groupRef, { balance: increment(netToGroup) });
                         const contribRef = doc(collection(db, "contributions"));
                         transaction.set(contribRef, {
                             groupId: groupId,
                             userId: currentUser.uid,
-                            amount: amount - esusuDeduction - profitDeduction,
+                            amount: netToGroup,
                             date: new Date().toISOString(),
                             originalAmount: amount,
                             esusuDeduction,
@@ -633,14 +632,14 @@
                     const userData = userDoc.data();
                     await notifyAdmin(
                         `💰 Thrift Contribution: ${userData.fullName || currentUser.email} → ${group.name}`,
-                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction: ₦${esusuDeduction.toFixed(2)} (${esusuFraction*100}%)\nProfit deduction: ₦${profitDeduction.toFixed(2)} (1%)\nNet from Flexible: ₦${netFromUser.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction 4.76%: ₦${esusuDeduction.toFixed(2)}\nProfit deduction 1%: ₦${profitDeduction.toFixed(2)}\nNet added to group pot: ₦${netToGroup.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
                     );
                     
-                    showToast(`Contribution of ₦${amount.toFixed(2)} recorded.`, false);
+                    showToast(`Contribution of ₦${amount.toFixed(2)} recorded. Net ₦${netToGroup.toFixed(2)} added to group pot.`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
             
-            // Auto payout handler (credit to flexible)
+            // Auto payout handler (credit group balance to flexible plan, then reset group balance to zero)
             document.querySelectorAll('.claim-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -651,13 +650,15 @@
                     const idx = group.currentPayoutIndex || 0;
                     if (members[idx] !== currentUser.uid) return showToast("Not your turn", true);
                     
+                    // Check that all members have contributed at least (idx+1) times
                     const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
                     const contribSnap = await getDocs(contribQuery);
                     const counts = {};
                     contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
                     for (let m of members) if ((counts[m] || 0) <= idx) return showToast("Not all members have completed contributions for this cycle.", true);
                     
-                    const pot = group.contributionAmount * members.length;
+                    const pot = group.balance || 0;
+                    if (pot <= 0) return showToast("Group has no balance to pay out.", true);
                     
                     // Credit to flexible plan
                     const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
@@ -667,7 +668,11 @@
                     } else {
                         await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
                     }
-                    await updateDoc(groupRef, { currentPayoutIndex: (idx + 1) % members.length });
+                    // Reset group balance and advance index
+                    await updateDoc(groupRef, { 
+                        currentPayoutIndex: (idx + 1) % members.length,
+                        balance: 0
+                    });
                     await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString() });
                     
                     // Notify admin
@@ -675,7 +680,7 @@
                     const userData = userDoc.data();
                     await notifyAdmin(
                         `🎉 Thrift Payout: ${userData.fullName || currentUser.email} from ${group.name}`,
-                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nPayout Amount: ₦${pot.toFixed(2)}\nMembers: ${members.length}\nContribution per member: ₦${group.contributionAmount}\nTime: ${new Date().toLocaleString()}\nAuto-credited to flexible plan.`
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nPayout Amount: ₦${pot.toFixed(2)}\nMembers: ${members.length}\nTime: ${new Date().toLocaleString()}\nAuto-credited to flexible plan.`
                     );
                     
                     showToast(`Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
