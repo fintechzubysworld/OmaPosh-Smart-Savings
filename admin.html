@@ -413,30 +413,67 @@
             document.querySelectorAll('.reject-deposit').forEach(btn => btn.onclick = () => rejectDeposit(btn.dataset.id));
         });
     }
+// new deposit logic
+   async function approveDeposit(requestId) {
+    try {
+        const reqRef = doc(db, "deposit_requests", requestId);
+        const reqSnap = await getDoc(reqRef);
+        if (!reqSnap.exists()) return showMessage("Request not found");
+        const req = reqSnap.data();
 
-    async function approveDeposit(requestId) {
-        try {
-            const reqRef = doc(db, "deposit_requests", requestId);
-            const reqSnap = await getDoc(reqRef);
-            if (!reqSnap.exists()) return showMessage("Request not found");
-            const req = reqSnap.data();
-            const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", req.userId), where("type", "==", "flex"));
+        // Get the target plan (where the deposit should go)
+        const targetPlanRef = doc(db, "savings_plans", req.planId);
+        const targetPlanSnap = await getDoc(targetPlanRef);
+        if (!targetPlanSnap.exists()) return showMessage("Target plan not found");
+
+        const targetPlan = targetPlanSnap.data();
+        const isFlexibleTarget = (targetPlan.type === 'flex');
+
+        if (isFlexibleTarget) {
+            // Deposit to flexible plan: just add to its balance, no deduction
+            await runTransaction(db, async (transaction) => {
+                transaction.update(targetPlanRef, { balance: increment(req.amount) });
+                transaction.update(reqRef, { status: "approved", processedAt: new Date().toISOString() });
+            });
+            await addDoc(collection(db, "transactions"), {
+                userId: req.userId,
+                planId: req.planId,
+                amount: req.amount,
+                type: "deposit",
+                date: new Date().toISOString(),
+                description: "Direct deposit to flexible plan (admin approved)"
+            });
+            showMessage(`✅ Deposit of ₦${req.amount.toFixed(2)} added to flexible plan.`, false);
+        } else {
+            // Deposit to locked or target plan: must deduct from flexible plan first
+            const flexQuery = query(collection(db, "savings_plans"),
+                where("userId", "==", req.userId),
+                where("type", "==", "flex"));
             const flexSnap = await getDocs(flexQuery);
             if (flexSnap.empty) return showMessage("User does not have a flexible plan to fund this deposit.");
             const flexRef = flexSnap.docs[0].ref;
             const flexBalance = flexSnap.docs[0].data().balance || 0;
             if (flexBalance < req.amount) return showMessage("Insufficient flexible balance to cover this deposit.");
-            const planRef = doc(db, "savings_plans", req.planId);
+
             await runTransaction(db, async (transaction) => {
                 transaction.update(flexRef, { balance: increment(-req.amount) });
-                transaction.update(planRef, { balance: increment(req.amount) });
+                transaction.update(targetPlanRef, { balance: increment(req.amount) });
                 transaction.update(reqRef, { status: "approved", processedAt: new Date().toISOString() });
             });
-            await addDoc(collection(db, "transactions"), { userId: req.userId, planId: req.planId, amount: req.amount, type: "deposit", date: new Date().toISOString(), description: "Deposit funded from flexible plan" });
-            await logAudit("approve_deposit", req.userId, { amount: req.amount });
-            showMessage("Deposit approved – amount transferred from flexible plan.", false);
-        } catch(e) { showMessage(e.message); }
-    }
+            await addDoc(collection(db, "transactions"), {
+                userId: req.userId,
+                planId: req.planId,
+                amount: req.amount,
+                type: "deposit",
+                date: new Date().toISOString(),
+                description: "Deposit funded from flexible plan"
+            });
+            showMessage(`Deposit approved – amount transferred from flexible plan to ${targetPlan.type} plan.`, false);
+        }
+        await logAudit("approve_deposit", req.userId, { amount: req.amount, targetPlanType: targetPlan.type });
+    } catch(e) { showMessage(e.message); }
+}
+    //new deposit logic
     async function rejectDeposit(requestId) {
         if (!confirm("Reject deposit?")) return;
         await updateDoc(doc(db, "deposit_requests", requestId), { status: "rejected", processedAt: new Date().toISOString() });
