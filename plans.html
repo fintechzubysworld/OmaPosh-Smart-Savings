@@ -155,6 +155,8 @@
         .btn-primary:hover { background: #ff9f1a; }
         .btn-outline { background: transparent; border: 1px solid white; color: white; }
         .btn-outline:hover { background: rgba(255,255,255,0.1); }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; }
         .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; }
@@ -188,6 +190,7 @@
         .bank-amount { font-size: 1.5rem; font-weight: bold; color: #1e3c72; }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
         .hidden { display: none !important; }
+        .disabled-btn { opacity: 0.6; cursor: not-allowed; }
         @media (max-width: 768px) {
             .main-content { padding: 20px; }
             .btn-sm { width: 100%; margin: 6px 0; }
@@ -214,12 +217,13 @@
                 <button class="btn btn-primary" id="createTargetBtn">🎯 Target Plan</button>
             </div>
             <div id="plansList" class="card-grid">Loading plans...</div>
+            <div id="flexWarning" class="info-banner" style="display:none; background:#ffe0b3; color:#b45f06;"></div>
         </div>
     </div>
     <footer>© 2026 OmaPosh Smart Savings</footer>
 </div>
 
-<!-- Payment Modal - explicitly hidden with style and class -->
+<!-- Payment Modal -->
 <div id="paymentModal" class="hidden" style="display: none !important;">
     <div>
         <h3 id="paymentModalTitle">Complete Payment</h3>
@@ -280,8 +284,9 @@
     const paymentModal = document.getElementById('paymentModal');
     let modalResolve = null;
     let pendingPaymentCallback = null;
+    const flexWarning = document.getElementById('flexWarning');
 
-    // Force hide payment modal on load (extra safety)
+    // Force hide payment modal on load
     if (paymentModal) {
         paymentModal.style.display = 'none';
         paymentModal.classList.add('hidden');
@@ -311,9 +316,7 @@
     document.getElementById('closeModalBtn').onclick = closeModal;
     modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
 
-    // Strict guard: only allow modal to open if explicitly allowed
     let paymentModalAllowed = false;
-
     function showPaymentGateway(amount, purpose, onCreateRequest) {
         return new Promise((resolve) => {
             if (!paymentModalAllowed) {
@@ -372,6 +375,35 @@
         } catch(e) { return { deposits: 0, withdrawals: 0 }; }
     }
 
+    // Check if user already has a flexible plan
+    async function hasFlexiblePlan() {
+        if (!currentUser) return false;
+        const q = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+        const snap = await getDocs(q);
+        return !snap.empty;
+    }
+
+    // Update UI: disable flexible plan button if already exists
+    async function updateFlexibleButtonState() {
+        const flexBtn = document.getElementById('createFlexBtn');
+        if (!flexBtn) return;
+        const exists = await hasFlexiblePlan();
+        if (exists) {
+            flexBtn.disabled = true;
+            flexBtn.classList.add('disabled-btn');
+            flexBtn.title = "You already have a flexible plan. Only one flexible plan is allowed.";
+            if (flexWarning) {
+                flexWarning.style.display = 'block';
+                flexWarning.innerHTML = "⚠️ You already have a Flexible Savings Plan. You cannot create another flexible plan. If you need to adjust your savings, you can deposit or withdraw from your existing flexible plan.";
+            }
+        } else {
+            flexBtn.disabled = false;
+            flexBtn.classList.remove('disabled-btn');
+            flexBtn.title = "";
+            if (flexWarning) flexWarning.style.display = 'none';
+        }
+    }
+
     function listenToPlans() {
         if (plansUnsubscribe) plansUnsubscribe();
         if (!currentUser) return;
@@ -379,6 +411,7 @@
         plansUnsubscribe = onSnapshot(q, async (snapshot) => {
             if (snapshot.empty) {
                 plansList.innerHTML = '<p>No plans. Create one above.</p>';
+                await updateFlexibleButtonState();
                 return;
             }
             let html = '';
@@ -407,6 +440,7 @@
             document.querySelectorAll('.deposit-btn').forEach(btn => btn.onclick = () => initiateSavingsDeposit(btn.dataset.plan));
             document.querySelectorAll('.withdraw-btn').forEach(btn => btn.onclick = () => submitPlanWithdrawalRequest(btn.dataset.plan));
             document.querySelectorAll('.history-btn').forEach(btn => btn.onclick = () => viewFullHistory(btn.dataset.plan));
+            await updateFlexibleButtonState();
         }, (error) => {
             console.error("Plans snapshot error:", error);
             plansList.innerHTML = '<p class="info-banner" style="color:red;">Error loading plans. Check console.</p>';
@@ -420,7 +454,7 @@
             const planRef = doc(db, "savings_plans", planId);
             const planSnap = await getDoc(planRef);
             if (!planSnap.exists() || planSnap.data().userId !== currentUser.uid) return showToast("Invalid plan", true);
-            paymentModalAllowed = true;  // allow only this one time
+            paymentModalAllowed = true;
             await showPaymentGateway(amount, "Deposit to Savings Plan", async (transactionRef) => {
                 await addDoc(collection(db, "deposit_requests"), {
                     userId: currentUser.uid,
@@ -494,6 +528,14 @@
     }
 
     async function createPlanWithInitialDeposit(planData, initialDepositAmt) {
+        // Extra safety: prevent duplicate flexible plan creation
+        if (planData.type === 'flex') {
+            const exists = await hasFlexiblePlan();
+            if (exists) {
+                showToast("You already have a flexible plan. You cannot create another one.", true);
+                return;
+            }
+        }
         try {
             const planRef = await addDoc(collection(db, "savings_plans"), { ...planData, balance: 0, createdAt: new Date().toISOString() });
             if (initialDepositAmt > 0) {
@@ -513,12 +555,18 @@
                 });
                 paymentModalAllowed = false;
             } else {
-                showToast(`Plan created.`, false);
+                showToast(`${planData.type.charAt(0).toUpperCase() + planData.type.slice(1)} plan created.`, false);
             }
         } catch(err) { showToast(err.message, true); }
     }
 
-    document.getElementById('createFlexBtn').onclick = () => {
+    document.getElementById('createFlexBtn').onclick = async () => {
+        // Check before opening modal
+        const exists = await hasFlexiblePlan();
+        if (exists) {
+            showToast("You already have a flexible plan. Only one flexible plan is allowed.", true);
+            return;
+        }
         showModal("Create Flexible Plan", `<div class="form-group"><label>Initial deposit (₦) - payment via Moniepoint</label><input type="number" id="flexDeposit" value="0" step="100"></div>`, true, "Create Plan")
         .then(async ok => { if(ok && currentUser) { let amt = parseFloat(document.getElementById('flexDeposit')?.value) || 0; if (amt < 0) amt = 0; await createPlanWithInitialDeposit({ userId: currentUser.uid, type: "flex" }, amt); } closeModal(); });
     };
