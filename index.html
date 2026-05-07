@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
-    <!-- Global Custom Dialog Override (alert/confirm/prompt) -->
+    <!-- Global Custom Dialog Override -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
@@ -444,17 +444,17 @@
     // Navigation / UI
     function addLedgerButton() { if (!document.getElementById('ledgerFloatingBtn')) { const btn = document.createElement('button'); btn.id = 'ledgerFloatingBtn'; btn.innerHTML = '📒 My Ledger'; btn.onclick = () => window.location.href = 'ledger.html'; document.body.appendChild(btn); } }
     
-    // Fixed notification widget – badge only appears when unread > 0
+    // FIXED: Notification widget – badge only appears when unread > 0
     function addNotificationWidget() {
         if (document.getElementById('floatingInboxBtn')) return;
-        // Create floating inbox button
+        // Floating inbox button
         const inboxBtn = document.createElement('button');
         inboxBtn.id = 'floatingInboxBtn';
         inboxBtn.innerHTML = '✉️';
         inboxBtn.onclick = () => window.location.href = 'notifications.html';
         document.body.appendChild(inboxBtn);
         
-        // Create bell icon in header
+        // Bell icon in header with hidden badge by default
         const bellDiv = document.createElement('div');
         bellDiv.id = 'notificationBell';
         bellDiv.style.cssText = 'position:relative; margin-left:12px; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;';
@@ -465,7 +465,7 @@
         }
         bellDiv.onclick = () => window.location.href = 'notifications.html';
         
-        // Listen for unread messages
+        // Real-time unread count listener
         if (currentUser) {
             const messagesQuery = query(collection(db, "messages"), where("userId", "==", currentUser.uid));
             onSnapshot(messagesQuery, (snapshot) => {
@@ -500,7 +500,7 @@
             listenToBalances();
             listenUserGroups();
             addLedgerButton();
-            addNotificationWidget(); // will set up unread listener
+            addNotificationWidget(); // ✅ This now sets up the correct badge behaviour
             // Contribution Reminder
             const groupsSnap = await getDocs(collection(db, "groups"));
             const userGroups = groupsSnap.docs.filter(d => d.data().members?.includes(user.uid)).map(d => ({ id: d.id, ...d.data() }));
@@ -536,7 +536,7 @@
     // Modal helpers (generic)
     window.closeModal = () => { document.getElementById('modal').classList.add('hidden'); };
     document.getElementById('closeModalBtn')?.addEventListener('click', () => closeModal());
-    // Payment modal handler (used by plans.html if needed, but keep functional)
+    // Payment modal handler (used by plans.html if needed)
     let pendingPaymentCallback = null;
     window.showPaymentGateway = (amount, purpose, onCreateRequest) => {
         return new Promise((resolve) => {
