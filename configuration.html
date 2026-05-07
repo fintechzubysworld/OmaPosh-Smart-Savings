@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>OmaPosh | Esusu & Thrift Group Configuration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>OmaPosh | Advanced Configuration Hub</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
@@ -68,7 +73,7 @@
         }
         .form-group { margin-bottom: 18px; }
         label { display: block; font-weight: 600; margin-bottom: 6px; color: #1e3c72; }
-        input, select, textarea {
+        input, select {
             width: 100%;
             padding: 12px;
             border: 1px solid #ccc;
@@ -76,6 +81,34 @@
             font-size: 1rem;
         }
         .flex-btns { display: flex; gap: 15px; flex-wrap: wrap; margin: 20px 0; }
+        .card {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 18px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ffb347;
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            background: white;
+            padding: 12px;
+            border-radius: 16px;
+            border: 1px solid #e9ecef;
+        }
+        .config-row input[type="text"] { flex: 2; min-width: 150px; }
+        .config-row input[type="number"] { flex: 1; min-width: 100px; }
+        .config-row button { margin-left: auto; }
+        .badge {
+            background: #e9ecef;
+            padding: 4px 10px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            color: #495057;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -111,21 +144,6 @@
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .admin-badge {
-            background: #1e3c72;
-            color: white;
-            border-radius: 60px;
-            padding: 4px 12px;
-            font-size: 0.7rem;
-            display: inline-block;
-        }
-        .system-account-card {
-            background: #f8f9fa;
-            border-radius: 20px;
-            padding: 18px;
-            margin-bottom: 20px;
-            border-left: 5px solid #ffb347;
-        }
         .member-item {
             display: flex;
             justify-content: space-between;
@@ -148,10 +166,11 @@
         @media (max-width: 700px) {
             .main-content { padding: 20px; }
             .section-title { font-size: 1.3rem; }
+            .config-row { flex-direction: column; align-items: stretch; }
+            .config-row button { margin-left: 0; margin-top: 8px; }
             th, td { display: block; text-align: left; }
             td:before { content: attr(data-label); font-weight: bold; display: inline-block; width: 40%; }
         }
-        /* Modal */
         .modal {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.6);
@@ -178,8 +197,8 @@
 <div class="container">
     <header>
         <div class="logo">
-            <h1>⚙️ OmaPosh Configuration Hub</h1>
-            <p>Esusu Fraction • Thrift Groups Management</p>
+            <h1>⚙️ Configuration Hub</h1>
+            <p>Advanced Fractions & Thrift Groups</p>
         </div>
         <div class="user-info">
             <span id="adminName"></span>
@@ -192,23 +211,38 @@
             <p>Verifying admin access...</p>
         </div>
         <div id="configContent" class="hidden">
-            <!-- ========== ESUSU FRACTION SECTION ========== -->
+            <!-- ========== MULTIPLE ESUSU FRACTIONS ========== -->
             <div class="section">
-                <div class="section-title">📊 Esusu Deduction Rate</div>
-                <div class="system-account-card">
-                    <div style="font-weight: bold; margin-bottom: 8px;">Current Esusu Fraction</div>
-                    <div id="currentPercentDisplay" style="font-size: 2rem; font-weight: 800; color: #2a5298;">--%</div>
-                    <div class="note">of every contribution in groups with "Apply Esusu deduction" enabled.</div>
-                </div>
-                <div class="form-group">
-                    <label>Update Fraction (0 to 1)</label>
-                    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                        <input type="number" id="fractionInput" step="0.001" min="0" max="1" value="0.01" style="flex:2;">
-                        <span>= <strong id="percentPreview">1.0</strong>%</span>
+                <div class="section-title">🔄 Multiple Esusu Fractions (up to 10)</div>
+                <div class="card">
+                    <p>Each named configuration can be assigned to thrift groups later. Maximum 10 active configs.</p>
+                    <div id="esusuConfigsList"></div>
+                    <div class="flex-btns">
+                        <button class="btn btn-primary" id="addEsusuConfigBtn">+ Add Esusu Configuration</button>
                     </div>
-                    <div class="note">Example: 0.01 = 1%, 0.05 = 5%</div>
                 </div>
-                <button class="btn btn-primary" id="saveFractionBtn">💾 Save Esusu Fraction</button>
+            </div>
+
+            <!-- ========== SAVINGS PLAN FRACTIONS ========== -->
+            <div class="section">
+                <div class="section-title">💰 Savings Plan Fractions</div>
+                <div class="card">
+                    <p>Set the fraction (0‑1) applied to contributions or withdrawals for each plan type.</p>
+                    <div class="form-group">
+                        <label>Flexible Plan Fraction</label>
+                        <input type="number" id="flexFraction" step="0.001" min="0" max="1" value="0.00">
+                        <div class="note">e.g., 0.00 = 0%, 0.05 = 5%</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Locked Plan Fraction</label>
+                        <input type="number" id="lockedFraction" step="0.001" min="0" max="1" value="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Target Plan Fraction</label>
+                        <input type="number" id="targetFraction" step="0.001" min="0" max="1" value="0.00">
+                    </div>
+                    <button class="btn btn-primary" id="saveSavingsFractionsBtn">💾 Save Savings Fractions</button>
+                </div>
             </div>
 
             <!-- ========== THRIFT GROUP MANAGEMENT ========== -->
@@ -222,13 +256,13 @@
                         <thead>
                             <tr><th>Group Name</th><th>Contribution</th><th>Frequency</th><th>Members</th><th>Models</th><th>Actions</th>
                         </thead>
-                        <tbody><tr><td colspan="6">Loading groups...</td></tr>
+                        <tbody><tr><td colspan="6">Loading groups...</td></tr></tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-    <footer>© 2026 OmaPosh Smart Savings — Configuration & Thrift Management</footer>
+    <footer>© 2026 OmaPosh Smart Savings — Advanced Configuration & Thrift Management</footer>
 </div>
 
 <!-- CREATE GROUP MODAL -->
@@ -239,7 +273,12 @@
         <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
         <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><div class="note">1 = daily, 7 = weekly, 30 = monthly</div></div>
         <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
-        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label></div>
+        <div class="form-group"><label>Apply Esusu deduction</label>
+            <select id="newGroupEsusuConfigId">
+                <option value="">None</option>
+            </select>
+            <div class="note">Select which Esusu configuration to apply (or none).</div>
+        </div>
         <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
         <div class="flex-btns" style="margin-top: 20px;">
             <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
@@ -248,7 +287,7 @@
     </div>
 </div>
 
-<!-- VIEW MEMBERS MODAL (dynamic) -->
+<!-- VIEW MEMBERS MODAL -->
 <div id="viewMembersModal" class="modal hidden">
     <div>
         <h3 id="membersModalTitle">Group Members</h3>
@@ -260,7 +299,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, arrayRemove, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -280,10 +319,12 @@
     const configContent = document.getElementById('configContent');
     const adminNameSpan = document.getElementById('adminName');
     const backToAdminBtn = document.getElementById('backToAdminBtn');
-    const fractionInput = document.getElementById('fractionInput');
-    const percentPreviewSpan = document.getElementById('percentPreview');
-    const saveFractionBtn = document.getElementById('saveFractionBtn');
-    const currentPercentDisplay = document.getElementById('currentPercentDisplay');
+    const esusuConfigsDiv = document.getElementById('esusuConfigsList');
+    const addEsusuConfigBtn = document.getElementById('addEsusuConfigBtn');
+    const flexFractionInput = document.getElementById('flexFraction');
+    const lockedFractionInput = document.getElementById('lockedFraction');
+    const targetFractionInput = document.getElementById('targetFraction');
+    const saveSavingsFractionsBtn = document.getElementById('saveSavingsFractionsBtn');
     const createGroupBtn = document.getElementById('createGroupBtn');
     const createGroupModal = document.getElementById('createGroupModal');
     const confirmCreateGroupBtn = document.getElementById('confirmCreateGroupBtn');
@@ -292,9 +333,11 @@
     const membersModalTitle = document.getElementById('membersModalTitle');
     const membersListDiv = document.getElementById('membersList');
     const closeMembersModalBtn = document.getElementById('closeMembersModalBtn');
+    const newGroupEsusuConfigId = document.getElementById('newGroupEsusuConfigId');
 
     let currentAdmin = null;
-    let currentFraction = 0.01;
+    let esusuConfigs = []; // array of { id, name, fraction }
+    let groupsUnsubscribe = null;
 
     // Helper functions
     function showMessage(msg, type = 'info') {
@@ -308,60 +351,171 @@
         setTimeout(() => msgDiv.remove(), 4000);
     }
 
-    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
 
     async function logAudit(action, targetUserId = null, details = {}) {
         if (!currentAdmin) return;
-        await addDoc(collection(db, "audit_logs"), { adminId: currentAdmin.uid, adminEmail: currentAdmin.email, action, targetUserId, details, timestamp: new Date().toISOString() });
+        await addDoc(collection(db, "audit_logs"), {
+            adminId: currentAdmin.uid,
+            adminEmail: currentAdmin.email,
+            action,
+            targetUserId,
+            details,
+            timestamp: new Date().toISOString()
+        });
     }
 
-    // ========== ESUSU FRACTION LOGIC ==========
-    async function loadFraction() {
-        const configRef = doc(db, "system_config", "financial_models");
-        const docSnap = await getDoc(configRef);
+    // ========== ESUSU CONFIGURATIONS ==========
+    async function loadEsusuConfigs() {
+        const docRef = doc(db, "system_config", "esusu_fractions");
+        const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-            currentFraction = docSnap.data().esusuFraction ?? 0.01;
+            esusuConfigs = docSnap.data().configs || [];
         } else {
-            currentFraction = 0.01;
-            await setDoc(configRef, { esusuFraction: 0.01 });
+            esusuConfigs = [{ id: "default_1", name: "Default Esusu", fraction: 0.01 }];
+            await setDoc(docRef, { configs: esusuConfigs, updatedAt: new Date().toISOString() });
         }
-        fractionInput.value = currentFraction;
-        const percent = (currentFraction * 100).toFixed(2);
-        currentPercentDisplay.innerHTML = `${percent}% <span style="font-size:1rem;">(${currentFraction})</span>`;
-        percentPreviewSpan.textContent = percent;
+        renderEsusuConfigs();
+        updateGroupCreationDropdown();
     }
 
-    async function saveFraction(newFraction) {
-        const configRef = doc(db, "system_config", "financial_models");
-        await setDoc(configRef, { esusuFraction: newFraction, updatedAt: new Date().toISOString(), lastUpdatedBy: currentAdmin?.uid }, { merge: true });
-        currentFraction = newFraction;
-        const percent = (newFraction * 100).toFixed(2);
-        currentPercentDisplay.innerHTML = `${percent}% <span style="font-size:1rem;">(${newFraction})</span>`;
-        showMessage(`Esusu fraction updated to ${percent}% (${newFraction}).`, 'success');
-        await logAudit("update_esusu_fraction", null, { newFraction });
+    async function saveEsusuConfigs() {
+        const docRef = doc(db, "system_config", "esusu_fractions");
+        await setDoc(docRef, { configs: esusuConfigs, updatedAt: new Date().toISOString(), lastUpdatedBy: currentAdmin?.uid }, { merge: true });
+        showMessage("Esusu configurations saved.", 'success');
+        await logAudit("update_esusu_configs", null, { count: esusuConfigs.length });
+        updateGroupCreationDropdown();
     }
 
-    fractionInput.addEventListener('input', () => {
-        let val = parseFloat(fractionInput.value);
-        if (isNaN(val)) val = 0;
-        const percent = (val * 100).toFixed(2);
-        percentPreviewSpan.textContent = percent;
-    });
-
-    saveFractionBtn.onclick = async () => {
-        let newVal = parseFloat(fractionInput.value);
-        if (isNaN(newVal) || newVal < 0 || newVal > 1) {
-            showMessage("Please enter a number between 0 and 1.", 'error');
+    function renderEsusuConfigs() {
+        if (!esusuConfigsDiv) return;
+        if (esusuConfigs.length === 0) {
+            esusuConfigsDiv.innerHTML = '<p class="note">No configurations. Click "Add" to create one.</p>';
             return;
         }
-        if (confirm(`Change Esusu deduction from ${(currentFraction*100).toFixed(2)}% to ${(newVal*100).toFixed(2)}%?`)) {
-            await saveFraction(newVal);
+        let html = '';
+        esusuConfigs.forEach((cfg, idx) => {
+            html += `
+                <div class="config-row" data-id="${cfg.id}">
+                    <input type="text" placeholder="Configuration name" value="${escapeHtml(cfg.name)}" class="esusu-name" style="flex:2;">
+                    <input type="number" step="0.001" min="0" max="1" value="${cfg.fraction}" class="esusu-fraction" style="flex:1;">
+                    <span class="badge">${(cfg.fraction * 100).toFixed(2)}%</span>
+                    <button class="btn btn-sm btn-danger delete-esusu-btn" data-idx="${idx}">🗑️ Remove</button>
+                </div>
+            `;
+        });
+        esusuConfigsDiv.innerHTML = html;
+
+        document.querySelectorAll('.config-row').forEach((row, idx) => {
+            const nameInput = row.querySelector('.esusu-name');
+            const fractionInput = row.querySelector('.esusu-fraction');
+            const deleteBtn = row.querySelector('.delete-esusu-btn');
+            
+            const updateConfig = () => {
+                const newName = nameInput.value.trim();
+                const newFraction = parseFloat(fractionInput.value);
+                if (newName && !isNaN(newFraction) && newFraction >= 0 && newFraction <= 1) {
+                    esusuConfigs[idx].name = newName;
+                    esusuConfigs[idx].fraction = newFraction;
+                    const badge = row.querySelector('.badge');
+                    if (badge) badge.textContent = `${(newFraction * 100).toFixed(2)}%`;
+                    saveEsusuConfigs();
+                } else if (isNaN(newFraction)) {
+                    fractionInput.value = esusuConfigs[idx].fraction;
+                    showMessage("Fraction must be a number between 0 and 1.", 'error');
+                } else if (!newName) {
+                    nameInput.value = esusuConfigs[idx].name;
+                    showMessage("Name cannot be empty.", 'error');
+                }
+            };
+            nameInput.addEventListener('change', updateConfig);
+            fractionInput.addEventListener('change', updateConfig);
+            
+            deleteBtn.onclick = async () => {
+                if (esusuConfigs.length <= 1) {
+                    showMessage("You must keep at least one Esusu configuration.", 'error');
+                    return;
+                }
+                if (confirm(`Delete "${esusuConfigs[idx].name}"?`)) {
+                    esusuConfigs.splice(idx, 1);
+                    await saveEsusuConfigs();
+                    renderEsusuConfigs();
+                }
+            };
+        });
+    }
+
+    addEsusuConfigBtn.onclick = () => {
+        if (esusuConfigs.length >= 10) {
+            showMessage("Maximum 10 configurations allowed.", 'error');
+            return;
         }
+        const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+        esusuConfigs.push({
+            id: newId,
+            name: `Esusu ${esusuConfigs.length + 1}`,
+            fraction: 0.01
+        });
+        saveEsusuConfigs().then(() => renderEsusuConfigs());
     };
 
-    // ========== THRIFT GROUP MANAGEMENT ==========
-    let groupsUnsubscribe = null;
+    function updateGroupCreationDropdown() {
+        if (!newGroupEsusuConfigId) return;
+        let options = '<option value="">None</option>';
+        esusuConfigs.forEach(cfg => {
+            options += `<option value="${cfg.id}">${escapeHtml(cfg.name)} (${(cfg.fraction * 100).toFixed(2)}%)</option>`;
+        });
+        newGroupEsusuConfigId.innerHTML = options;
+    }
 
+    // ========== SAVINGS PLAN FRACTIONS ==========
+    async function loadSavingsFractions() {
+        const docRef = doc(db, "system_config", "savings_fractions");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            flexFractionInput.value = data.flexible ?? 0;
+            lockedFractionInput.value = data.locked ?? 0;
+            targetFractionInput.value = data.target ?? 0;
+        } else {
+            flexFractionInput.value = 0;
+            lockedFractionInput.value = 0;
+            targetFractionInput.value = 0;
+            await setDoc(docRef, { flexible: 0, locked: 0, target: 0, updatedAt: new Date().toISOString() });
+        }
+    }
+
+    async function saveSavingsFractions() {
+        const flexible = parseFloat(flexFractionInput.value);
+        const locked = parseFloat(lockedFractionInput.value);
+        const target = parseFloat(targetFractionInput.value);
+        if (isNaN(flexible) || flexible < 0 || flexible > 1 ||
+            isNaN(locked) || locked < 0 || locked > 1 ||
+            isNaN(target) || target < 0 || target > 1) {
+            showMessage("All fractions must be numbers between 0 and 1.", 'error');
+            return;
+        }
+        const docRef = doc(db, "system_config", "savings_fractions");
+        await setDoc(docRef, {
+            flexible, locked, target,
+            updatedAt: new Date().toISOString(),
+            lastUpdatedBy: currentAdmin?.uid
+        }, { merge: true });
+        showMessage("Savings plan fractions saved.", 'success');
+        await logAudit("update_savings_fractions", null, { flexible, locked, target });
+    }
+
+    saveSavingsFractionsBtn.onclick = saveSavingsFractions;
+
+    // ========== THRIFT GROUP MANAGEMENT ==========
     async function loadGroups() {
         if (groupsUnsubscribe) groupsUnsubscribe();
         const q = collection(db, "groups");
@@ -378,8 +532,11 @@
                 const creatorName = creatorDoc.exists() ? creatorDoc.data().fullName : g.creatorId;
                 let models = '';
                 if (g.applyProfitLoss) models += '📊 Profit/Loss ';
-                if (g.applyEsusu) models += '🔄 Esusu ';
-                if (!models) models = 'None';
+                if (g.esusuConfigId) {
+                    const esuCfg = esusuConfigs.find(c => c.id === g.esusuConfigId);
+                    models += `🔄 Esusu (${esuCfg ? esuCfg.name : '?'}) `;
+                }
+                if (!models.trim()) models = 'None';
                 const freqText = g.frequencyDays === 1 ? 'Daily' : (g.frequencyDays === 7 ? 'Weekly' : (g.frequencyDays === 30 ? 'Monthly' : `${g.frequencyDays} days`));
                 html += `<tr>
                     <td data-label="Group Name"><strong>${escapeHtml(g.name)}</strong><br><small>by ${escapeHtml(creatorName)}</small></td>
@@ -395,13 +552,12 @@
             }
             tbody.innerHTML = html;
 
-            // attach event listeners
             document.querySelectorAll('.view-members').forEach(btn => {
                 btn.onclick = () => viewGroupMembers(btn.dataset.id, btn.dataset.name);
             });
             document.querySelectorAll('.delete-group').forEach(btn => {
                 btn.onclick = async () => {
-                    if (confirm("Delete this group permanently? All contribution history will remain but group will be removed.")) {
+                    if (confirm("Delete this group permanently?")) {
                         await deleteDoc(doc(db, "groups", btn.dataset.id));
                         await logAudit("delete_group", null, { groupId: btn.dataset.id });
                         showMessage("Group deleted.", 'success');
@@ -441,7 +597,7 @@
                             await updateDoc(doc(db, "groups", btn.dataset.group), { members: arrayRemove(btn.dataset.uid) });
                             await logAudit("remove_member_from_group", btn.dataset.uid, { groupId });
                             showMessage(`Removed ${btn.dataset.name} from group.`, 'success');
-                            viewGroupMembers(groupId, groupName); // refresh modal
+                            viewGroupMembers(groupId, groupName);
                         }
                     };
                 });
@@ -455,7 +611,6 @@
 
     function closeModal(modalEl) { modalEl.classList.add('hidden'); }
 
-    // Create group modal logic
     createGroupBtn.onclick = () => createGroupModal.classList.remove('hidden');
     cancelCreateGroupBtn.onclick = () => closeModal(createGroupModal);
     confirmCreateGroupBtn.onclick = async () => {
@@ -463,51 +618,41 @@
         const amount = parseFloat(document.getElementById('newGroupAmount').value);
         const frequencyDays = parseInt(document.getElementById('newGroupFrequency').value);
         const maxMembers = parseInt(document.getElementById('newGroupMaxMembers').value);
-        const applyEsusu = document.getElementById('newGroupApplyEsusu').checked;
+        const esusuConfigId = newGroupEsusuConfigId.value || null;
         const applyProfitLoss = document.getElementById('newGroupApplyProfitLoss').checked;
 
         if (!name || isNaN(amount) || amount <= 0 || isNaN(frequencyDays) || frequencyDays < 1 || isNaN(maxMembers) || maxMembers < 2) {
-            showMessage("Please fill all fields correctly (name, positive amount, frequency ≥1, max members ≥2).", 'error');
+            showMessage("Please fill all fields correctly.", 'error');
             return;
         }
         try {
             if (!currentAdmin) throw new Error("Not authenticated");
             await addDoc(collection(db, "groups"), {
-                name: name,
-                contributionAmount: amount,
-                frequencyDays: frequencyDays,
-                maxMembers: maxMembers,
-                applyEsusu: applyEsusu,
-                applyProfitLoss: applyProfitLoss,
-                members: [],
-                currentPayoutIndex: 0,
-                creatorId: currentAdmin.uid,
-                createdAt: new Date().toISOString()
+                name, contributionAmount: amount, frequencyDays, maxMembers,
+                esusuConfigId, applyProfitLoss,
+                members: [], currentPayoutIndex: 0,
+                creatorId: currentAdmin.uid, createdAt: new Date().toISOString()
             });
-            showMessage(`Thrift group "${name}" created successfully!`, 'success');
+            showMessage(`Thrift group "${name}" created!`, 'success');
             await logAudit("create_thrift_group", null, { groupName: name });
             closeModal(createGroupModal);
-            // reset form
             document.getElementById('newGroupName').value = '';
             document.getElementById('newGroupAmount').value = '';
             document.getElementById('newGroupFrequency').value = '7';
             document.getElementById('newGroupMaxMembers').value = '10';
-            document.getElementById('newGroupApplyEsusu').checked = false;
             document.getElementById('newGroupApplyProfitLoss').checked = false;
+            newGroupEsusuConfigId.value = '';
         } catch (err) {
             showMessage("Error: " + err.message, 'error');
         }
     };
 
-    // Close member modal
     closeMembersModalBtn.onclick = () => closeModal(viewMembersModal);
     viewMembersModal.addEventListener('click', (e) => { if (e.target === viewMembersModal) closeModal(viewMembersModal); });
     createGroupModal.addEventListener('click', (e) => { if (e.target === createGroupModal) closeModal(createGroupModal); });
 
-    // ========== REDIRECT TO ADMIN DASHBOARD ==========
-    backToAdminBtn.onclick = () => {
-        window.location.href = 'admin.html';  // change this to your actual admin main page filename
-    };
+    // ========== BACK BUTTON ==========
+    backToAdminBtn.onclick = () => { window.location.href = 'admin.html'; };
 
     // ========== AUTHENTICATION & INIT ==========
     onAuthStateChanged(auth, async (user) => {
@@ -523,12 +668,12 @@
                 adminNameSpan.innerText = `👋 ${userDoc.exists() ? userDoc.data().fullName : user.email}`;
                 loadingSpinner.classList.add('hidden');
                 configContent.classList.remove('hidden');
-                await loadFraction();
+                await loadEsusuConfigs();
+                await loadSavingsFractions();
                 await loadGroups();
                 return;
             }
         }
-        // Not admin or not logged in
         loadingSpinner.innerHTML = '<div class="message message-error">⛔ Access Denied. Admin privileges required. <br><br><button id="redirectLogin" class="btn btn-primary">Go to Login</button></div>';
         const redirectBtn = document.getElementById('redirectLogin');
         if (redirectBtn) redirectBtn.onclick = () => window.location.href = 'index.html';
