@@ -613,7 +613,21 @@
 
     createGroupBtn.onclick = () => createGroupModal.classList.remove('hidden');
     cancelCreateGroupBtn.onclick = () => closeModal(createGroupModal);
+    //percentage
     confirmCreateGroupBtn.onclick = async () => {
+        await addDoc(collection(db, "groups"), {
+    name: name,
+    contributionAmount: amount,
+    frequencyDays: frequencyDays,
+    maxMembers: maxMembers,
+    applyEsusu: false,   // ignored – we now always apply fixed 4.76%
+    applyProfitLoss: true, // still apply 1%? Yes, keep as per user request (they said 1% profit? Actually they said 3% on flexible deposits, but thrift has separate 1% profit? We'll keep 1% profit for thrift as previously coded. The user only specified 4.76% Esusu and 3% on flexible deposits. So thrift profit deduction remains 1%.)
+    members: [],
+    currentPayoutIndex: 0,
+    balance: 0,          // <-- add this
+    creatorId: currentAdmin.uid,
+    createdAt: new Date().toISOString()
+}); //percentage
         const name = document.getElementById('newGroupName').value.trim();
         const amount = parseFloat(document.getElementById('newGroupAmount').value);
         const frequencyDays = parseInt(document.getElementById('newGroupFrequency').value);
