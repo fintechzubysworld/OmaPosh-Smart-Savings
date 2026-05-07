@@ -602,7 +602,8 @@
                 } catch(err) { showToast(err.message, true); }
             }));
             
-            // Auto contribution handler (use group-specific deduction rates)
+            // ========== CORRECTED CONTRIBUTION HANDLER ==========
+            // Debit FULL contribution amount from flexible plan, then route deductions to system accounts, net to group.
             document.querySelectorAll('.contribute-group-btn').forEach(btn => btn.addEventListener('click', async () => {
                 const groupId = btn.dataset.groupId;
                 try {
@@ -631,11 +632,15 @@
                     if (flexSnap.empty) return showToast("No flexible plan to fund contribution", true);
                     const flexRef = flexSnap.docs[0].ref;
                     const flexBalance = flexSnap.docs[0].data().balance || 0;
-                    if (flexBalance < netToGroup) return showToast(`Insufficient flexible balance. Need ₦${netToGroup.toFixed(2)}`, true);
                     
-                    // Perform transaction
+                    // Check if user has enough balance for the FULL contribution amount
+                    if (flexBalance < amount) {
+                        return showToast(`Insufficient flexible balance. Need ₦${amount.toFixed(2)}`, true);
+                    }
+                    
+                    // Perform transaction: debit full amount, credit system accounts, credit net to group
                     await runTransaction(db, async (transaction) => {
-                        transaction.update(flexRef, { balance: increment(-netToGroup) });
+                        transaction.update(flexRef, { balance: increment(-amount) });   // deduct FULL amount
                         if (esusuDeduction > 0) transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
                         if (profitDeduction > 0) transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
                         transaction.update(groupRef, { balance: increment(netToGroup) });
@@ -657,10 +662,10 @@
                     const userData = userDoc.data();
                     await notifyAdmin(
                         `💰 Thrift Contribution: ${userData.fullName || currentUser.email} → ${group.name}`,
-                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction ${(esusuRate*100).toFixed(2)}%: ₦${esusuDeduction.toFixed(2)}\nProfit deduction ${(profitRate*100).toFixed(2)}%: ₦${profitDeduction.toFixed(2)}\nNet added to group pot: ₦${netToGroup.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction ${(esusuRate*100).toFixed(2)}%: ₦${esusuDeduction.toFixed(2)}\nProfit deduction ${(profitRate*100).toFixed(2)}%: ₦${profitDeduction.toFixed(2)}\nNet added to group pot: ₦${netToGroup.toFixed(2)}\nFlexible balance reduced by: ₦${amount.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
                     );
                     
-                    showToast(`Contribution recorded. Net ₦${netToGroup.toFixed(2)} added to group.`, false);
+                    showToast(`Contribution of ₦${amount.toFixed(2)} recorded. Net ₦${netToGroup.toFixed(2)} added to group.`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
             
