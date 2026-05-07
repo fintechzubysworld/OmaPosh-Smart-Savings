@@ -4,12 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>OmaPosh Smart Savings | Thrift & Co-operative</title>
-    <!-- Global Custom Dialog Override -->
+    <!-- ========== CUSTOM DIALOG OVERRIDE ========== -->
     <script>
     (function() {
         if (window.__customDialogsInstalled) return;
         window.__customDialogsInstalled = true;
-        const init = () => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+        function init() {
             const overlay = document.createElement('div');
             overlay.id = 'custom-dialog-overlay';
             overlay.style.cssText = `
@@ -45,7 +50,7 @@
             const ok = document.getElementById('custom-dialog-ok');
             const cancel = document.getElementById('custom-dialog-cancel');
 
-            const hide = () => {
+            function hide() {
                 overlay.style.visibility = 'hidden';
                 if (resolveFn) {
                     if (isPromptMode) resolveFn(null);
@@ -53,7 +58,7 @@
                     resolveFn = null;
                 }
                 isPromptMode = false;
-            };
+            }
             ok.onclick = () => {
                 overlay.style.visibility = 'hidden';
                 if (resolveFn) {
@@ -65,8 +70,9 @@
             };
             cancel.onclick = hide;
             overlay.addEventListener('click', (e) => { if (e.target === overlay) hide(); });
+
             let userName = 'OmaPosh';
-            const updateUserName = () => {
+            function updateUserName() {
                 if (typeof auth !== 'undefined' && auth.currentUser) {
                     if (auth.currentUser.email) userName = auth.currentUser.email.split('@')[0];
                     if (typeof db !== 'undefined' && auth.currentUser.uid) {
@@ -77,7 +83,7 @@
                         }).catch(() => {});
                     }
                 }
-            };
+            }
             updateUserName();
             const interval = setInterval(() => {
                 if (typeof auth !== 'undefined' && auth.currentUser) {
@@ -88,26 +94,33 @@
             if (typeof onAuthStateChanged !== 'undefined' && typeof auth !== 'undefined') {
                 onAuthStateChanged(auth, () => updateUserName());
             }
-            window.alert = (m) => {
+
+            function showDialog(prefix, message, showInput, defaultValue) {
+                if (header) header.innerText = `${userName} ${prefix}`;
+                if (msg) msg.innerText = String(message);
+                if (showInput && inputGroup && inputField) {
+                    inputField.value = defaultValue;
+                    inputGroup.style.display = 'block';
+                } else if (inputGroup) {
+                    inputGroup.style.display = 'none';
+                }
+                overlay.style.visibility = 'visible';
+            }
+
+            window.alert = function(m) {
                 if (cancel) cancel.style.display = 'none';
                 if (ok) ok.innerText = 'OK';
-                header.innerText = `${userName} says:`;
-                msg.innerText = String(m);
-                inputGroup.style.display = 'none';
-                overlay.style.visibility = 'visible';
+                showDialog('says:', m, false);
                 return new Promise((resolve) => {
                     const handler = () => { overlay.style.visibility = 'hidden'; resolve(); };
                     if (ok) ok.onclick = handler;
                     if (cancel) cancel.style.display = 'none';
                 });
             };
-            window.confirm = (m) => {
+            window.confirm = function(m) {
                 if (cancel) cancel.style.display = 'inline-flex';
                 if (ok) ok.innerText = 'OK';
-                header.innerText = `${userName} asks:`;
-                msg.innerText = String(m);
-                inputGroup.style.display = 'none';
-                overlay.style.visibility = 'visible';
+                showDialog('asks:', m, false);
                 return new Promise((resolve) => {
                     const onOk = () => { overlay.style.visibility = 'hidden'; resolve(true); };
                     const onCancel = () => { overlay.style.visibility = 'hidden'; resolve(false); };
@@ -115,14 +128,10 @@
                     if (cancel) cancel.onclick = onCancel;
                 });
             };
-            window.prompt = (m, d) => {
+            window.prompt = function(m, d) {
                 if (cancel) cancel.style.display = 'inline-flex';
                 if (ok) ok.innerText = 'OK';
-                header.innerText = `${userName} requests:`;
-                msg.innerText = String(m);
-                inputField.value = d || '';
-                inputGroup.style.display = 'block';
-                overlay.style.visibility = 'visible';
+                showDialog('requests:', m, true, d || '');
                 isPromptMode = true;
                 return new Promise((resolve) => {
                     const onOk = () => { overlay.style.visibility = 'hidden'; resolve(inputField ? inputField.value : null); };
@@ -131,9 +140,7 @@
                     if (cancel) cancel.onclick = onCancel;
                 });
             };
-        };
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-        else init();
+        }
     })();
     </script>
     <style>
@@ -144,21 +151,23 @@
         .logo h1 { font-size: 1.8rem; letter-spacing: 1px; }
         .logo p { font-size: 0.8rem; opacity: 0.8; }
         .user-info { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
-        .profile-name { cursor: pointer; font-weight: 500; transition: opacity 0.2s; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 40px; }
-        .profile-name:hover { background: rgba(255,255,255,0.3); }
+        .profile-name { cursor: pointer; text-decoration: underline; text-underline-offset: 4px; font-weight: 500; transition: opacity 0.2s; }
+        .profile-name:hover { opacity: 0.8; }
         .btn { padding: 8px 16px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; }
         .btn-primary { background: #ffb347; color: #1e2a3e; }
         .btn-primary:hover { background: #ff9f1a; }
         .btn-outline { background: transparent; border: 1px solid white; color: white; }
         .btn-outline:hover { background: rgba(255,255,255,0.1); }
+        .btn-secondary { background: #17a2b8; color: white; }
+        .btn-secondary:hover { background: #138496; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
         .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; cursor: pointer; transition: all 0.2s; }
         .section-title:hover { transform: scale(1.02); }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; margin-top: 15px; }
-        .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; transition: 0.2s; }
+        .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; position: relative; transition: 0.2s; }
         .plan-type { display: inline-block; background: #e9f0ff; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: bold; color: #1e3c72; margin-bottom: 12px; }
-        .amount { font-size: 1.8rem; font-weight: bold; margin: 10px 0; }
+        .amount { font-size: 1.8rem; font-weight: bold; margin: 10px 0; word-break: break-word; }
         .progress-bar { background: #e9ecef; border-radius: 20px; height: 8px; margin: 15px 0; overflow: hidden; }
         .progress-fill { background: #28a745; height: 100%; width: 0%; }
         .btn-sm { padding: 8px 14px; font-size: 0.85rem; margin-top: 8px; margin-right: 8px; min-height: 40px; border-radius: 40px; }
@@ -166,25 +175,124 @@
         label { display: block; font-weight: 600; margin-bottom: 5px; }
         input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 12px; font-size: 1rem; }
         .flex-btns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
-        .auth-box { max-width: 400px; margin: 40px auto; background: white; padding: 30px; border-radius: 30px; }
+        .auth-box { max-width: 400px; margin: 40px auto; background: white; padding: 30px; border-radius: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; }
         .hidden { display: none !important; }
+        .alert { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-size: 0.9rem; }
         .info-banner { background: #d1ecf1; color: #0c5460; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; }
         footer { text-align: center; padding: 20px; font-size: 0.8rem; color: #666; background: #f8f9fa; }
-        #modal, #paymentModal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-        #modal > div, #paymentModal > div { background: white; max-width: 500px; width: 100%; border-radius: 24px; padding: 24px; pointer-events: auto; max-height: 85vh; overflow-y: auto; margin: auto; }
+        #modal, #paymentModal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
+            padding: 16px;
+        }
+        #modal > div, #paymentModal > div {
+            background: white; max-width: 500px; width: 100%; border-radius: 24px; padding: 24px; pointer-events: auto; max-height: 85vh; overflow-y: auto; margin: auto;
+        }
         .bank-details { background: #eef2ff; padding: 16px; border-radius: 16px; margin: 16px 0; text-align: center; }
+        .bank-details p { margin: 8px 0; font-size: 1rem; }
         .bank-amount { font-size: 1.5rem; font-weight: bold; color: #1e3c72; }
-        .balance-card { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 24px; padding: 20px; margin: 20px 0; cursor: pointer; transition: all 0.2s ease; border: 1px solid #dee2e6; }
-        .balance-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        .balance-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #dee2e6; }
-        .balance-label { font-weight: 600; color: #495057; }
-        .balance-amount { font-size: 1.4rem; font-weight: bold; color: #1e3c72; }
-        .total-balance { margin-top: 12px; padding-top: 12px; border-top: 2px solid #ffb347; text-align: right; font-size: 1.1rem; }
-        .total-number { font-size: 1.6rem; font-weight: bold; color: #2a5298; }
-        #ledgerFloatingBtn, #floatingInboxBtn { position: fixed; z-index: 1000; background: #ffb347; color: #1e2a3e; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        #ledgerFloatingBtn { bottom: 20px; right: 20px; border-radius: 50px; padding: 12px 20px; font-size: 1rem; font-weight: bold; gap: 8px; }
-        #floatingInboxBtn { bottom: 90px; right: 20px; border-radius: 50px; width: 48px; height: 48px; font-size: 1.4rem; }
-        @media (max-width: 768px) { body { padding: 12px; } .main-content { padding: 20px 16px; } .card-grid { grid-template-columns: 1fr; } .btn, .btn-sm { width: 100%; margin: 6px 0; justify-content: center; } .flex-btns { flex-direction: column; } }
+        .pending-badge { background: #fff3cd; color: #856404; border-radius: 20px; padding: 4px 12px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-top: 8px; }
+        .request-badge { background: #ffe0b3; color: #b45f06; border-radius: 20px; padding: 4px 12px; font-size: 0.7rem; font-weight: bold; display: inline-block; margin-left: 8px; margin-top: 6px; }
+        .history-list { list-style: none; padding-left: 0; }
+        .history-list li { border-bottom: 1px solid #eee; padding: 12px 0; word-break: break-word; }
+        .status-pending { color: #e67e22; font-weight: bold; }
+        .status-approved { color: #27ae60; }
+        h4 { margin: 20px 0 12px 0; color: #2c3e50; font-size: 1.2rem; }
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .main-content { padding: 20px 16px; }
+            header { padding: 16px 20px; }
+            .logo h1 { font-size: 1.4rem; }
+            .section-title { font-size: 1.4rem; }
+            .card-grid { grid-template-columns: 1fr; gap: 16px; }
+            .btn, .btn-sm { width: 100%; margin: 6px 0; justify-content: center; }
+            .flex-btns { flex-direction: column; width: 100%; gap: 10px; }
+            .user-info { width: 100%; justify-content: space-between; }
+            input, select { font-size: 16px; }
+        }
+        button, .btn, [onclick] { cursor: pointer; touch-action: manipulation; }
+        #ledgerFloatingBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: #ffb347;
+            color: #1e2a3e;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #ledgerFloatingBtn:hover { transform: scale(1.02); }
+        .login-prompt {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+            padding: 40px;
+        }
+        .login-prompt h2 { color: #1e3c72; margin-bottom: 20px; }
+        .login-prompt .btn-large { padding: 14px 32px; font-size: 1.1rem; }
+        .balance-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 24px;
+            padding: 20px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .balance-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
+        }
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .balance-row:last-child {
+            border-bottom: none;
+        }
+        .balance-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .balance-amount {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        .total-balance {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 2px solid #ffb347;
+            text-align: right;
+            font-size: 1.1rem;
+        }
+        .total-balance span:first-child { font-weight: normal; color: #6c757d; }
+        .total-balance .total-number { font-size: 1.6rem; font-weight: bold; color: #2a5298; }
+        .deduction-badge {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            margin: 4px 0;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -192,45 +300,65 @@
     <header>
         <div class="logo"><h1>💰 OmaPosh Smart Savings</h1><p>thrift • co-operative • smart investing</p></div>
         <div class="user-info">
-            <span id="userName" class="profile-name"></span>
-            <button class="btn btn-outline" id="logoutBtn">Logout</button>
+            <span id="userName" class="profile-name" style="cursor:pointer; text-decoration:none;"></span>
+            <button class="btn btn-outline" id="logoutBtn" style="display:none;">Logout</button>
         </div>
     </header>
     <div class="main-content" id="mainContent">
+        <!-- Clickable Savings Balances -->
         <div class="section">
-            <div class="section-title" id="plansHeading">📈 My Savings Plans</div>
-            <div id="balanceCard" class="balance-card">
-                <div class="balance-row"><span class="balance-label">💰 Flexible Plan:</span><span class="balance-amount" id="flexBalance">₦0.00</span></div>
-                <div class="balance-row"><span class="balance-label">🔒 Locked Plan:</span><span class="balance-amount" id="lockedBalance">₦0.00</span></div>
-                <div class="balance-row"><span class="balance-label">🎯 Target Plan:</span><span class="balance-amount" id="targetBalance">₦0.00</span></div>
-                <div class="total-balance"><span>📊 Total Savings: </span><span class="total-number" id="totalBalance">₦0.00</span></div>
-                <p class="info-banner" style="margin-top:12px; margin-bottom:0; font-size:0.8rem;">👆 Click anywhere to manage plans & deposit</p>
+            <div class="section-title" id="plansHeading">
+                📈 My Savings Plans
+            </div>
+            <div id="balanceCard" class="balance-card" style="cursor: pointer;">
+                <div class="balance-row">
+                    <span class="balance-label">💰 Flexible Plan:</span>
+                    <span class="balance-amount" id="flexBalance">₦0.00</span>
+                </div>
+                <div class="balance-row">
+                    <span class="balance-label">🔒 Locked Plan:</span>
+                    <span class="balance-amount" id="lockedBalance">₦0.00</span>
+                </div>
+                <div class="balance-row">
+                    <span class="balance-label">🎯 Target Plan:</span>
+                    <span class="balance-amount" id="targetBalance">₦0.00</span>
+                </div>
+                <div class="total-balance">
+                    <span>📊 Total Savings: </span>
+                    <span class="total-number" id="totalBalance">₦0.00</span>
+                </div>
+                <p class="info-banner" style="margin-top:12px; margin-bottom:0; font-size:0.8rem;">👆 Click anywhere on this card to manage your plans</p>
             </div>
         </div>
 
+        <!-- Thrift Groups Section -->
         <div class="section">
-            <div class="section-title">👥 Thrift Groups (Join & Save)</div>
+            <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
             <div id="groupsList" class="card-grid">Loading groups...</div>
-            <p class="info-banner">✨ Contributions auto-deduct from Flexible plan (Esusu & Profit deductions applied).</p>
+            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Contributions are auto-deducted from your Flexible plan after group-specific deductions (Esusu & Profit/Loss).</p>
         </div>
 
+        <!-- Withdrawal Section (bottom) -->
         <div class="section" id="withdrawSection" style="display: none;">
-            <div class="section-title">💸 Request Withdrawal</div>
-            <div class="form-group"><label>Amount (₦)</label><input type="number" id="withdrawalAmount" placeholder="Enter amount" step="100" min="0"></div>
+            <div class="section-title">💸 Request Account Withdrawal</div>
+            <div class="form-group">
+                <label>Amount (₦)</label>
+                <input type="number" id="withdrawalAmount" placeholder="Enter amount" step="100" min="0">
+            </div>
             <button class="btn btn-primary" id="withdrawBtn">Request Withdrawal</button>
-            <p class="info-banner">Funds from Flexible plan; needs admin approval.</p>
+            <p class="info-banner" style="margin-top:10px;">Funds are taken from your flexible plan and require admin approval.</p>
         </div>
 
-        <div id="loginPrompt" class="login-prompt hidden" style="text-align:center; padding:60px 20px;">
+        <div id="loginPrompt" class="login-prompt hidden">
             <h2>🔐 Welcome to OmaPosh</h2>
-            <p style="margin-bottom:30px;">Login or create an account to access savings & thrift groups.</p>
+            <p style="margin-bottom: 30px;">Please log in or create an account to access your savings and thrift groups.</p>
             <button class="btn btn-primary btn-large" id="continueToLoginBtn">Continue to Login →</button>
         </div>
     </div>
     <footer>© 2026 OmaPosh Smart Savings</footer>
 </div>
 
-<!-- Payment Modal -->
+<!-- Payment Gateway Modal (only for flexible deposits) -->
 <div id="paymentModal" class="hidden">
     <div>
         <h3 id="paymentModalTitle">Complete Payment</h3>
@@ -240,35 +368,63 @@
                 <p>Account Name: <strong>OmaPosh Smart Savings</strong></p>
                 <p>Account Number: <strong>8138164296</strong></p>
                 <p>Bank: <strong>Moniepoint Microfinance Bank</strong></p>
-                <hr><p>Amount: <span id="paymentAmountDisplay" class="bank-amount">₦0.00</span></p>
-                <p class="info-banner">After transfer, click "I have paid". Admin will approve.</p>
+                <hr style="margin:12px 0;">
+                <p>Amount to pay: <span id="paymentAmountDisplay" class="bank-amount">₦0.00</span></p>
+                <p class="info-banner" style="margin-top:12px; font-size:0.8rem;">After successful transfer, click "I have paid". Your request will be sent to admin for approval.</p>
             </div>
-            <div class="form-group"><label>Transaction Reference</label><input type="text" id="transactionRef" placeholder="Optional ref"></div>
+            <div class="form-group">
+                <label>Transaction Reference (Optional)</label>
+                <input type="text" id="transactionRef" placeholder="e.g., Moniepoint ref or your name">
+            </div>
         </div>
-        <div class="flex-btns"><button class="btn btn-outline" id="closePaymentModalBtn">Cancel</button><button class="btn btn-primary" id="confirmPaymentBtn">✅ I have paid</button></div>
+        <div class="flex-btns" style="margin-top:20px;">
+            <button class="btn btn-outline" id="closePaymentModalBtn">Cancel</button>
+            <button class="btn btn-primary" id="confirmPaymentBtn">✅ I have paid</button>
+        </div>
     </div>
 </div>
 
-<div id="modal" class="hidden"><div><h3 id="modalTitle"></h3><div id="modalBody"></div><div class="flex-btns"><button class="btn btn-outline" id="closeModalBtn">Close</button><button class="btn btn-primary" id="modalConfirmBtn" style="display:none;">Confirm</button></div></div></div>
+<!-- Generic Modal -->
+<div id="modal" class="hidden">
+    <div>
+        <h3 id="modalTitle"></h3>
+        <div id="modalBody"></div>
+        <div class="flex-btns" style="margin-top:20px;">
+            <button class="btn btn-outline" id="closeModalBtn">Close</button>
+            <button class="btn btn-primary" id="modalConfirmBtn" style="display:none;">Confirm</button>
+        </div>
+    </div>
+</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, query, where, onSnapshot, arrayUnion, increment, runTransaction, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    const firebaseConfig = { apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA", authDomain: "omaposh-smart-savings.firebaseapp.com", projectId: "omaposh-smart-savings", storageBucket: "omaposh-smart-savings.firebasestorage.app", messagingSenderId: "469614412839", appId: "1:469614412839:web:d51a47b468daad6184fa02" };
+    const firebaseConfig = {
+        apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+        authDomain: "omaposh-smart-savings.firebaseapp.com",
+        projectId: "omaposh-smart-savings",
+        storageBucket: "omaposh-smart-savings.firebasestorage.app",
+        messagingSenderId: "469614412839",
+        appId: "1:469614412839:web:d51a47b468daad6184fa02"
+    };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let currentUser = null;
-    let unsubscribeGroups = null, unsubscribePlans = null;
-
+    // DOM elements
     const withdrawSection = document.getElementById('withdrawSection');
     const loginPrompt = document.getElementById('loginPrompt');
     const userNameSpan = document.getElementById('userName');
     const logoutBtn = document.getElementById('logoutBtn');
     const groupsList = document.getElementById('groupsList');
+    const modal = document.getElementById('modal');
+    const paymentModal = document.getElementById('paymentModal');
+    const paymentAmountDisplay = document.getElementById('paymentAmountDisplay');
+    const transactionRefInput = document.getElementById('transactionRef');
+    const closePaymentModalBtn = document.getElementById('closePaymentModalBtn');
+    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
     const flexBalanceSpan = document.getElementById('flexBalance');
     const lockedBalanceSpan = document.getElementById('lockedBalance');
     const targetBalanceSpan = document.getElementById('targetBalance');
@@ -276,27 +432,101 @@
     const plansHeading = document.getElementById('plansHeading');
     const balanceCard = document.getElementById('balanceCard');
 
-    function showToast(msg, isErr = false) { const t = document.createElement('div'); t.innerText = msg; t.style.cssText = `position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:${isErr?'#dc3545':'#28a745'}; color:white; padding:12px 20px; border-radius:40px; z-index:10001; font-weight:bold; max-width:90%;`; document.body.appendChild(t); setTimeout(()=>t.remove(),4000); }
-    function getGreeting() { const h = new Date().getHours(); if (h<12) return "Good morning"; if (h<18) return "Good afternoon"; return "Good evening"; }
+    let currentUser = null;
+    let unsubscribeGroups = null;
+    let unsubscribePlans = null;
+    let modalResolve = null;
+    let pendingPaymentCallback = null;
 
-    async function ensureFlexiblePlan(uid) {
-        const q = query(collection(db, "savings_plans"), where("userId", "==", uid), where("type", "==", "flex"));
-        const snap = await getDocs(q);
-        if (snap.empty) {
-            const newRef = doc(collection(db, "savings_plans"));
-            await setDoc(newRef, { userId: uid, type: "flex", balance: 0, createdAt: new Date().toISOString() });
-            return newRef;
-        }
-        return snap.docs[0].ref;
+    function showToast(message, isError = false) {
+        const toast = document.createElement('div');
+        toast.innerText = message;
+        toast.style.position = 'fixed';
+        toast.style.bottom = '20px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.backgroundColor = isError ? '#dc3545' : '#28a745';
+        toast.style.color = 'white';
+        toast.style.padding = '12px 20px';
+        toast.style.borderRadius = '40px';
+        toast.style.zIndex = '10000';
+        toast.style.fontWeight = 'bold';
+        toast.style.textAlign = 'center';
+        toast.style.maxWidth = '90%';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3500);
     }
 
+    function getGreeting() { const h = new Date().getHours(); if (h<12) return "Good morning"; if (h<18) return "Good afternoon"; return "Good evening"; }
+
+    function showModal(title, bodyHtml, showConfirm = false, confirmText = "Confirm") {
+        return new Promise((resolve) => {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalBody').innerHTML = bodyHtml;
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            if (showConfirm) {
+                confirmBtn.style.display = 'inline-flex';
+                confirmBtn.innerText = confirmText;
+            } else { confirmBtn.style.display = 'none'; }
+            modal.classList.remove('hidden');
+            modalResolve = resolve;
+        });
+    }
+    function closeModal() { modal.classList.add('hidden'); if(modalResolve) { modalResolve(false); modalResolve = null; } }
+    document.getElementById('modalConfirmBtn').onclick = () => { if(modalResolve) { modalResolve(true); modalResolve = null; } closeModal(); };
+    document.getElementById('closeModalBtn').onclick = closeModal;
+    modal.addEventListener('click', (e) => { if(e.target === modal) closeModal(); });
+
+    let paymentModalAllowed = false;
+    function showPaymentGateway(amount, purpose, onCreateRequest) {
+        return new Promise((resolve) => {
+            if (!paymentModalAllowed) {
+                console.warn("Payment modal blocked: not triggered by user button click");
+                resolve(false);
+                return;
+            }
+            paymentAmountDisplay.innerText = `₦${amount.toFixed(2)}`;
+            document.getElementById('paymentModalTitle').innerText = purpose;
+            transactionRefInput.value = '';
+            paymentModal.classList.remove('hidden');
+            pendingPaymentCallback = async () => {
+                const ref = transactionRefInput.value.trim() || "N/A";
+                await onCreateRequest(ref);
+                showToast(`Deposit request of ₦${amount.toFixed(2)} sent to admin for approval.`, false);
+                paymentModal.classList.add('hidden');
+                resolve(true);
+            };
+        });
+    }
+    closePaymentModalBtn.onclick = () => {
+        paymentModal.classList.add('hidden');
+        pendingPaymentCallback = null;
+    };
+    confirmPaymentBtn.onclick = async () => {
+        if (pendingPaymentCallback) {
+            await pendingPaymentCallback();
+            pendingPaymentCallback = null;
+        } else {
+            paymentModal.classList.add('hidden');
+        }
+    };
+    paymentModal.addEventListener('click', (e) => { if(e.target === paymentModal) paymentModal.classList.add('hidden'); });
+
+    // ========== REAL-TIME BALANCE UPDATES ==========
     function listenToBalances() {
         if (unsubscribePlans) unsubscribePlans();
         if (!currentUser) return;
         const q = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid));
         unsubscribePlans = onSnapshot(q, (snapshot) => {
             let flex = 0, locked = 0, target = 0, total = 0;
-            snapshot.forEach(doc => { const d = doc.data(); const bal = d.balance || 0; total += bal; if (d.type === 'flex') flex = bal; else if (d.type === 'locked') locked = bal; else if (d.type === 'target') target = bal; });
+            snapshot.forEach(doc => {
+                const plan = doc.data();
+                const balance = plan.balance || 0;
+                total += balance;
+                if (plan.type === 'flex') flex = balance;
+                else if (plan.type === 'locked') locked = balance;
+                else if (plan.type === 'target') target = balance;
+            });
             flexBalanceSpan.innerText = `₦${flex.toFixed(2)}`;
             lockedBalanceSpan.innerText = `₦${locked.toFixed(2)}`;
             targetBalanceSpan.innerText = `₦${target.toFixed(2)}`;
@@ -304,257 +534,488 @@
         });
     }
 
-    async function notifyAdmin(subject, message) { await addDoc(collection(db, "messages"), { userId: "admin_notification", subject, message, read: false, createdAt: new Date(), type: "auto_action" }); }
+    // ========== THRIFT GROUP FUNCTIONS ==========
+    async function notifyAdmin(subject, message) {
+        await addDoc(collection(db, "messages"), {
+            userId: "admin_notification",
+            subject: subject,
+            message: message,
+            read: false,
+            createdAt: new Date(),
+            type: "auto_action"
+        });
+    }
 
     function listenUserGroups() {
         if (unsubscribeGroups) unsubscribeGroups();
-        const groupsQuery = collection(db, "groups");
-        unsubscribeGroups = onSnapshot(groupsQuery, async (snapshot) => {
+        const q = collection(db, "groups");
+        unsubscribeGroups = onSnapshot(q, async (snapshot) => {
             if (!currentUser) return;
             let html = '';
+            let anyGroup = false;
             for (const docSnap of snapshot.docs) {
+                anyGroup = true;
                 const group = { id: docSnap.id, ...docSnap.data() };
                 const isMember = group.members?.includes(currentUser.uid) || false;
                 const memberCount = group.members?.length || 0;
-                const isFull = memberCount >= (group.maxMembers || 10);
-                const joinBtn = !isMember ? (isFull ? `<button class="btn btn-sm" disabled>❌ Full</button>` : `<button class="btn btn-sm btn-primary join-group-btn" data-id="${group.id}">➕ Join Group</button>`) : `<button class="btn btn-sm" disabled style="background:#28a745; color:white;">✅ Member</button>`;
-                const actionBtns = isMember ? `<div class="flex-btns" style="margin-top:12px;"><button class="btn btn-sm btn-primary contribute-group-btn" data-id="${group.id}">💰 Contribute ₦${group.contributionAmount}</button><button class="btn btn-sm btn-outline claim-group-btn" data-id="${group.id}" style="background:green;">💸 Claim Payout</button></div>` : '';
-                html += `<div class="card"><div class="plan-type">THRIFT</div><h3>${(group.name||'Group').replace(/[&<>]/g, '')}</h3><div>💰 ₦${group.contributionAmount} / ${group.frequencyDays} days</div><div>👥 ${memberCount}/${group.maxMembers||10}</div><div>🏦 Pot: ₦${(group.balance||0).toFixed(2)}</div><div>📉 Esusu:${((group.esusuRate||0)*100).toFixed(0)}% | Profit:${((group.profitRate||0.01)*100).toFixed(0)}%</div>${joinBtn}${actionBtns}</div>`;
+                const maxMembers = group.maxMembers || 10;
+                const isFull = memberCount >= maxMembers;
+                const groupName = (group.name || 'Unnamed Group').replace(/[&<>]/g, function(m) { return m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'); });
+                const esusuPercent = ((group.esusuRate || 0) * 100).toFixed(2);
+                const profitPercent = ((group.profitRate || 0.01) * 100).toFixed(2);
+                let joinButton = !isMember ? (isFull ? `<button class="btn btn-sm" disabled>❌ Group Full</button>` : `<button class="btn btn-sm btn-primary join-group-btn" data-group-id="${group.id}">➕ Join This Thrift Group</button>`) : `<button class="btn btn-sm" disabled style="background:#28a745; color:white;">✅ Already a Member</button>`;
+                let actionButtons = isMember ? `<div class="flex-btns" style="margin-top:12px;"><button class="btn btn-sm btn-primary contribute-group-btn" data-group-id="${group.id}">💰 Deposit Contribution (₦${group.contributionAmount})</button><button class="btn btn-sm btn-outline claim-group-btn" data-group-id="${group.id}" style="background:green;">💸 Withdraw Payout (Claim)</button></div>` : '';
+                let groupBalance = group.balance || 0;
+                html += `<div class="card">
+                            <div class="plan-type">THRIFT GROUP</div>
+                            <h3>${groupName}</h3>
+                            <div>💰 Contribution: ₦${group.contributionAmount} every ${group.frequencyDays} days</div>
+                            <div>👥 Members: ${memberCount}/${maxMembers}</div>
+                            <div>🏦 Group Balance: ₦${groupBalance.toFixed(2)}</div>
+                            <div>📊 Deductions: Esusu ${esusuPercent}% / Profit ${profitPercent}%</div>
+                            <div>🔄 Next payout: ${group.currentPayoutIndex || 0}</div>
+                            ${joinButton}
+                            ${actionButtons}
+                        </div>`;
             }
-            groupsList.innerHTML = html || '<p>No thrift groups available.</p>';
+            groupsList.innerHTML = anyGroup ? html : '<p>No thrift groups yet. Admin will create.</p>';
             
-            document.querySelectorAll('.join-group-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-                const gid = btn.dataset.id;
+            // Join group handler
+            document.querySelectorAll('.join-group-btn').forEach(btn => btn.addEventListener('click', async () => {
+                const groupId = btn.dataset.groupId;
                 try {
-                    const groupRef = doc(db, "groups", gid);
-                    const grp = await getDoc(groupRef);
-                    if (!grp.exists()) throw new Error("Group missing");
-                    if (grp.data().members?.includes(currentUser.uid)) return showToast("Already member");
-                    if (grp.data().members?.length >= (grp.data().maxMembers||10)) return showToast("Group full");
+                    const groupRef = doc(db, "groups", groupId);
+                    const groupSnap = await getDoc(groupRef);
+                    if (!groupSnap.exists()) return showToast("Group not found", true);
+                    const groupData = groupSnap.data();
+                    if (groupData.members?.includes(currentUser.uid)) return showToast("Already a member", false);
+                    if (groupData.members?.length >= groupData.maxMembers) return showToast("Group full", true);
                     await updateDoc(groupRef, { members: arrayUnion(currentUser.uid) });
-                    showToast(`Joined ${grp.data().name}!`, false);
-                    await notifyAdmin(`Joined Group: ${grp.data().name}`, `${currentUser.email} joined`);
+                    showToast(`Joined "${groupData.name}"!`, false);
+                    
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `👥 User Joined Thrift Group: ${groupData.name}`,
+                        `Customer: ${userData.fullName || currentUser.email} (${currentUser.email})\nGroup: ${groupData.name}\nTime: ${new Date().toLocaleString()}`
+                    );
                 } catch(err) { showToast(err.message, true); }
             }));
-
+            
+            // ========== CORRECTED CONTRIBUTION HANDLER ==========
+            // Debit FULL contribution amount from flexible plan, then route deductions to system accounts, net to group.
             document.querySelectorAll('.contribute-group-btn').forEach(btn => btn.addEventListener('click', async () => {
-                const gid = btn.dataset.id;
+                const groupId = btn.dataset.groupId;
                 try {
-                    const groupRef = doc(db, "groups", gid);
+                    const groupRef = doc(db, "groups", groupId);
                     const groupSnap = await getDoc(groupRef);
-                    if (!groupSnap.exists()) throw new Error("Group not found");
+                    if (!groupSnap.exists()) return showToast("Group not found", true);
                     const group = groupSnap.data();
-                    if (!group.members?.includes(currentUser.uid)) throw new Error("Not a member");
+                    if (!group.members?.includes(currentUser.uid)) return showToast("Join first", true);
                     const amount = group.contributionAmount;
+                    
+                    // Use group-specific rates (default to 0% if not set)
                     const esusuRate = group.esusuRate || 0;
-                    const profitRate = group.profitRate || 0.01;
-                    const esusuDed = amount * esusuRate;
-                    const profitDed = amount * profitRate;
-                    const netToGroup = amount - esusuDed - profitDed;
-                    if (netToGroup < 0) throw new Error("Deductions exceed contribution");
-
-                    const flexRef = await ensureFlexiblePlan(currentUser.uid);
-                    const flexDoc = await getDoc(flexRef);
-                    const flexBalance = flexDoc.data()?.balance || 0;
-                    if (flexBalance < amount) throw new Error(`Insufficient flexible balance: ₦${flexBalance.toFixed(2)}`);
-
+                    const profitRate = group.profitRate || 0.01; // default 1% profit if missing (backward compatible)
+                    const esusuDeduction = amount * esusuRate;
+                    const profitDeduction = amount * profitRate;
+                    const netToGroup = amount - esusuDeduction - profitDeduction;
+                    
+                    if (netToGroup < 0) {
+                        showToast("Deductions exceed contribution amount!", true);
+                        return;
+                    }
+                    
+                    // Get flexible plan
+                    const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+                    const flexSnap = await getDocs(flexQuery);
+                    if (flexSnap.empty) return showToast("No flexible plan to fund contribution", true);
+                    const flexRef = flexSnap.docs[0].ref;
+                    const flexBalance = flexSnap.docs[0].data().balance || 0;
+                    
+                    // Check if user has enough balance for the FULL contribution amount
+                    if (flexBalance < amount) {
+                        return showToast(`Insufficient flexible balance. Need ₦${amount.toFixed(2)}`, true);
+                    }
+                    
+                    // Perform transaction: debit full amount, credit system accounts, credit net to group
                     await runTransaction(db, async (transaction) => {
-                        transaction.update(flexRef, { balance: increment(-amount) });
-                        const esusuAcc = doc(db, "system_accounts", "esusu");
-                        const profitAcc = doc(db, "system_accounts", "profit_loss");
-                        const esusuSnap = await transaction.get(esusuAcc);
-                        if (!esusuSnap.exists()) transaction.set(esusuAcc, { balance: 0 });
-                        const profitSnap = await transaction.get(profitAcc);
-                        if (!profitSnap.exists()) transaction.set(profitAcc, { balance: 0 });
-                        if (esusuDed > 0) transaction.update(esusuAcc, { balance: increment(esusuDed) });
-                        if (profitDed > 0) transaction.update(profitAcc, { balance: increment(profitDed) });
+                        transaction.update(flexRef, { balance: increment(-amount) });   // deduct FULL amount
+                        if (esusuDeduction > 0) transaction.update(doc(db, "system_accounts", "esusu"), { balance: increment(esusuDeduction) });
+                        if (profitDeduction > 0) transaction.update(doc(db, "system_accounts", "profit_loss"), { balance: increment(profitDeduction) });
                         transaction.update(groupRef, { balance: increment(netToGroup) });
                         const contribRef = doc(collection(db, "contributions"));
-                        transaction.set(contribRef, { groupId: gid, userId: currentUser.uid, amount: netToGroup, originalAmount: amount, esusuDeduction: esusuDed, profitDeduction: profitDed, date: new Date().toISOString() });
+                        transaction.set(contribRef, {
+                            groupId: groupId,
+                            userId: currentUser.uid,
+                            amount: netToGroup,
+                            date: new Date().toISOString(),
+                            originalAmount: amount,
+                            esusuDeduction,
+                            profitDeduction,
+                            approvedBy: "auto_system"
+                        });
                     });
-                    await notifyAdmin(`Group Contribution: ${group.name}`, `${currentUser.email} contributed ₦${amount} (net ₦${netToGroup})`);
-                    showToast(`Contributed ₦${amount}! Net ₦${netToGroup} to group.`, false);
+                    
+                    // Notify admin
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `💰 Thrift Contribution: ${userData.fullName || currentUser.email} → ${group.name}`,
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nContribution: ₦${amount.toFixed(2)}\nEsusu deduction ${(esusuRate*100).toFixed(2)}%: ₦${esusuDeduction.toFixed(2)}\nProfit deduction ${(profitRate*100).toFixed(2)}%: ₦${profitDeduction.toFixed(2)}\nNet added to group pot: ₦${netToGroup.toFixed(2)}\nFlexible balance reduced by: ₦${amount.toFixed(2)}\nTime: ${new Date().toLocaleString()}\nAuto-approved.`
+                    );
+                    
+                    showToast(`Contribution of ₦${amount.toFixed(2)} recorded. Net ₦${netToGroup.toFixed(2)} added to group.`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
-
+            
+            // Auto payout handler (credits group balance to flexible plan)
             document.querySelectorAll('.claim-group-btn').forEach(btn => btn.addEventListener('click', async () => {
-                const gid = btn.dataset.id;
+                const groupId = btn.dataset.groupId;
                 try {
-                    const groupRef = doc(db, "groups", gid);
+                    const groupRef = doc(db, "groups", groupId);
                     const groupSnap = await getDoc(groupRef);
                     const group = groupSnap.data();
                     const members = group.members || [];
                     const idx = group.currentPayoutIndex || 0;
-                    if (members[idx] !== currentUser.uid) return showToast("Not your turn for payout", true);
-                    const contribQuery = query(collection(db, "contributions"), where("groupId", "==", gid));
+                    if (members[idx] !== currentUser.uid) return showToast("Not your turn", true);
+                    
+                    // Verify all members have contributed enough times
+                    const contribQuery = query(collection(db, "contributions"), where("groupId", "==", groupId));
                     const contribSnap = await getDocs(contribQuery);
                     const counts = {};
-                    contribSnap.forEach(c => { const uid = c.data().userId; counts[uid] = (counts[uid]||0) + 1; });
-                    for (let m of members) if ((counts[m]||0) <= idx) return showToast("Some members haven't completed contributions this cycle", true);
+                    contribSnap.forEach(d => { const c = d.data(); counts[c.userId] = (counts[c.userId] || 0) + 1; });
+                    for (let m of members) if ((counts[m] || 0) <= idx) return showToast("Not all members have completed contributions for this cycle.", true);
+                    
                     const pot = group.balance || 0;
-                    if (pot <= 0) return showToast("Group balance is zero", true);
-                    const flexRef = await ensureFlexiblePlan(currentUser.uid);
-                    await runTransaction(db, async (transaction) => {
-                        transaction.update(flexRef, { balance: increment(pot) });
-                        transaction.update(groupRef, { balance: 0, currentPayoutIndex: (idx + 1) % members.length });
+                    if (pot <= 0) return showToast("Group has no balance to pay out.", true);
+                    
+                    // Credit to flexible plan
+                    const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+                    let flexSnap = await getDocs(flexQuery);
+                    if (flexSnap.empty) {
+                        await addDoc(collection(db, "savings_plans"), { userId: currentUser.uid, type: "flex", balance: pot, createdAt: new Date().toISOString() });
+                    } else {
+                        await updateDoc(flexSnap.docs[0].ref, { balance: increment(pot) });
+                    }
+                    // Reset group balance and advance index
+                    await updateDoc(groupRef, { 
+                        currentPayoutIndex: (idx + 1) % members.length,
+                        balance: 0
                     });
-                    await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId: gid });
-                    await notifyAdmin(`Payout to ${currentUser.email}`, `Group: ${group.name} Amount: ₦${pot}`);
-                    showToast(`🎉 Payout ₦${pot.toFixed(2)} credited to Flexible plan!`, false);
+                    await addDoc(collection(db, "transactions"), { userId: currentUser.uid, amount: pot, type: "payout", groupId, date: new Date().toISOString() });
+                    
+                    // Notify admin
+                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                    const userData = userDoc.data();
+                    await notifyAdmin(
+                        `🎉 Thrift Payout: ${userData.fullName || currentUser.email} from ${group.name}`,
+                        `Customer: ${userData.fullName || 'N/A'} (${currentUser.email})\nGroup: ${group.name}\nPayout Amount: ₦${pot.toFixed(2)}\nMembers: ${members.length}\nTime: ${new Date().toLocaleString()}\nAuto-credited to flexible plan.`
+                    );
+                    
+                    showToast(`Payout of ₦${pot.toFixed(2)} credited to your flexible plan!`, false);
                 } catch(err) { showToast(err.message, true); }
             }));
         });
     }
 
-    // Withdrawal logic with profile completeness check
-    const requiredProfileFields = ['fullName', 'bankName', 'accountNumber', 'accountName'];
-    async function isProfileComplete(uid) {
-        const userDoc = await getDoc(doc(db, "users", uid));
-        if (!userDoc.exists()) return false;
-        const data = userDoc.data();
-        return requiredProfileFields.every(f => data[f] && data[f].toString().trim() !== '');
+    function addLedgerButton() {
+        if (document.getElementById('ledgerFloatingBtn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'ledgerFloatingBtn';
+        btn.innerHTML = '📒 My Ledger';
+        btn.onclick = () => window.location.href = 'ledger.html';
+        document.body.appendChild(btn);
     }
-    async function createWithdrawalRequest(uid, amount) {
-        const userDoc = await getDoc(doc(db, "users", uid));
-        const profile = userDoc.data();
-        await addDoc(collection(db, "withdrawals"), {
-            userId: uid, userEmail: auth.currentUser.email, fullName: profile.fullName || 'Unknown',
-            amount, accountDetails: { bankName: profile.bankName, accountNumber: profile.accountNumber, accountName: profile.accountName },
-            status: "pending", requestedAt: new Date().toISOString()
+
+    // ========== WITHDRAWAL FROM FLEXIBLE PLAN (admin approval) ==========
+    const REQUIRED_PROFILE_FIELDS = ['fullName', 'bankName', 'accountNumber', 'accountName'];
+
+    async function checkProfileComplete(uid) {
+        const userDocRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userDocRef);
+        if (!userSnap.exists()) return false;
+        const data = userSnap.data();
+        return REQUIRED_PROFILE_FIELDS.every(field => data[field] && data[field].toString().trim() !== '');
+    }
+
+    async function getUserProfile(uid) {
+        const userDocRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userDocRef);
+        return userSnap.exists() ? userSnap.data() : null;
+    }
+
+    const withdrawBtn = document.getElementById('withdrawBtn');
+    const withdrawalAmountInput = document.getElementById('withdrawalAmount');
+
+    if (withdrawBtn) {
+        withdrawBtn.addEventListener('click', async () => {
+            if (!currentUser) {
+                showToast("You must be logged in to withdraw.", true);
+                return;
+            }
+            const amount = parseFloat(withdrawalAmountInput.value);
+            if (!amount || amount <= 0) {
+                showToast("Please enter a valid withdrawal amount.", true);
+                return;
+            }
+
+            const isProfileComplete = await checkProfileComplete(currentUser.uid);
+            if (!isProfileComplete) {
+                sessionStorage.setItem('pendingWithdrawalAmount', amount);
+                window.location.href = `profile.html?returnTo=index.html&action=withdraw`;
+                return;
+            }
+
+            try {
+                const flexQuery = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid), where("type", "==", "flex"));
+                const flexSnap = await getDocs(flexQuery);
+                if (flexSnap.empty) {
+                    showToast("You do not have a flexible savings plan.", true);
+                    return;
+                }
+                const flexPlan = flexSnap.docs[0].data();
+                const flexBalance = flexPlan.balance || 0;
+                if (amount > flexBalance) {
+                    showToast(`Insufficient flexible balance. Your available balance is ₦${flexBalance.toFixed(2)}.`, true);
+                    return;
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Could not verify your flexible balance. Please try again.", true);
+                return;
+            }
+
+            await createAccountWithdrawalRequest(currentUser.uid, amount);
         });
-        showToast("Withdrawal request submitted for admin approval", false);
     }
-    document.getElementById('withdrawBtn')?.addEventListener('click', async () => {
-        if (!currentUser) return showToast("Login required", true);
-        const amount = parseFloat(document.getElementById('withdrawalAmount').value);
-        if (!amount || amount <= 0) return showToast("Valid amount needed", true);
-        const flexRef = await ensureFlexiblePlan(currentUser.uid);
-        const flexDoc = await getDoc(flexRef);
-        const bal = flexDoc.data()?.balance || 0;
-        if (amount > bal) return showToast(`Insufficient flexible balance: ₦${bal.toFixed(2)}`, true);
-        if (!await isProfileComplete(currentUser.uid)) {
-            sessionStorage.setItem('pendingWithdrawalAmount', amount);
-            window.location.href = "profile.html?returnTo=index.html&action=withdraw";
+
+    async function createAccountWithdrawalRequest(uid, amount) {
+        const profile = await getUserProfile(uid);
+        if (!profile) {
+            showToast("Could not fetch your profile. Please try again.", true);
             return;
         }
-        await createWithdrawalRequest(currentUser.uid, amount);
-        document.getElementById('withdrawalAmount').value = '';
-    });
 
-    // Navigation / UI
-    function addLedgerButton() { if (!document.getElementById('ledgerFloatingBtn')) { const btn = document.createElement('button'); btn.id = 'ledgerFloatingBtn'; btn.innerHTML = '📒 My Ledger'; btn.onclick = () => window.location.href = 'ledger.html'; document.body.appendChild(btn); } }
-    
-    // FIXED: Notification widget – badge only appears when unread > 0
-    function addNotificationWidget() {
-        if (document.getElementById('floatingInboxBtn')) return;
-        // Floating inbox button
-        const inboxBtn = document.createElement('button');
-        inboxBtn.id = 'floatingInboxBtn';
-        inboxBtn.innerHTML = '✉️';
-        inboxBtn.onclick = () => window.location.href = 'notifications.html';
-        document.body.appendChild(inboxBtn);
-        
-        // Bell icon in header with hidden badge by default
-        const bellDiv = document.createElement('div');
-        bellDiv.id = 'notificationBell';
-        bellDiv.style.cssText = 'position:relative; margin-left:12px; cursor:pointer; font-size:1.4rem; display:inline-flex; align-items:center;';
-        bellDiv.innerHTML = '🔔 <span id="unreadBadge" style="position:absolute; top:-8px; right:-12px; background:red; color:white; border-radius:50%; padding:2px 6px; font-size:0.7rem; font-weight:bold; display:none;"></span>';
-        const userInfoDiv = document.querySelector('.user-info');
-        if (userInfoDiv && !document.getElementById('notificationBell')) {
-            userInfoDiv.insertBefore(bellDiv, document.getElementById('logoutBtn'));
-        }
-        bellDiv.onclick = () => window.location.href = 'notifications.html';
-        
-        // Real-time unread count listener
-        if (currentUser) {
-            const messagesQuery = query(collection(db, "messages"), where("userId", "==", currentUser.uid));
-            onSnapshot(messagesQuery, (snapshot) => {
-                let unread = 0;
-                snapshot.forEach(doc => { if (!doc.data().read) unread++; });
-                const badge = document.getElementById('unreadBadge');
-                if (badge) {
-                    if (unread > 0) {
-                        badge.innerText = unread;
-                        badge.style.display = 'inline-flex';
-                    } else {
-                        badge.style.display = 'none';
-                    }
-                }
-            });
+        const withdrawalData = {
+            userId: uid,
+            userEmail: auth.currentUser.email,
+            fullName: profile.fullName || 'Unknown',
+            amount: amount,
+            accountDetails: {
+                bankName: profile.bankName,
+                accountNumber: profile.accountNumber,
+                accountName: profile.accountName
+            },
+            status: "pending",
+            requestedAt: new Date().toISOString(),
+            processedAt: null,
+            adminNote: ""
+        };
+
+        try {
+            await addDoc(collection(db, "withdrawals"), withdrawalData);
+            showToast("✅ Withdrawal request submitted. Admin will review it shortly.", false);
+            withdrawalAmountInput.value = '';
+        } catch (error) {
+            console.error("Failed to submit withdrawal:", error);
+            showToast("Failed to submit withdrawal request. Please try again.", true);
         }
     }
 
-    // Initialize user plans on login
+    (function handleReturnFromProfile() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('withdraw') === '1' && auth.currentUser) {
+            const user = auth.currentUser;
+            setTimeout(async () => {
+                const isComplete = await checkProfileComplete(user.uid);
+                if (isComplete) {
+                    const storedAmount = sessionStorage.getItem('pendingWithdrawalAmount');
+                    if (storedAmount) {
+                        const amount = parseFloat(storedAmount);
+                        sessionStorage.removeItem('pendingWithdrawalAmount');
+                        await createAccountWithdrawalRequest(user.uid, amount);
+                    } else {
+                        showToast("Profile completed. Please enter the withdrawal amount again.", false);
+                        withdrawSection.style.display = 'block';
+                    }
+                } else {
+                    showToast("Profile still incomplete. Please update all required fields.", true);
+                }
+            }, 500);
+        }
+    })();
+
+    // ========== CONTRIBUTION REMINDER SYSTEM ==========
+    async function checkContributionReminders() {
+        if (!currentUser) return;
+        const userId = currentUser.uid;
+        const groupsSnap = await getDocs(collection(db, "groups"));
+        const userGroups = [];
+        groupsSnap.forEach(doc => {
+            const group = doc.data();
+            if (group.members && group.members.includes(userId)) {
+                userGroups.push({ id: doc.id, ...group });
+            }
+        });
+        for (const group of userGroups) {
+            const contributionsSnap = await getDocs(query(collection(db, "contributions"), where("groupId", "==", group.id), where("userId", "==", userId), orderBy("date", "desc")));
+            let lastDate = null;
+            if (!contributionsSnap.empty) {
+                const last = contributionsSnap.docs[0].data();
+                lastDate = last.date ? new Date(last.date) : null;
+            }
+            const now = new Date();
+            let daysSince = null;
+            if (lastDate) {
+                const diff = now - lastDate;
+                daysSince = diff / (1000 * 60 * 60 * 24);
+            } else {
+                daysSince = group.frequencyDays + 1;
+            }
+            const remindersSnap = await getDocs(query(collection(db, "messages"), where("userId", "==", userId), where("type", "==", "reminder"), where("createdAt", ">", new Date(Date.now() - 24 * 60 * 60 * 1000))));
+            const alreadyReminded = remindersSnap.docs.some(doc => doc.data().message && doc.data().message.includes(group.name));
+            if (daysSince >= group.frequencyDays && !alreadyReminded) {
+                const frequencyText = group.frequencyDays === 1 ? "daily" : (group.frequencyDays === 7 ? "weekly" : "monthly");
+                await addDoc(collection(db, "messages"), {
+                    userId: userId,
+                    subject: `💰 Contribution Reminder: ${group.name}`,
+                    message: `You have not made your ${frequencyText} contribution of ₦${group.contributionAmount} to the thrift group "${group.name}". Please make your contribution to stay on track.`,
+                    read: false,
+                    createdAt: new Date(),
+                    type: "reminder"
+                });
+                showToast(`Reminder: ${frequencyText} contribution due for ${group.name}`, false);
+            }
+        }
+    }
+
+    // ========== AUTH & INIT ==========
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
             const userDoc = await getDoc(doc(db, "users", user.uid));
-            const role = userDoc.exists() ? userDoc.data().role : null;
+            let role = userDoc.exists() ? userDoc.data().role : null;
             if (role === 'admin') { window.location.href = "admin.html"; return; }
             loginPrompt.classList.add('hidden');
             withdrawSection.style.display = 'block';
             const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
-            userNameSpan.innerText = `${getGreeting()}, ${fullName || user.email.split('@')[0]}`;
+            userNameSpan.innerText = `${getGreeting()}, ${fullName}`;
             logoutBtn.style.display = 'inline-flex';
-            await ensureFlexiblePlan(user.uid);
             listenToBalances();
             listenUserGroups();
+            await checkContributionReminders();
             addLedgerButton();
-            addNotificationWidget(); // ✅ This now sets up the correct badge behaviour
-            // Contribution Reminder
-            const groupsSnap = await getDocs(collection(db, "groups"));
-            const userGroups = groupsSnap.docs.filter(d => d.data().members?.includes(user.uid)).map(d => ({ id: d.id, ...d.data() }));
-            for (const group of userGroups) {
-                const lastContrib = await getDocs(query(collection(db, "contributions"), where("groupId", "==", group.id), where("userId", "==", user.uid), orderBy("date", "desc")));
-                let daysSince = group.frequencyDays + 1;
-                if (!lastContrib.empty) { const lastDate = new Date(lastContrib.docs[0].data().date); daysSince = (Date.now() - lastDate) / (86400000); }
-                const reminded = await getDocs(query(collection(db, "messages"), where("userId", "==", user.uid), where("type", "==", "reminder"), where("createdAt", ">", new Date(Date.now() - 86400000))));
-                if (daysSince >= group.frequencyDays && reminded.empty) {
-                    await addDoc(collection(db, "messages"), { userId: user.uid, subject: `💰 Contribution due: ${group.name}`, message: `Your ${group.frequencyDays}-day contribution of ₦${group.contributionAmount} is overdue.`, read: false, createdAt: new Date(), type: "reminder" });
-                    showToast(`Reminder: contribution due for ${group.name}`, false);
-                }
-            }
         } else {
-            if (unsubscribeGroups) unsubscribeGroups();
-            if (unsubscribePlans) unsubscribePlans();
             withdrawSection.style.display = 'none';
             loginPrompt.classList.remove('hidden');
             userNameSpan.innerText = '';
             logoutBtn.style.display = 'none';
-            document.getElementById('ledgerFloatingBtn')?.remove();
-            document.getElementById('floatingInboxBtn')?.remove();
-            document.getElementById('notificationBell')?.remove();
+            const existingLedger = document.getElementById('ledgerFloatingBtn');
+            if (existingLedger) existingLedger.remove();
+            if (unsubscribeGroups) unsubscribeGroups();
+            if (unsubscribePlans) unsubscribePlans();
         }
     });
 
     logoutBtn.onclick = () => signOut(auth);
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
-    if (plansHeading) plansHeading.addEventListener('click', () => window.location.href = 'plans.html');
-    if (balanceCard) balanceCard.addEventListener('click', () => window.location.href = 'plans.html');
     
-    // Modal helpers (generic)
-    window.closeModal = () => { document.getElementById('modal').classList.add('hidden'); };
-    document.getElementById('closeModalBtn')?.addEventListener('click', () => closeModal());
-    // Payment modal handler (used by plans.html if needed)
-    let pendingPaymentCallback = null;
-    window.showPaymentGateway = (amount, purpose, onCreateRequest) => {
-        return new Promise((resolve) => {
-            const modalDiv = document.getElementById('paymentModal');
-            document.getElementById('paymentAmountDisplay').innerText = `₦${amount.toFixed(2)}`;
-            document.getElementById('paymentModalTitle').innerText = purpose;
-            document.getElementById('transactionRef').value = '';
-            modalDiv.classList.remove('hidden');
-            pendingPaymentCallback = async () => {
-                await onCreateRequest(document.getElementById('transactionRef').value.trim() || "N/A");
-                modalDiv.classList.add('hidden');
-                resolve(true);
-            };
-        });
-    };
-    document.getElementById('confirmPaymentBtn').onclick = async () => { if (pendingPaymentCallback) await pendingPaymentCallback(); pendingPaymentCallback = null; document.getElementById('paymentModal').classList.add('hidden'); };
-    document.getElementById('closePaymentModalBtn').onclick = () => { document.getElementById('paymentModal').classList.add('hidden'); pendingPaymentCallback = null; };
-    document.getElementById('paymentModal')?.addEventListener('click', (e) => { if(e.target === document.getElementById('paymentModal')) document.getElementById('paymentModal').classList.add('hidden'); });
+    if (plansHeading) plansHeading.addEventListener('click', () => { window.location.href = 'plans.html'; });
+    if (balanceCard) balanceCard.addEventListener('click', () => { window.location.href = 'plans.html'; });
+</script>
+
+<!-- Notification Buttons -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
+    authDomain: "omaposh-smart-savings.firebaseapp.com",
+    projectId: "omaposh-smart-savings",
+    storageBucket: "omaposh-smart-savings.firebasestorage.app",
+    messagingSenderId: "469614412839",
+    appId: "1:469614412839:web:d51a47b468daad6184fa02"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let buttonsAdded = false;
+
+function addNotificationButtons(user) {
+    if (buttonsAdded) return;
+    if (!user) return;
+    const userId = user.uid;
+    const messagesRef = collection(db, "messages");
+    const q = query(messagesRef, where("userId", "==", userId));
+
+    let floatingBtn = document.getElementById('floatingInboxBtn');
+    if (!floatingBtn) {
+        floatingBtn = document.createElement('button');
+        floatingBtn.id = 'floatingInboxBtn';
+        floatingBtn.innerHTML = '✉️';
+        floatingBtn.style.cssText = `
+            position: fixed; bottom: 90px; right: 20px; z-index: 1000;
+            background: #ffb347; color: #1e2a3e; border: none;
+            border-radius: 50px; width: 48px; height: 48px; font-size: 1.4rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer;
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;
+        `;
+        floatingBtn.onclick = () => window.location.href = 'notifications.html';
+        document.body.appendChild(floatingBtn);
+    }
+
+    let bellContainer = document.getElementById('notificationBell');
+    if (!bellContainer) {
+        const userInfo = document.querySelector('.user-info');
+        if (userInfo && !document.getElementById('notificationBell')) {
+            bellContainer = document.createElement('div');
+            bellContainer.id = 'notificationBell';
+            bellContainer.style.cssText = `
+                position: relative; cursor: pointer; font-size: 1.4rem;
+                margin-right: 8px; display: flex; align-items: center; display: none;
+            `;
+            bellContainer.innerHTML = '🔔 <span id="unreadBadge" style="position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;"></span>';
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) userInfo.insertBefore(bellContainer, logoutBtn);
+            else userInfo.appendChild(bellContainer);
+            bellContainer.onclick = () => window.location.href = 'notifications.html';
+        }
+    }
+
+    const unreadBadge = document.getElementById('unreadBadge');
+    onSnapshot(q, (snapshot) => {
+        let unread = 0;
+        snapshot.forEach(doc => { if (!doc.data().read) unread++; });
+        if (unreadBadge && bellContainer) {
+            if (unread > 0) {
+                unreadBadge.innerText = unread;
+                unreadBadge.style.display = 'inline-flex';
+                bellContainer.style.display = 'flex';
+            } else {
+                unreadBadge.style.display = 'none';
+                bellContainer.style.display = 'none';
+            }
+        }
+    });
+    buttonsAdded = true;
+}
+
+onAuthStateChanged(auth, (user) => {
+    if (user) { addNotificationButtons(user); } 
+    else {
+        const floating = document.getElementById('floatingInboxBtn');
+        if (floating) floating.remove();
+        const bell = document.getElementById('notificationBell');
+        if (bell) bell.remove();
+        buttonsAdded = false;
+    }
+});
 </script>
 </body>
 </html>
