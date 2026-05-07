@@ -162,7 +162,8 @@
         .btn-secondary:hover { background: #138496; }
         .main-content { padding: 30px; }
         .section { margin-bottom: 40px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
-        .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; }
+        .section-title { font-size: 1.6rem; margin-bottom: 20px; color: #1e3c72; border-left: 5px solid #ffb347; padding-left: 15px; cursor: pointer; transition: all 0.2s; }
+        .section-title:hover { transform: scale(1.02); }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 15px; }
         .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; border: 1px solid #eaeef2; position: relative; transition: 0.2s; }
         .plan-type { display: inline-block; background: #e9f0ff; padding: 4px 12px; border-radius: 30px; font-size: 0.75rem; font-weight: bold; color: #1e3c72; margin-bottom: 12px; }
@@ -241,43 +242,50 @@
         }
         .login-prompt h2 { color: #1e3c72; margin-bottom: 20px; }
         .login-prompt .btn-large { padding: 14px 32px; font-size: 1.1rem; }
-        /* Flashing green highlight for clickable heading */
-        @keyframes slowFlash {
-            0% { text-shadow: 0 0 0px #2ecc71; opacity: 1; }
-            50% { text-shadow: 0 0 12px #2ecc71, 0 0 8px #2ecc71; color: #2ecc71; }
-            100% { text-shadow: 0 0 0px #2ecc71; opacity: 1; }
-        }
-        .clickable-plan-heading {
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .clickable-plan-heading:hover {
-            transform: scale(1.02);
-        }
-        .wallet-icon {
-            text-align: center;
+        /* Balance card styles */
+        .balance-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 24px;
+            padding: 20px;
             margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
-        .wallet-box {
-            display: inline-block;
-            background: #f4d03f;
-            border-radius: 20px;
-            padding: 30px 40px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-            position: relative;
+        .balance-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
         }
-        .naira-note-left, .naira-note-right {
-            position: absolute;
-            background: #2ecc71;
-            border-radius: 12px;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            color: white;
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .balance-row:last-child {
+            border-bottom: none;
+        }
+        .balance-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .balance-amount {
+            font-size: 1.4rem;
             font-weight: bold;
-            transform: rotate(-15deg);
+            color: #1e3c72;
         }
-        .naira-note-left { bottom: -15px; left: 10px; transform: rotate(-10deg); }
-        .naira-note-right { bottom: -10px; right: 10px; transform: rotate(10deg); background: #27ae60; }
+        .total-balance {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 2px solid #ffb347;
+            text-align: right;
+            font-size: 1.1rem;
+        }
+        .total-balance span:first-child { font-weight: normal; color: #6c757d; }
+        .total-balance .total-number { font-size: 1.6rem; font-weight: bold; color: #2a5298; }
     </style>
 </head>
 <body>
@@ -290,7 +298,40 @@
         </div>
     </header>
     <div class="main-content" id="mainContent">
-        <!-- Withdraw button (global) -->
+        <!-- Clickable Savings Balances (replaces wallet icon) -->
+        <div class="section">
+            <div class="section-title" id="plansHeading">
+                📈 My Savings Plans
+            </div>
+            <div id="balanceCard" class="balance-card" style="cursor: pointer;">
+                <div class="balance-row">
+                    <span class="balance-label">💰 Flexible Plan:</span>
+                    <span class="balance-amount" id="flexBalance">₦0.00</span>
+                </div>
+                <div class="balance-row">
+                    <span class="balance-label">🔒 Locked Plan:</span>
+                    <span class="balance-amount" id="lockedBalance">₦0.00</span>
+                </div>
+                <div class="balance-row">
+                    <span class="balance-label">🎯 Target Plan:</span>
+                    <span class="balance-amount" id="targetBalance">₦0.00</span>
+                </div>
+                <div class="total-balance">
+                    <span>📊 Total Savings: </span>
+                    <span class="total-number" id="totalBalance">₦0.00</span>
+                </div>
+                <p class="info-banner" style="margin-top:12px; margin-bottom:0; font-size:0.8rem;">👆 Click anywhere on this card to manage your plans</p>
+            </div>
+        </div>
+
+        <!-- Thrift Groups Section -->
+        <div class="section">
+            <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
+            <div id="groupsList" class="card-grid">Loading groups...</div>
+            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Join, then deposit contributions via payment gateway. All payments require admin approval.</p>
+        </div>
+
+        <!-- Withdrawal Section (moved to bottom, after thrift groups) -->
         <div class="section" id="withdrawSection" style="display: none;">
             <div class="section-title">💸 Request Account Withdrawal</div>
             <div class="form-group">
@@ -298,29 +339,7 @@
                 <input type="number" id="withdrawalAmount" placeholder="Enter amount" step="100" min="0">
             </div>
             <button class="btn btn-primary" id="withdrawBtn">Request Withdrawal</button>
-            <p class="info-banner" style="margin-top:10px;">Your profile must be complete (bank details) before you can request a withdrawal.</p>
-        </div>
-
-        <!-- Savings Plans Section (now just a clickable link + wallet icon) -->
-        <div class="section">
-            <div class="section-title clickable-plan-heading" id="plansHeading" style="animation: slowFlash 1.5s infinite;">
-                📈 My Savings Plans
-            </div>
-            <div class="wallet-icon">
-                <div class="wallet-box">
-                    <div style="font-size: 4rem;">👛</div>
-                    <div class="naira-note-left">💵 ₦</div>
-                    <div class="naira-note-right">💵 ₦</div>
-                </div>
-                <p style="margin-top: 12px; color: #7f8c8d;">Click the heading to manage your plans</p>
-            </div>
-        </div>
-
-        <!-- Thrift Groups Section (unchanged) -->
-        <div class="section">
-            <div class="section-title">👥 Thrift Groups (Join Yourself)</div>
-            <div id="groupsList" class="card-grid">Loading groups...</div>
-            <p class="info-banner" style="margin-top:12px; background:#e9ecef;">✨ Browse groups below. Join, then deposit contributions via payment gateway. All payments require admin approval.</p>
+            <p class="info-banner" style="margin-top:10px;">Your profile must be complete (bank details) before you can request a withdrawal. Funds are taken from your flexible plan.</p>
         </div>
 
         <div id="loginPrompt" class="login-prompt hidden">
@@ -399,9 +418,16 @@
     const transactionRefInput = document.getElementById('transactionRef');
     const closePaymentModalBtn = document.getElementById('closePaymentModalBtn');
     const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    const flexBalanceSpan = document.getElementById('flexBalance');
+    const lockedBalanceSpan = document.getElementById('lockedBalance');
+    const targetBalanceSpan = document.getElementById('targetBalance');
+    const totalBalanceSpan = document.getElementById('totalBalance');
+    const plansHeading = document.getElementById('plansHeading');
+    const balanceCard = document.getElementById('balanceCard');
 
     let currentUser = null;
     let unsubscribeGroups = null;
+    let unsubscribePlans = null;
     let modalResolve = null;
     let pendingPaymentCallback = null;
 
@@ -472,6 +498,28 @@
         }
     };
     paymentModal.addEventListener('click', (e) => { if(e.target === paymentModal) paymentModal.classList.add('hidden'); });
+
+    // ========== REAL-TIME BALANCE UPDATES ==========
+    function listenToBalances() {
+        if (unsubscribePlans) unsubscribePlans();
+        if (!currentUser) return;
+        const q = query(collection(db, "savings_plans"), where("userId", "==", currentUser.uid));
+        unsubscribePlans = onSnapshot(q, (snapshot) => {
+            let flex = 0, locked = 0, target = 0, total = 0;
+            snapshot.forEach(doc => {
+                const plan = doc.data();
+                const balance = plan.balance || 0;
+                total += balance;
+                if (plan.type === 'flex') flex = balance;
+                else if (plan.type === 'locked') locked = balance;
+                else if (plan.type === 'target') target = balance;
+            });
+            flexBalanceSpan.innerText = `₦${flex.toFixed(2)}`;
+            lockedBalanceSpan.innerText = `₦${locked.toFixed(2)}`;
+            targetBalanceSpan.innerText = `₦${target.toFixed(2)}`;
+            totalBalanceSpan.innerText = `₦${total.toFixed(2)}`;
+        });
+    }
 
     // ========== THRIFT GROUP FUNCTIONS ==========
     function listenUserGroups() {
@@ -744,6 +792,7 @@
             const fullName = userDoc.exists() ? userDoc.data().fullName : user.email;
             userNameSpan.innerText = `${getGreeting()}, ${fullName}`;
             logoutBtn.style.display = 'inline-flex';
+            listenToBalances();
             listenUserGroups();
             await checkContributionReminders();
             addLedgerButton();
@@ -755,6 +804,7 @@
             const existingLedger = document.getElementById('ledgerFloatingBtn');
             if (existingLedger) existingLedger.remove();
             if (unsubscribeGroups) unsubscribeGroups();
+            if (unsubscribePlans) unsubscribePlans();
         }
     });
 
@@ -762,11 +812,9 @@
     document.getElementById('continueToLoginBtn').onclick = () => window.location.href = 'authentication.html';
     if (userNameSpan) userNameSpan.addEventListener('click', () => { if (currentUser) window.location.href = 'profile.html'; });
     
-    // Redirect to plans.html when clicking the heading
-    const plansHeading = document.getElementById('plansHeading');
-    if (plansHeading) {
-        plansHeading.addEventListener('click', () => { window.location.href = 'plans.html'; });
-    }
+    // Redirect to plans.html when clicking the heading OR the balance card
+    if (plansHeading) plansHeading.addEventListener('click', () => { window.location.href = 'plans.html'; });
+    if (balanceCard) balanceCard.addEventListener('click', () => { window.location.href = 'plans.html'; });
 </script>
 
 <!-- ========== NOTIFICATION BUTTONS (Floating Inbox & Bell) ========== -->
