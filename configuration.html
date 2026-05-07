@@ -5,12 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>OmaPosh | Advanced Configuration Hub</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
@@ -55,8 +50,6 @@
         .btn-outline:hover { background: rgba(255,255,255,0.1); }
         .btn-danger { background: #dc3545; color: white; }
         .btn-danger:hover { background: #c82333; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
         .btn-sm { padding: 5px 12px; font-size: 0.8rem; min-height: 34px; }
         .main-content { padding: 30px; }
         .section {
@@ -216,6 +209,7 @@
                 <div class="section-title">🔄 Multiple Esusu Fractions (up to 10)</div>
                 <div class="card">
                     <p>Each named configuration can be assigned to thrift groups later. Maximum 10 active configs.</p>
+                    <p class="note"><strong>Note:</strong> The main application now uses a fixed 4.76% Esusu deduction for all thrift contributions. These configurations are kept for future flexibility.</p>
                     <div id="esusuConfigsList"></div>
                     <div class="flex-btns">
                         <button class="btn btn-primary" id="addEsusuConfigBtn">+ Add Esusu Configuration</button>
@@ -254,9 +248,9 @@
                 <div style="overflow-x: auto;">
                     <table id="groupsTable">
                         <thead>
-                            <tr><th>Group Name</th><th>Contribution</th><th>Frequency</th><th>Members</th><th>Models</th><th>Actions</th>
+                            <tr><th>Group Name</th><th>Contribution</th><th>Frequency</th><th>Members</th><th>Models</th><th>Balance</th><th>Actions</th>
                         </thead>
-                        <tbody><tr><td colspan="6">Loading groups...</td></tr></tbody>
+                        <tbody><tr><td colspan="7">Loading groups...</td></tr>
                     </table>
                 </div>
             </div>
@@ -273,13 +267,10 @@
         <div class="form-group"><label>Contribution Amount (₦)</label><input type="number" id="newGroupAmount" step="100" min="0"></div>
         <div class="form-group"><label>Frequency (days)</label><input type="number" id="newGroupFrequency" min="1" value="7"><div class="note">1 = daily, 7 = weekly, 30 = monthly</div></div>
         <div class="form-group"><label>Maximum Members</label><input type="number" id="newGroupMaxMembers" min="2" value="10"></div>
-        <div class="form-group"><label>Apply Esusu deduction</label>
-            <select id="newGroupEsusuConfigId">
-                <option value="">None</option>
-            </select>
-            <div class="note">Select which Esusu configuration to apply (or none).</div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyEsusu"> Apply Esusu deduction (admin‑configured fraction)</label>
+            <div class="note">Note: The main app currently uses a fixed 4.76% deduction regardless of this setting.</div>
         </div>
-        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss"> Apply Profit/Loss deduction (1%)</label></div>
+        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="newGroupApplyProfitLoss" checked> Apply Profit/Loss deduction (1%)</label></div>
         <div class="flex-btns" style="margin-top: 20px;">
             <button class="btn btn-primary" id="confirmCreateGroupBtn">Create Group</button>
             <button class="btn btn-outline" id="cancelCreateGroupBtn">Cancel</button>
@@ -287,7 +278,7 @@
     </div>
 </div>
 
-<!-- VIEW MEMBERS MODAL -->
+<!-- VIEW MEMBERS MODAL (dynamic) -->
 <div id="viewMembersModal" class="modal hidden">
     <div>
         <h3 id="membersModalTitle">Group Members</h3>
@@ -299,7 +290,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, arrayRemove, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBpQcjgebXvtFSbHtQ2B39m3lhrkzmvwXA",
@@ -333,7 +324,8 @@
     const membersModalTitle = document.getElementById('membersModalTitle');
     const membersListDiv = document.getElementById('membersList');
     const closeMembersModalBtn = document.getElementById('closeMembersModalBtn');
-    const newGroupEsusuConfigId = document.getElementById('newGroupEsusuConfigId');
+    const newGroupApplyEsusu = document.getElementById('newGroupApplyEsusu');
+    const newGroupApplyProfitLoss = document.getElementById('newGroupApplyProfitLoss');
 
     let currentAdmin = null;
     let esusuConfigs = []; // array of { id, name, fraction }
@@ -384,7 +376,6 @@
             await setDoc(docRef, { configs: esusuConfigs, updatedAt: new Date().toISOString() });
         }
         renderEsusuConfigs();
-        updateGroupCreationDropdown();
     }
 
     async function saveEsusuConfigs() {
@@ -392,7 +383,6 @@
         await setDoc(docRef, { configs: esusuConfigs, updatedAt: new Date().toISOString(), lastUpdatedBy: currentAdmin?.uid }, { merge: true });
         showMessage("Esusu configurations saved.", 'success');
         await logAudit("update_esusu_configs", null, { count: esusuConfigs.length });
-        updateGroupCreationDropdown();
     }
 
     function renderEsusuConfigs() {
@@ -467,15 +457,6 @@
         saveEsusuConfigs().then(() => renderEsusuConfigs());
     };
 
-    function updateGroupCreationDropdown() {
-        if (!newGroupEsusuConfigId) return;
-        let options = '<option value="">None</option>';
-        esusuConfigs.forEach(cfg => {
-            options += `<option value="${cfg.id}">${escapeHtml(cfg.name)} (${(cfg.fraction * 100).toFixed(2)}%)</option>`;
-        });
-        newGroupEsusuConfigId.innerHTML = options;
-    }
-
     // ========== SAVINGS PLAN FRACTIONS ==========
     async function loadSavingsFractions() {
         const docRef = doc(db, "system_config", "savings_fractions");
@@ -522,7 +503,7 @@
         groupsUnsubscribe = onSnapshot(q, async (snapshot) => {
             const tbody = document.querySelector('#groupsTable tbody');
             if (snapshot.empty) {
-                tbody.innerHTML = '<tr><td colspan="6">No thrift groups created yet. Use the button above to create one.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7">No thrift groups created yet. Use the button above to create one.</td></table>';
                 return;
             }
             let html = '';
@@ -532,18 +513,17 @@
                 const creatorName = creatorDoc.exists() ? creatorDoc.data().fullName : g.creatorId;
                 let models = '';
                 if (g.applyProfitLoss) models += '📊 Profit/Loss ';
-                if (g.esusuConfigId) {
-                    const esuCfg = esusuConfigs.find(c => c.id === g.esusuConfigId);
-                    models += `🔄 Esusu (${esuCfg ? esuCfg.name : '?'}) `;
-                }
+                if (g.applyEsusu) models += '🔄 Esusu ';
                 if (!models.trim()) models = 'None';
                 const freqText = g.frequencyDays === 1 ? 'Daily' : (g.frequencyDays === 7 ? 'Weekly' : (g.frequencyDays === 30 ? 'Monthly' : `${g.frequencyDays} days`));
+                const balance = g.balance || 0;
                 html += `<tr>
                     <td data-label="Group Name"><strong>${escapeHtml(g.name)}</strong><br><small>by ${escapeHtml(creatorName)}</small></td>
                     <td data-label="Contribution">₦${g.contributionAmount.toLocaleString()}</td>
                     <td data-label="Frequency">${freqText}</td>
                     <td data-label="Members">${g.members?.length || 0} / ${g.maxMembers}</td>
                     <td data-label="Models">${models}</td>
+                    <td data-label="Balance">₦${balance.toFixed(2)}</td>
                     <td data-label="Actions">
                         <button class="btn btn-sm btn-primary view-members" data-id="${docSnap.id}" data-name="${escapeHtml(g.name)}">👥 Members</button>
                         <button class="btn btn-sm btn-danger delete-group" data-id="${docSnap.id}">🗑️ Delete</button>
@@ -557,7 +537,7 @@
             });
             document.querySelectorAll('.delete-group').forEach(btn => {
                 btn.onclick = async () => {
-                    if (confirm("Delete this group permanently?")) {
+                    if (confirm("Delete this group permanently? All contribution history will remain but group will be removed.")) {
                         await deleteDoc(doc(db, "groups", btn.dataset.id));
                         await logAudit("delete_group", null, { groupId: btn.dataset.id });
                         showMessage("Group deleted.", 'success');
@@ -611,56 +591,52 @@
 
     function closeModal(modalEl) { modalEl.classList.add('hidden'); }
 
+    // Create group modal logic
     createGroupBtn.onclick = () => createGroupModal.classList.remove('hidden');
     cancelCreateGroupBtn.onclick = () => closeModal(createGroupModal);
-    //percentage
     confirmCreateGroupBtn.onclick = async () => {
-        await addDoc(collection(db, "groups"), {
-    name: name,
-    contributionAmount: amount,
-    frequencyDays: frequencyDays,
-    maxMembers: maxMembers,
-    applyEsusu: false,   // ignored – we now always apply fixed 4.76%
-    applyProfitLoss: true, // still apply 1%? Yes, keep as per user request (they said 1% profit? Actually they said 3% on flexible deposits, but thrift has separate 1% profit? We'll keep 1% profit for thrift as previously coded. The user only specified 4.76% Esusu and 3% on flexible deposits. So thrift profit deduction remains 1%.)
-    members: [],
-    currentPayoutIndex: 0,
-    balance: 0,          // <-- add this
-    creatorId: currentAdmin.uid,
-    createdAt: new Date().toISOString()
-}); //percentage
         const name = document.getElementById('newGroupName').value.trim();
         const amount = parseFloat(document.getElementById('newGroupAmount').value);
         const frequencyDays = parseInt(document.getElementById('newGroupFrequency').value);
         const maxMembers = parseInt(document.getElementById('newGroupMaxMembers').value);
-        const esusuConfigId = newGroupEsusuConfigId.value || null;
-        const applyProfitLoss = document.getElementById('newGroupApplyProfitLoss').checked;
+        const applyEsusu = newGroupApplyEsusu.checked;
+        const applyProfitLoss = newGroupApplyProfitLoss.checked;
 
         if (!name || isNaN(amount) || amount <= 0 || isNaN(frequencyDays) || frequencyDays < 1 || isNaN(maxMembers) || maxMembers < 2) {
-            showMessage("Please fill all fields correctly.", 'error');
+            showMessage("Please fill all fields correctly (name, positive amount, frequency ≥1, max members ≥2).", 'error');
             return;
         }
         try {
             if (!currentAdmin) throw new Error("Not authenticated");
             await addDoc(collection(db, "groups"), {
-                name, contributionAmount: amount, frequencyDays, maxMembers,
-                esusuConfigId, applyProfitLoss,
-                members: [], currentPayoutIndex: 0,
-                creatorId: currentAdmin.uid, createdAt: new Date().toISOString()
+                name: name,
+                contributionAmount: amount,
+                frequencyDays: frequencyDays,
+                maxMembers: maxMembers,
+                applyEsusu: applyEsusu,
+                applyProfitLoss: applyProfitLoss,
+                members: [],
+                currentPayoutIndex: 0,
+                balance: 0,           // initial group pot balance
+                creatorId: currentAdmin.uid,
+                createdAt: new Date().toISOString()
             });
-            showMessage(`Thrift group "${name}" created!`, 'success');
+            showMessage(`Thrift group "${name}" created successfully!`, 'success');
             await logAudit("create_thrift_group", null, { groupName: name });
             closeModal(createGroupModal);
+            // reset form
             document.getElementById('newGroupName').value = '';
             document.getElementById('newGroupAmount').value = '';
             document.getElementById('newGroupFrequency').value = '7';
             document.getElementById('newGroupMaxMembers').value = '10';
-            document.getElementById('newGroupApplyProfitLoss').checked = false;
-            newGroupEsusuConfigId.value = '';
+            newGroupApplyEsusu.checked = false;
+            newGroupApplyProfitLoss.checked = true; // default on as per common usage
         } catch (err) {
             showMessage("Error: " + err.message, 'error');
         }
     };
 
+    // Close member modal
     closeMembersModalBtn.onclick = () => closeModal(viewMembersModal);
     viewMembersModal.addEventListener('click', (e) => { if (e.target === viewMembersModal) closeModal(viewMembersModal); });
     createGroupModal.addEventListener('click', (e) => { if (e.target === createGroupModal) closeModal(createGroupModal); });
@@ -674,7 +650,12 @@
             const userDoc = await getDoc(doc(db, "users", user.uid));
             let role = userDoc.exists() ? userDoc.data().role : null;
             if (user.email === "admin@omaposhsmartsavings.com" && role !== 'admin') {
-                await setDoc(doc(db, "users", user.uid), { fullName: "Administrator", email: user.email, role: "admin", createdAt: new Date().toISOString() }, { merge: true });
+                await setDoc(doc(db, "users", user.uid), {
+                    fullName: "Administrator",
+                    email: user.email,
+                    role: "admin",
+                    createdAt: new Date().toISOString()
+                }, { merge: true });
                 role = 'admin';
             }
             if (role === 'admin') {
@@ -688,6 +669,7 @@
                 return;
             }
         }
+        // Not admin or not logged in
         loadingSpinner.innerHTML = '<div class="message message-error">⛔ Access Denied. Admin privileges required. <br><br><button id="redirectLogin" class="btn btn-primary">Go to Login</button></div>';
         const redirectBtn = document.getElementById('redirectLogin');
         if (redirectBtn) redirectBtn.onclick = () => window.location.href = 'index.html';
